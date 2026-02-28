@@ -17,6 +17,9 @@ import requests
 STRAVA_AUTHORIZE_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 
+# Reuse a single session (E: connection pooling)
+_SESSION = requests.Session()
+
 
 def _get_env(name: str, required: bool = True, default: Optional[str] = None) -> Optional[str]:
     value = os.getenv(name, default)
@@ -37,7 +40,6 @@ class StravaOAuthConfig:
 
     @staticmethod
     def from_env() -> "StravaOAuthConfig":
-        # Keep names explicit and standard
         return StravaOAuthConfig(
             client_id=_get_env("STRAVA_CLIENT_ID"),
             client_secret=_get_env("STRAVA_CLIENT_SECRET"),
@@ -47,12 +49,6 @@ class StravaOAuthConfig:
 
 
 def default_token_path() -> Path:
-    """
-    Store tokens OUTSIDE the repo by default if TRAILTRAINING_BASE_DIR is set
-    to somewhere outside your git working tree.
-
-    Falls back to ~/.trailtraining
-    """
     base_dir = Path(os.getenv("TRAILTRAINING_BASE_DIR", str(Path.home() / ".trailtraining"))).expanduser()
     token_dir = base_dir / "tokens"
     token_dir.mkdir(parents=True, exist_ok=True)
@@ -60,9 +56,6 @@ def default_token_path() -> Path:
 
 
 def build_authorize_url(config: StravaOAuthConfig, state: Optional[str] = None) -> tuple[str, str]:
-    """
-    Returns (url, state). Save the state and verify it when you receive the callback.
-    """
     if state is None:
         state = secrets.token_urlsafe(24)
 
@@ -77,11 +70,8 @@ def build_authorize_url(config: StravaOAuthConfig, state: Optional[str] = None) 
     return f"{STRAVA_AUTHORIZE_URL}?{urlencode(params)}", state
 
 
-def exchange_code_for_token(config: StravaOAuthConfig, code: str) -> Dict[str, Any]:
-    """
-    Exchanges an OAuth 'code' for an access token.
-    """
-    resp = requests.post(
+def exchange_code_for_token(config: StravaOAuthConfig, code: str, session: requests.Session = _SESSION) -> Dict[str, Any]:
+    resp = session.post(
         STRAVA_TOKEN_URL,
         data={
             "client_id": config.client_id,
@@ -95,8 +85,10 @@ def exchange_code_for_token(config: StravaOAuthConfig, code: str) -> Dict[str, A
     return resp.json()
 
 
-def refresh_access_token(config: StravaOAuthConfig, refresh_token: str) -> Dict[str, Any]:
-    resp = requests.post(
+def refresh_access_token(
+    config: StravaOAuthConfig, refresh_token: str, session: requests.Session = _SESSION
+) -> Dict[str, Any]:
+    resp = session.post(
         STRAVA_TOKEN_URL,
         data={
             "client_id": config.client_id,
@@ -120,14 +112,12 @@ def load_token(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
 def save_token(token: Dict[str, Any], path: Optional[Path] = None) -> Path:
     path = path or default_token_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(token, indent=2, sort_keys=True), encoding="utf-8")
+    # compact is fine (small file)
+    path.write_text(json.dumps(token, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     return path
 
 
 def token_is_valid(token: Dict[str, Any], leeway_seconds: int = 60) -> bool:
-    """
-    Strava returns `expires_at` as a unix timestamp (seconds).
-    """
     expires_at = token.get("expires_at")
     if not isinstance(expires_at, (int, float)):
         return False
@@ -135,10 +125,6 @@ def token_is_valid(token: Dict[str, Any], leeway_seconds: int = 60) -> bool:
 
 
 def get_valid_token(config: StravaOAuthConfig, token_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
-    """
-    Loads token; if expired and refresh_token exists, refreshes and saves it.
-    Returns None if no token exists yet.
-    """
     token_path = token_path or default_token_path()
     token = load_token(token_path)
     if token is None:

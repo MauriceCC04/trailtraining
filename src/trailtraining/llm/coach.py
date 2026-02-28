@@ -1,168 +1,250 @@
+# src/trailtraining/llm/coach.py
+
 from __future__ import annotations
 
-import json
 import os
-import tempfile
-import zipfile
 from dataclasses import dataclass
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, Tuple, List, Dict
+from typing import Any, Dict, List, Optional, Tuple
 
 from openai import OpenAI
 
-from trailtraining.llm.prompts import SYSTEM_PROMPT, PROMPTS
-
-# If your project already has trailtraining.config with PROMPTING_DIRECTORY, this will use it.
-# If not, it falls back to ./prompting
-try:
-    from trailtraining import config as _config  # type: ignore
-    DEFAULT_PROMPTING_DIR = Path(getattr(_config, "PROMPTING_DIRECTORY"))
-except Exception:
-    DEFAULT_PROMPTING_DIR = Path.cwd() / "prompting"
+from trailtraining import config
+from trailtraining.util.state import load_json, save_json
 
 
-@dataclass(frozen=True)
-class CoachConfig:
-    model: str = "gpt-5.2"  # GPT-5.2 Thinking in API :contentReference[oaicite:4]{index=4}
-    reasoning_effort: str = "medium"  # none|low|medium|high|xhigh :contentReference[oaicite:5]{index=5}
-    verbosity: str = "medium"  # low|medium|high (text.verbosity) :contentReference[oaicite:6]{index=6}
-    days: int = 60
-    max_chars: int = 200_000
-    temperature: Optional[float] = None  # only allowed if reasoning_effort == "none" :contentReference[oaicite:7]{index=7}
-
-
-def _load_json(path: Path) -> Any:
+def _as_date(s: str) -> Optional[date]:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Missing required JSON file: {path}")
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to parse JSON: {path} ({e})")
-
-
-def _parse_date(x: Any) -> Optional[date]:
-    try:
-        s = str(x)[:10]  # handle 'YYYY-MM-DD...' variants
-        return datetime.fromisoformat(s).date()
+        return date.fromisoformat(s)
     except Exception:
         return None
 
 
-def _find_required_files(root: Path) -> Tuple[Path, Path]:
-    personal = sorted(root.rglob("formatted_personal_data.json"))
-    summary = sorted(root.rglob("combined_summary.json"))
-    if not personal:
-        raise FileNotFoundError(f"Could not find formatted_personal_data.json under: {root}")
-    if not summary:
-        raise FileNotFoundError(f"Could not find combined_summary.json under: {root}")
-    return personal[0], summary[0]
+def _coerce_path(p: Optional[str]) -> Optional[Path]:
+    return Path(p).expanduser().resolve() if p else None
 
 
-def _dedup_activities(combined: List[Dict[str, Any]]) -> List[str]:
-    notes: List[str] = []
+def _resolve_input_paths(
+    input_path: Optional[str],
+    personal_path: Optional[str],
+    summary_path: Optional[str],
+) -> Tuple[Path, Path, Optional[Path]]:
+    """
+    Mirrors your CLI behavior:
+      - if --personal/--summary provided, use them
+      - else use --input (dir) or prompting directory
+    """
+    base: Path
+    if input_path:
+        base = Path(input_path).expanduser().resolve()
+    else:
+        base = Path(config.PROMPTING_DIRECTORY).expanduser().resolve()
+
+    if base.is_file() and base.suffix.lower() == ".zip":
+        raise RuntimeError("Zip input not supported in this optimized version. Use a directory path.")
+
+    personal = _coerce_path(personal_path) or (base / "formatted_personal_data.json")
+    summary = _coerce_path(summary_path) or (base / "combined_summary.json")
+    rollups = base / "combined_rollups.json"
+    return personal, summary, (rollups if rollups.exists() else None)
+
+
+def _dedup_activities_in_place(combined: List[Dict[str, Any]]) -> None:
+    seen = set()
     for day in combined:
         acts = day.get("activities")
-        if not isinstance(acts, list) or not acts:
+        if not isinstance(acts, list):
+            day["activities"] = []
             continue
-
-        seen = set()
-        kept = []
-        removed = 0
-
+        new_acts = []
         for a in acts:
             if not isinstance(a, dict):
                 continue
-            key = (
-                str(day.get("date", "")),
-                str(a.get("start_time", "")),
-                str(a.get("sport_type", "")),
-                str(a.get("distance_km", "")),
-                str(a.get("moving_time_sec", "")),
-            )
+            aid = a.get("id")
+            if aid is None:
+                new_acts.append(a)
+                continue
+            key = str(aid)
             if key in seen:
-                removed += 1
                 continue
             seen.add(key)
-            kept.append(a)
-
-        if removed:
-            day["activities"] = kept
-            notes.append(f"{day.get('date')}: removed {removed} duplicate activities")
-
-    return notes
+            new_acts.append(a)
+        day["activities"] = new_acts
 
 
-def _normalize_and_slice_combined(
-    combined: Any,
-    days: int,
-    max_chars: int,
-) -> Tuple[List[Dict[str, Any]], List[str]]:
-    if not isinstance(combined, list):
-        raise ValueError("combined_summary.json must be a JSON array (list).")
+def _filter_last_days(combined: List[Dict[str, Any]], days: int) -> List[Dict[str, Any]]:
+    if days <= 0:
+        return combined
+    if not combined:
+        return combined
 
-    combined_list: List[Dict[str, Any]] = [x for x in combined if isinstance(x, dict)]
-    combined_list.sort(key=lambda d: str(d.get("date", "")))  # enforce chronological
+    # assume combined sorted by date asc (as produced by combine.py)
+    last = _as_date(combined[-1].get("date", ""))
+    if not last:
+        return combined
 
-    notes: List[str] = []
-    notes.extend(_dedup_activities(combined_list))
+    cutoff = last - timedelta(days=days - 1)
+    out = []
+    for d in combined:
+        ds = d.get("date")
+        if not isinstance(ds, str):
+            continue
+        dd = _as_date(ds)
+        if dd and dd >= cutoff:
+            out.append(d)
+    return out
 
-    # keep recent N days/entries
-    if days and days > 0 and combined_list:
-        last_d = _parse_date(combined_list[-1].get("date"))
-        if last_d:
-            start = last_d - timedelta(days=days - 1)
-            combined_list = [
-                d for d in combined_list
-                if (_parse_date(d.get("date")) or last_d) >= start
-            ]
+
+def _summarize_activity(a: Dict[str, Any]) -> str:
+    sport = a.get("sport_type") or a.get("type") or "unknown"
+    dist_m = a.get("distance")
+    elev_m = a.get("total_elevation_gain")
+    mv_s = a.get("moving_time")
+    hr = a.get("average_heartrate")
+
+    parts = [str(sport)]
+    if isinstance(dist_m, (int, float)):
+        parts.append(f"{dist_m/1000.0:.2f} km")
+    if isinstance(elev_m, (int, float)):
+        parts.append(f"{elev_m:.0f} m+")
+    if isinstance(mv_s, (int, float)):
+        parts.append(f"{mv_s/60.0:.0f} min")
+    if isinstance(hr, (int, float)):
+        parts.append(f"avgHR {hr:.0f}")
+
+    name = a.get("name")
+    if isinstance(name, str) and name.strip():
+        parts.append(f"({name.strip()})")
+
+    return " • " + " | ".join(parts)
+
+
+def _summarize_day(day: Dict[str, Any]) -> str:
+    d = day.get("date", "unknown-date")
+    lines = [f"## {d}"]
+
+    sleep = day.get("sleep")
+    if isinstance(sleep, dict):
+        # keep it lightweight: only include a few small fields if present
+        keys = ["sleep_score", "score", "duration", "total_sleep", "resting_hr", "rhr", "readiness", "stress"]
+        picked = {k: sleep.get(k) for k in keys if k in sleep}
+        if picked:
+            lines.append(f"Sleep: {picked}")
         else:
-            combined_list = combined_list[-days:]
+            # fallback: avoid dumping huge dicts
+            lines.append("Sleep: (data present)")
+    elif sleep is None:
+        lines.append("Sleep: (none)")
 
-    def _payload_chars(arr: List[Dict[str, Any]]) -> int:
-        return len(json.dumps(arr, ensure_ascii=False, separators=(",", ":")))
+    acts = day.get("activities") or []
+    if isinstance(acts, list) and acts:
+        lines.append(f"Activities ({len(acts)}):")
+        for a in acts[:50]:  # hard cap per day
+            if isinstance(a, dict):
+                lines.append(_summarize_activity(a))
+    else:
+        lines.append("Activities: (none)")
 
-    # shrink until below max_chars (keep at least ~7 entries)
-    if max_chars and max_chars > 0:
-        while combined_list and _payload_chars(combined_list) > max_chars and len(combined_list) > 7:
-            new_len = max(7, int(len(combined_list) * 0.7))
-            combined_list = combined_list[-new_len:]
-            notes.append(f"Payload too large; auto-shrunk combined_summary to last {len(combined_list)} entries.")
-
-    return combined_list, notes
+    return "\n".join(lines) + "\n"
 
 
-def _build_user_message(
+def _build_prompt_text(
     prompt_name: str,
-    personal_data: Any,
-    combined_data: List[Dict[str, Any]],
-    preprocessing_notes: List[str],
+    personal: Any,
+    rollups: Optional[Any],
+    combined: List[Dict[str, Any]],
+    *,
+    max_chars: int,
+    detail_days: int,
 ) -> str:
-    prompt_text = PROMPTS[prompt_name].strip()
-    parts: List[str] = [prompt_text, ""]
+    """
+    F: Budgeted assembly.
+    We build from newest → oldest until we hit max_chars, then stop.
+    """
+    header = [
+        f"# TrailTraining Coach Brief: {prompt_name}",
+        "",
+        "## Personal profile (raw JSON)",
+        str(personal)[:50_000],  # safety cap so a giant profile doesn't consume everything
+        "",
+    ]
 
-    if preprocessing_notes:
-        parts.append("Data notes (preprocessing performed before this prompt):")
-        parts.extend([f"- {n}" for n in preprocessing_notes])
-        parts.append("")
+    if rollups is not None:
+        header += [
+            "## Recent rollups (7d/28d)",
+            str(rollups),
+            "",
+        ]
 
-    parts.append("Here are the JSON files for this run.\n")
+    # Limit daily detail further even if combined is large
+    if detail_days > 0 and len(combined) > detail_days:
+        combined_detail = combined[-detail_days:]
+        combined_older = combined[:-detail_days]
+    else:
+        combined_detail = combined
+        combined_older = []
 
-    parts.append("### formatted_personal_data.json")
-    parts.append("```json")
-    parts.append(json.dumps(personal_data, ensure_ascii=False, separators=(",", ":")))
-    parts.append("```")
-    parts.append("")
+    # We include only minimal reference to older days (optional)
+    if combined_older:
+        header += [
+            f"## Older days included in window: {len(combined_older)} (details omitted; rely on rollups + recent detail)",
+            "",
+        ]
 
-    parts.append("### combined_summary.json")
-    parts.append("```json")
-    parts.append(json.dumps(combined_data, ensure_ascii=False, separators=(",", ":")))
-    parts.append("```")
+    base = "\n".join(header)
+    budget = max_chars if max_chars > 0 else 200_000
 
-    return "\n".join(parts)
+    # Start with base; then add day blocks newest→oldest until budget is exhausted
+    text_parts: List[str] = [base]
+    used = len(base)
+
+    # Add detailed days newest→oldest
+    for day in reversed(combined_detail):
+        block = _summarize_day(day)
+        if used + len(block) > budget:
+            break
+        text_parts.append(block)
+        used += len(block)
+
+    # Add tail instruction
+    tail = "\n## Task\n" + _prompt_instruction(prompt_name) + "\n"
+    if used + len(tail) <= budget:
+        text_parts.append(tail)
+
+    return "\n".join(text_parts)
+
+
+def _prompt_instruction(prompt_name: str) -> str:
+    # Try to use your centralized prompts if present, else fall back.
+    try:
+        from trailtraining.llm.prompts import PROMPTS  # type: ignore
+        if isinstance(PROMPTS, dict) and prompt_name in PROMPTS:
+            return str(PROMPTS[prompt_name])
+    except Exception:
+        pass
+
+    if prompt_name == "training-plan":
+        return "Generate a trail-running training plan for the next 7–14 days based on fatigue, recent volume, and sleep."
+    if prompt_name == "recovery-status":
+        return "Assess recovery status for the last 7 days and give actionable guidance for today and tomorrow."
+    if prompt_name == "meal-plan":
+        return "Suggest a practical meal plan for the next 3 days aligned with training load and recovery."
+    return "Provide coaching guidance based on the provided data."
+
+
+@dataclass(frozen=True)
+class CoachConfig:
+    model: str = os.getenv("TRAILTRAINING_LLM_MODEL", "gpt-5.2")
+    reasoning_effort: str = os.getenv("TRAILTRAINING_REASONING_EFFORT", "medium")  # none|low|medium|high|xhigh
+    verbosity: str = os.getenv("TRAILTRAINING_VERBOSITY", "medium")  # low|medium|high
+    days: int = int(os.getenv("TRAILTRAINING_COACH_DAYS", "60"))
+    max_chars: int = int(os.getenv("TRAILTRAINING_COACH_MAX_CHARS", "200000"))
+    temperature: Optional[float] = None
 
 
 def run_coach_brief(
+    *,
     prompt: str,
     cfg: CoachConfig,
     input_path: Optional[str] = None,
@@ -170,75 +252,65 @@ def run_coach_brief(
     summary_path: Optional[str] = None,
     output_path: Optional[str] = None,
 ) -> Tuple[str, Optional[str]]:
-    """
-    Returns (coach_text, saved_path_or_None)
-    """
-    if prompt not in PROMPTS:
-        raise ValueError(f"Unknown prompt '{prompt}'. Choose from: {', '.join(PROMPTS.keys())}")
+    config.ensure_directories()
 
-    # Locate files (supports directory or .zip)
-    temp_dir_obj = None
-    try:
-        if personal_path and summary_path:
-            personal_file = Path(personal_path).expanduser().resolve()
-            summary_file = Path(summary_path).expanduser().resolve()
-        else:
-            root = DEFAULT_PROMPTING_DIR
-            if input_path:
-                ip = Path(input_path).expanduser().resolve()
-                if ip.is_file() and ip.suffix.lower() == ".zip":
-                    temp_dir_obj = tempfile.TemporaryDirectory(prefix="trailtraining_prompt_zip_")
-                    with zipfile.ZipFile(ip, "r") as zf:
-                        zf.extractall(temp_dir_obj.name)
-                    root = Path(temp_dir_obj.name)
-                else:
-                    root = ip
-            personal_file, summary_file = _find_required_files(root)
+    personal_p, summary_p, rollups_p = _resolve_input_paths(input_path, personal_path, summary_path)
 
-        personal = _load_json(personal_file)
-        combined_raw = _load_json(summary_file)
+    personal = load_json(personal_p, default={})
+    combined = load_json(summary_p, default=[])
+    rollups = load_json(rollups_p, default=None) if rollups_p else None
 
-        combined, prep_notes = _normalize_and_slice_combined(
-            combined=combined_raw,
-            days=cfg.days,
-            max_chars=cfg.max_chars,
+    if not isinstance(combined, list):
+        raise RuntimeError("combined_summary.json must be a list of day objects")
+
+    # F: early pruning
+    _dedup_activities_in_place(combined)
+    combined = _filter_last_days(combined, cfg.days)
+
+    detail_days = int(os.getenv("TRAILTRAINING_COACH_DETAIL_DAYS", "14"))
+    detail_days = max(1, min(detail_days, len(combined))) if combined else 0
+
+    prompt_text = _build_prompt_text(
+        prompt_name=prompt,
+        personal=personal,
+        rollups=rollups,
+        combined=combined,
+        max_chars=cfg.max_chars,
+        detail_days=detail_days,
+    )
+
+    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("TRAILTRAINING_OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "Missing OpenAI API key. Set OPENAI_API_KEY (recommended) or TRAILTRAINING_OPENAI_API_KEY.\n"
+            "Example:\n"
+            "  export OPENAI_API_KEY='sk-...'\n"
+            "Then rerun: trailtraining coach --prompt training-plan"
         )
 
-        user_msg = _build_user_message(
-            prompt_name=prompt,
-            personal_data=personal,
-            combined_data=combined,
-            preprocessing_notes=prep_notes,
-        )
+    client = OpenAI(api_key=api_key)
 
-        # ---- OpenAI call (Responses API, recommended for reasoning models) :contentReference[oaicite:8]{index=8}
-        client = OpenAI()
+    # Official pattern: reasoning + text verbosity via Responses API
+    kwargs: Dict[str, Any] = {
+        "model": cfg.model,
+        "input": prompt_text,
+        "reasoning": {"effort": cfg.reasoning_effort},
+        "text": {"verbosity": cfg.verbosity},
+    }
+    # API restriction: temperature typically only allowed when reasoning.effort == "none"
+    if cfg.reasoning_effort == "none" and cfg.temperature is not None:
+        kwargs["temperature"] = cfg.temperature
 
-        create_kwargs: Dict[str, Any] = {
-            "model": cfg.model,
-            "instructions": SYSTEM_PROMPT,
-            "input": [{"role": "user", "content": user_msg}],
-            "reasoning": {"effort": cfg.reasoning_effort},
-            "text": {"verbosity": cfg.verbosity},
-        }
+    resp = client.responses.create(**kwargs)
+    out_text = getattr(resp, "output_text", None) or str(resp)
 
-        # temperature only allowed when reasoning.effort == "none" :contentReference[oaicite:9]{index=9}
-        if cfg.reasoning_effort == "none" and cfg.temperature is not None:
-            create_kwargs["temperature"] = cfg.temperature
+    # Save output
+    if output_path:
+        out_p = Path(output_path).expanduser().resolve()
+    else:
+        out_p = Path(config.PROMPTING_DIRECTORY) / f"coach_brief_{prompt}.md"
 
-        resp = client.responses.create(**create_kwargs)
-        text = (resp.output_text or "").strip()
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+    out_p.write_text(out_text, encoding="utf-8")
 
-        # Write output
-        if output_path is None:
-            out = DEFAULT_PROMPTING_DIR / f"coach_brief_{prompt}.md"
-        else:
-            out = Path(output_path).expanduser().resolve()
-
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(text + "\n", encoding="utf-8")
-        return text, str(out)
-
-    finally:
-        if temp_dir_obj is not None:
-            temp_dir_obj.cleanup()
+    return out_text, str(out_p)

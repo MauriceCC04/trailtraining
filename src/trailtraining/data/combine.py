@@ -1,168 +1,206 @@
-# pipelines/combine_jsons.py
+# src/trailtraining/data/combine.py
 
-from trailtraining.pipelines import garmin as garmin_pipeline, download_garmin_data, strava as strava_pipeline
+from __future__ import annotations
+
 import os
+from collections import Counter, defaultdict
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 from trailtraining import config
-import json
-import re
-from datetime import datetime
-
-def duration_to_seconds(duration_str):
-    pattern = r"P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?"
-    match = re.match(pattern, duration_str.replace("P0D", "P"))
-    if not match:
-        return 0
-    days, hours, minutes, seconds = [int(x) if x else 0 for x in match.groups()]
-    return days * 86400 + hours * 3600 + minutes * 60 + seconds
-
-def parse_garmin_entry(entry):
-    return {
-        "date": entry["calendarDate"],
-        "sleep_hours": round(entry["sleepTimeSeconds"] / 3600, 2),
-        "resting_hr": entry["restingHeartRate"],
-        "avg_hrv": entry["avgOvernightHrv"],
-        "hrv_status": entry["hrvStatus"],
-        "body_battery_change": entry["bodyBatteryChange"],
-        "sleep_time_seconds": entry["sleepTimeSeconds"],
-        "deep_sleep_seconds": entry["deepSleepSeconds"],
-        "light_sleep_seconds": entry["lightSleepSeconds"],
-        "rem_sleep_seconds": entry["remSleepSeconds"],
-        "awake_seconds": entry["awakeSleepSeconds"],
-    }
+from trailtraining.util.state import load_json, save_json
 
 
-def parse_sleep_entry(entry):
-    # only keep what you want
-    sleep_seconds = entry.get("sleepTimeSeconds")
-    return {
-        "date": entry["calendarDate"],
-        "sleep_hours": round((sleep_seconds or 0) / 3600, 2),
-        "sleep_time_seconds": sleep_seconds,
-        "resting_hr": entry.get("restingHeartRate"),
-        "avg_hrv": entry.get("avgOvernightHrv"),
-    }
-
-def _date_only_from_strava(dt):
-    s = str(dt).replace('Z','')
-    if '.' in s:
-        s = s.split('.')[0]
-    if 'T' not in s:
-        s = s.replace(' ', 'T')
-    return datetime.fromisoformat(s).date().isoformat()
-import math, re
-
-def _to_float(v, default=0.0):
-    if v is None:
-        return default
-    if isinstance(v, (int, float)):
-        return float(v)
-    token = str(v).strip().split()[0]
+def _as_date(s: str) -> Optional[date]:
     try:
-        return float(token)
+        return date.fromisoformat(s[:10])
     except Exception:
-        return default
+        return None
 
-def _duration_to_seconds(x):
-    if x is None:
-        return 0
-    if isinstance(x, (int, float)):
-        return int(x)
-    s = str(x).strip()
-    m = re.match(r'(?:(\d+)\s+days?\s+)?(\d{1,2}):(\d{2}):(\d{2})', s)
-    if m:
-        days = int(m.group(1) or 0); h, m_, sec = map(int, m.groups()[-3:])
-        return days*86400 + h*3600 + m_*60 + sec
-    if s.startswith("P"):
-        m = re.match(r"P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", s.replace("P0D","P"))
-        if m:
-            d,h,mi,se = [int(x) if x else 0 for x in m.groups()]
-            return d*86400 + h*3600 + mi*60 + se
-    try:
-        return int(float(s))
-    except Exception:
-        return 0
-def safe_round(value, ndigits=1, default=None):
-    if value is None:
-        return default
-    try:
-        return round(float(value), ndigits)
-    except (ValueError, TypeError):
-        return default
 
-def parse_strava_entry(entry):
-    # normalize datetime safely (can be datetime-like or string)
-    dt_raw = entry.get("start_date_local")
-    dt_str = str(dt_raw).replace("T", " ")
-    date_str = dt_str[:10]  # "YYYY-MM-DD"
+def _extract_sleep_date(entry: Dict[str, Any]) -> Optional[str]:
+    """
+    Garmin/Intervals filtered_sleep.json uses 'calendarDate' (YYYY-MM-DD).
+    Be tolerant of other key names and nested dailySleepDTO.
+    """
+    for k in ("calendarDate", "date", "day", "calendar_date", "id"):
+        v = entry.get(k)
+        if isinstance(v, str) and len(v) >= 10:
+            return v[:10]
 
-    distance_m = _to_float(entry.get("distance"), default=0.0)  # Strava distance is meters
-    elev_gain_m = _to_float(entry.get("total_elevation_gain"), default=0.0)
+    dto = entry.get("dailySleepDTO")
+    if isinstance(dto, dict):
+        v = dto.get("calendarDate") or dto.get("date") or dto.get("day")
+        if isinstance(v, str) and len(v) >= 10:
+            return v[:10]
+
+    return None
+
+
+def _date_key_from_activity(a: Dict[str, Any]) -> Optional[str]:
+    # Prefer local date for grouping
+    s = a.get("start_date_local") or a.get("start_date")
+    if not isinstance(s, str) or len(s) < 10:
+        return None
+    return s[:10]
+
+
+def _load_sleep_by_date(path: str) -> Dict[str, Dict[str, Any]]:
+    raw = load_json(path, default=None)
+    if raw is None:
+        return {}
+
+    # If it's already dict keyed by date, normalize keys to YYYY-MM-DD
+    if isinstance(raw, dict):
+        out: Dict[str, Dict[str, Any]] = {}
+        for k, v in raw.items():
+            if isinstance(k, str) and len(k) >= 10 and isinstance(v, dict):
+                out[k[:10]] = v
+        return out
+
+    # Typical case: list of dict entries with calendarDate
+    out: Dict[str, Dict[str, Any]] = {}
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            d = _extract_sleep_date(item)
+            if d:
+                out[d] = item
+    return out
+
+
+def _load_activities_by_date(path: str) -> Dict[str, List[Dict[str, Any]]]:
+    raw = load_json(path, default=[])
+    if not isinstance(raw, list):
+        return {}
+
+    out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for a in raw:
+        if not isinstance(a, dict):
+            continue
+        d = _date_key_from_activity(a)
+        if d:
+            out[d].append(a)
+    return out
+
+
+def _compute_rollup(
+    combined: List[Dict[str, Any]],
+    *,
+    end_date: date,
+    window_days: int,
+) -> Dict[str, Any]:
+    start_date = end_date - timedelta(days=window_days - 1)
+
+    total_distance_m = 0.0
+    total_elev_m = 0.0
+    total_moving_s = 0.0
+    hr_sum = 0.0
+    hr_n = 0
+    activity_count = 0
+    sports = Counter()
+    sleep_days_with_data = 0
+
+    for day_obj in combined:
+        d_str = day_obj.get("date")
+        if not isinstance(d_str, str):
+            continue
+        d = _as_date(d_str)
+        if not d or d < start_date or d > end_date:
+            continue
+
+        if day_obj.get("sleep") is not None:
+            sleep_days_with_data += 1
+
+        acts = day_obj.get("activities") or []
+        if not isinstance(acts, list):
+            continue
+
+        for a in acts:
+            if not isinstance(a, dict):
+                continue
+            activity_count += 1
+            sports[str(a.get("sport_type") or a.get("type") or "unknown")] += 1
+
+            dist = a.get("distance")
+            if isinstance(dist, (int, float)):
+                total_distance_m += float(dist)
+
+            elev = a.get("total_elevation_gain")
+            if isinstance(elev, (int, float)):
+                total_elev_m += float(elev)
+
+            mv = a.get("moving_time")
+            if isinstance(mv, (int, float)):
+                total_moving_s += float(mv)
+
+            hr = a.get("average_heartrate")
+            if isinstance(hr, (int, float)):
+                hr_sum += float(hr)
+                hr_n += 1
+
+    avg_hr = (hr_sum / hr_n) if hr_n else None
 
     return {
-        "date": date_str,
-        "start_time": dt_str,
-        "sport_type": entry.get("sport_type"),
-        "activity_name": entry.get("name"),
-        "activity": entry.get("activity"),
-        "distance_km": round(distance_m / 1000.0, 2),
-        "avg_hr": safe_round(entry.get("average_heartrate"), 1),
-        "max_hr": safe_round(entry.get("max_heartrate"), 1),
-        "elevation_gain_m": elev_gain_m,
-        "elev_low": entry.get("elev_low"),
-        "elev_high": entry.get("elev_high"),
-        "moving_time_sec": _duration_to_seconds(entry.get("moving_time")),
-        "elapsed_time_sec": _duration_to_seconds(entry.get("elapsed_time")),
+        "window_days": window_days,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "activities": {
+            "count": activity_count,
+            "total_distance_km": round(total_distance_m / 1000.0, 3),
+            "total_elevation_m": round(total_elev_m, 1),
+            "total_moving_time_hours": round(total_moving_s / 3600.0, 3),
+            "average_heartrate_mean": (round(avg_hr, 2) if avg_hr is not None else None),
+            "count_by_sport": dict(sports),
+        },
+        "sleep_days_with_data": sleep_days_with_data,
     }
 
-def main():
-    with open(os.path.join(config.PROCESSING_DIRECTORY, "filtered_sleep.json")) as f:
-        sleep_data = json.load(f)
 
-    with open(os.path.join(config.PROCESSING_DIRECTORY, "strava_activities.json")) as f:
-        strava_data = json.load(f)
+def main() -> None:
+    config.ensure_directories()
 
-    parsed_sleep = {e["calendarDate"]: parse_sleep_entry(e) for e in sleep_data}
+    sleep_path = os.path.join(config.PROCESSING_DIRECTORY, "filtered_sleep.json")
+    activities_path = os.path.join(config.PROCESSING_DIRECTORY, "strava_activities.json")
 
-    parsed_strava = {}
-    for entry in strava_data:
-        date_key = str(entry.get("start_date_local")).replace("T", " ")[:10]
-        parsed_strava.setdefault(date_key, []).append(parse_strava_entry(entry))
+    sleep_by_date = _load_sleep_by_date(sleep_path)
+    activities_by_date = _load_activities_by_date(activities_path)
 
-    # --- align start date: start at the later (max) of the two series' earliest dates ---
-    sleep_min = min(parsed_sleep) if parsed_sleep else None
-    strava_min = min(parsed_strava) if parsed_strava else None
+    print(f"Loaded sleep days: {len(sleep_by_date)} from {sleep_path}")
+    print(f"Loaded activity days: {len(activities_by_date)} from {activities_path}")
 
-    if sleep_min and strava_min:
-        cutoff_start = max(sleep_min, strava_min)
-    else:
-        # If one side is empty, just use the other side's start (or None if both empty)
-        cutoff_start = sleep_min or strava_min
+    all_dates = sorted(set(sleep_by_date.keys()) | set(activities_by_date.keys()))
+    combined: List[Dict[str, Any]] = []
 
-    if cutoff_start:
-        parsed_sleep = {d: v for d, v in parsed_sleep.items() if d >= cutoff_start}
-        parsed_strava = {d: v for d, v in parsed_strava.items() if d >= cutoff_start}
-
-    # union of dates (after cutoff) so days with activities but no sleep still appear
-    all_dates = sorted(set(parsed_sleep.keys()) | set(parsed_strava.keys()))
-
-    combined_summary = []
     for d in all_dates:
-        summary = {"date": d}
-        if d in parsed_sleep:
-            # parsed_sleep[d] already contains "date", but we don’t need duplicates
-            sleep_fields = dict(parsed_sleep[d])
-            sleep_fields.pop("date", None)
-            summary.update(sleep_fields)
+        combined.append(
+            {
+                "date": d,
+                "sleep": sleep_by_date.get(d),          # <-- will now be a dict for matching days
+                "activities": activities_by_date.get(d, []),
+            }
+        )
 
-        summary["activities"] = parsed_strava.get(d, [])
-        combined_summary.append(summary)
+    out_summary = os.path.join(config.PROMPTING_DIRECTORY, "combined_summary.json")
+    save_json(out_summary, combined, compact=True)
 
-    output_file = os.path.join(config.PROMPTING_DIRECTORY, "combined_summary.json")
-    if os.path.exists(output_file):
-        os.remove(output_file)
+    # Rollups (7d + 28d) ending at the most recent date we have
+    if combined:
+        last_date = _as_date(combined[-1]["date"])
+        if last_date:
+            rollups = {
+                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "windows": {
+                    "7": _compute_rollup(combined, end_date=last_date, window_days=7),
+                    "28": _compute_rollup(combined, end_date=last_date, window_days=28),
+                },
+            }
+            out_rollups = os.path.join(config.PROMPTING_DIRECTORY, "combined_rollups.json")
+            save_json(out_rollups, rollups, compact=True)
 
-    with open(output_file, "w") as f:
-        json.dump(combined_summary, f, indent=4)
+    print(f"Wrote: {out_summary}")
+    print(f"Wrote: {os.path.join(config.PROMPTING_DIRECTORY, 'combined_rollups.json')}")
 
 
 if __name__ == "__main__":

@@ -37,6 +37,10 @@ export TRAILTRAINING_BASE_DIR="$HOME/activity data"
 # Now here use the credentials from your strava api application
 export STRAVA_CLIENT_ID=""
 export STRAVA_CLIENT_SECRET=""
+
+export STRAVA_REDIRECT_URI="http://127.0.0.1:5000/authorization"
+export TRAILTRAINING_BASE_DIR="$HOME/trailtraining-data"
+
 # and here just your garmin log in information
 export GARMIN_EMAIL=""
 export GARMIN_PASSWORD=""

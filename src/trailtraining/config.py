@@ -28,7 +28,7 @@ PROMPTING_DIRECTORY = os.path.join(BASE_DIR, "prompting")
 # Credentials (read from environment)
 STRAVA_ID = int(_env("STRAVA_CLIENT_ID", "0") or "0")
 STRAVA_SECRET = _env("STRAVA_CLIENT_SECRET", "")
-STRAVA_REDIRECT_URI = _env("STRAVA_REDIRECT_URI", "http://localhost:8000/callback")
+STRAVA_REDIRECT_URI = _env("STRAVA_REDIRECT_URI", "http://127.0.0.1:5000/authorization")
 
 GARMIN_EMAIL = _env("GARMIN_EMAIL", "")
 GARMIN_PASSWORD = _env("GARMIN_PASSWORD", "")
