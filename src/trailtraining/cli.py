@@ -141,10 +141,7 @@ def cmd_run_all_intervals(args):
 
 def _detect_provider_for_doctor() -> str:
     # Prefer explicit env var, otherwise auto.
-    env_v = (
-        (os.getenv("TRAILTRAINING_WELLNESS_PROVIDER") or "").strip()
-        or (os.getenv("WELLNESS_PROVIDER") or "").strip()
-    )
+    env_v = ((os.getenv("TRAILTRAINING_WELLNESS_PROVIDER") or "").strip() or (os.getenv("WELLNESS_PROVIDER") or "").strip())
     v = env_v.lower() if env_v else "auto"
     if v in {"garmin", "intervals"}:
         return v
@@ -283,6 +280,47 @@ def cmd_coach(args):
         print(f"\n[Saved] {out_path}")
 
 
+def cmd_eval_coach(args):
+    """
+    Evaluate a coach training-plan JSON output against simple constraints.
+    """
+    from trailtraining.llm.constraints import ConstraintConfig
+    from trailtraining.llm.eval import evaluate_training_plan_file
+    from trailtraining.util.state import save_json
+
+    cfg = ConstraintConfig(
+        max_ramp_pct=float(args.max_ramp_pct),
+        max_consecutive_hard=int(args.max_consecutive_hard),
+    )
+
+    violations, _obj = evaluate_training_plan_file(
+        args.input,
+        rollups_path=args.rollups,
+        cfg=cfg,
+    )
+
+    if args.output:
+        outp = Path(args.output).expanduser().resolve()
+        save_json(outp, violations, compact=False)
+        print(f"[Saved] {outp}")
+
+    if not violations:
+        print("✅ eval-coach: no violations")
+        raise SystemExit(0)
+
+    print("⚠️  eval-coach violations:")
+    for v in violations:
+        sev = v.get("severity", "unknown")
+        code = v.get("code", "UNKNOWN")
+        msg = v.get("message", "")
+        print(f"- [{sev}] {code}: {msg}")
+
+    # Fail on any high severity
+    if any(v.get("severity") == "high" for v in violations):
+        raise SystemExit(1)
+    raise SystemExit(0)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="trailtraining", description="TrailTraining CLI")
 
@@ -344,7 +382,7 @@ def main(argv=None):
     coach_p.add_argument(
         "--output",
         default=None,
-        help="Output markdown file. Default: <prompting_dir>/coach_brief_<prompt>.md",
+        help="Output file. Default: training-plan -> .json, others -> .md in <prompting_dir>/coach_brief_<prompt>.*",
     )
     coach_p.add_argument("--input", default=None, help="Directory containing the two JSON files. Default: prompting directory")
     coach_p.add_argument("--personal", default=None, help="Explicit path to formatted_personal_data.json (overrides --input)")
@@ -357,8 +395,16 @@ def main(argv=None):
         choices=["trailrunning", "triathlon"],
         help="Prompt preset: changes system instructions; training-plan prompt is sport-specific.",
     )
-
     coach_p.set_defaults(func=cmd_coach)
+
+    # eval-coach
+    eval_p = sub.add_parser("eval-coach", help="Evaluate coach training-plan JSON output against constraints")
+    eval_p.add_argument("--input", required=True, help="Path to coach_brief_training-plan.json (or any training-plan JSON)")
+    eval_p.add_argument("--rollups", default=None, help="Optional path to combined_rollups.json (default: same dir as --input)")
+    eval_p.add_argument("--max-ramp-pct", type=float, default=float(os.getenv("TRAILTRAINING_MAX_RAMP_PCT", "10")))
+    eval_p.add_argument("--max-consecutive-hard", type=int, default=int(os.getenv("TRAILTRAINING_MAX_CONSEC_HARD", "2")))
+    eval_p.add_argument("--output", default=None, help="Optional path to write violations JSON")
+    eval_p.set_defaults(func=cmd_eval_coach)
 
     # intervals
     intervals_p = sub.add_parser("fetch-intervals", help="Fetch sleep + resting HR from Intervals.icu")
