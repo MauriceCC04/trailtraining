@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -11,6 +12,7 @@ import requests
 from trailtraining import config
 
 BASE_URL = os.getenv("INTERVALS_BASE_URL", "https://intervals.icu/api/v1")
+_SESSION = requests.Session()
 
 
 def _pick(obj: Dict[str, Any], *keys: str, default: Any = None) -> Any:
@@ -41,8 +43,42 @@ def _auth_headers() -> Dict[str, str]:
         raise RuntimeError("Missing INTERVALS_API_KEY (or INTERVALS_ACCESS_TOKEN).")
 
     import base64
+
     basic = base64.b64encode(f"API_KEY:{api_key}".encode("utf-8")).decode("ascii")
     return {"Authorization": f"Basic {basic}"}
+
+
+def _request_with_retry(session: requests.Session, method: str, url: str, **kwargs) -> requests.Response:
+    """
+    Retries on:
+      - 429 (rate limit): uses Retry-After when present
+      - 5xx: exponential backoff
+      - timeouts/connection errors: exponential backoff
+    """
+    last_err: Optional[Exception] = None
+
+    for attempt in range(0, 6):
+        try:
+            resp = session.request(method, url, timeout=30, **kwargs)
+        except (requests.Timeout, requests.ConnectionError) as e:
+            last_err = e
+            time.sleep(min(30, 2**attempt))
+            continue
+
+        if resp.status_code == 429:
+            retry_after = resp.headers.get("Retry-After")
+            wait = int(retry_after) if (retry_after and retry_after.isdigit()) else (2**attempt)
+            time.sleep(min(60, max(1, wait)))
+            continue
+
+        if 500 <= resp.status_code <= 599:
+            time.sleep(min(30, 2**attempt))
+            continue
+
+        resp.raise_for_status()
+        return resp
+
+    raise RuntimeError(f"HTTP request failed after retries: {method} {url} ({last_err})")
 
 
 def fetch_wellness(oldest: str, newest: str) -> List[Dict[str, Any]]:
@@ -50,9 +86,19 @@ def fetch_wellness(oldest: str, newest: str) -> List[Dict[str, Any]]:
     url = f"{BASE_URL}/athlete/{athlete_id}/wellness"
     params = {"oldest": oldest, "newest": newest}
 
-    resp = requests.get(url, params=params, headers={**_auth_headers(), "Accept": "application/json"}, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
+    resp = _request_with_retry(
+        _SESSION,
+        "GET",
+        url,
+        params=params,
+        headers={**_auth_headers(), "Accept": "application/json"},
+    )
+
+    try:
+        data = resp.json()
+    except Exception as e:
+        raise RuntimeError(f"Intervals wellness JSON parse failed: {e}. HTTP {resp.status_code}: {resp.text[:500]}")
+
     if not isinstance(data, list):
         raise ValueError(f"Unexpected Intervals wellness response (expected list). Got: {type(data)}")
     return data

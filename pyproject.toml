@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trailtraining"
+version = "0.1.0"
+description = "Pipelines for Garmin/Strava + fatigue modeling"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "flask",
+  "openai>=1.0.0",
+  "requests",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7",
+  "ruff>=0.4",
+]
+
+[project.scripts]
+trailtraining = "trailtraining.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
