@@ -6,17 +6,18 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional, Union
 
+PathLike = Union[str, Path]
 
-def load_json(path: str | Path, default: Any = None) -> Any:
+def load_json(path: PathLike, default: Any = None) -> Any:
     p = Path(path)
     if not p.exists():
         return default
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-def atomic_write_text(path: str | Path, text: str) -> None:
+def atomic_write_text(path: PathLike, text: str) -> None:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
 
@@ -36,7 +37,7 @@ def atomic_write_text(path: str | Path, text: str) -> None:
 
 
 def save_json(
-    path: str | Path,
+    path: PathLike,
     obj: Any,
     *,
     compact: bool = True,

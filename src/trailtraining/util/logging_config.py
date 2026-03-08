@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Optional
 
-
-def configure_logging(level: str | None = None) -> None:
+def configure_logging(level: Optional[str] = None) -> None:
     """
     Central logging setup for the CLI.
 

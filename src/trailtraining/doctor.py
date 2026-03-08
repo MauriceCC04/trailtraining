@@ -8,6 +8,7 @@ from pathlib import Path
 
 from trailtraining import config
 from trailtraining.data.strava import default_token_path
+from typing import Optional
 
 
 def _ok(label: str, msg: str = "") -> None:
@@ -22,7 +23,7 @@ def _bad(label: str, msg: str = "") -> None:
     print(f"❌ {label}" + (f" — {msg}" if msg else ""))
 
 
-def _detect_provider(explicit: str | None = None) -> str:
+def _detect_provider(explicit: Optional[str] = None) -> str:
     # Normalize
     v = (explicit or config.WELLNESS_PROVIDER or "auto").strip().lower()
     if v in {"garmin", "intervals"}:
