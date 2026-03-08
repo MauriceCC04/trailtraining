@@ -3,11 +3,9 @@
 Pipeline script to run all garmin data processing steps in order.
 """
 from trailtraining.data import garmin as garmin_processing
-import sys
 import subprocess
 import shutil
 import os
-from trailtraining import config
 
 
 def main():
