@@ -1,11 +1,10 @@
 # src/trailtraining/forecast/forecast.py
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 from trailtraining import config
 from trailtraining.metrics.training_load import day_training_load_hours
