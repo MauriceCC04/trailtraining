@@ -798,7 +798,7 @@ def run_coach_brief(
         # Force deterministic readiness into the final plan object
         _apply_deterministic_readiness_to_plan(obj, deterministic_forecast)
         apply_eval_coach_guardrails(obj, rollups if isinstance(rollups, dict) else None)
-        
+
         # Save JSON output
         if output_path:
             out_p = Path(output_path).expanduser().resolve()
