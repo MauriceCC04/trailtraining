@@ -1,7 +1,6 @@
 /.venv
 /.venv/
 /src/trailtraining/features/
-/tests/
 /strava_access_token.pkl
 /running
 /garmindb.log

@@ -1,3 +1,4 @@
+````markdown
 ### Trailrunning Training Project — User Guide
 
 This project pulls your **training + wellness** data (**GarminDb or Intervals.icu** + **Strava**), combines it into a clean dataset, and optionally runs an LLM “coach”.
@@ -22,6 +23,9 @@ trailtraining --profile alice auth-strava
 
 # run pipeline (auto-picks Intervals vs Garmin)
 trailtraining --profile alice run-all
+
+# generate deterministic readiness + overreach risk (recommended)
+trailtraining --profile alice forecast
 
 # generate a structured training plan (JSON)
 trailtraining --profile alice coach --prompt training-plan
@@ -143,7 +147,10 @@ GARMIN_PASSWORD="..."
 # TRAILTRAINING_LOG_LEVEL="INFO"  # CRITICAL|ERROR|WARNING|INFO|DEBUG
 
 # --- Optional LLM coach ---
+# Prefer OPENAI_API_KEY; TRAILTRAINING_OPENAI_API_KEY also works
 OPENAI_API_KEY="..."
+# TRAILTRAINING_OPENAI_API_KEY="..."
+
 TRAILTRAINING_LLM_MODEL="gpt-5.2"
 TRAILTRAINING_REASONING_EFFORT="medium"   # none|low|medium|high|xhigh
 TRAILTRAINING_VERBOSITY="medium"          # low|medium|high
@@ -218,6 +225,12 @@ export GARMINGDB_CLI="/full/path/to/garmindb_cli"
 You do **not** need to manually create `~/.GarminDb/GarminConnectConfig.json`.
 The pipeline writes a per-profile config and activates it automatically.
 
+Fetch wellness only:
+
+```bash
+trailtraining --profile alice fetch-garmin
+```
+
 ---
 
 ## Wellness provider: Intervals.icu (faster)
@@ -241,6 +254,11 @@ Fetch wellness only:
 ```bash
 trailtraining --profile alice fetch-intervals --oldest "2023-01-01" --newest "2026-02-27"
 ```
+
+Notes:
+
+* `--oldest` defaults to a lookback window if omitted.
+* `--newest` defaults to “today” if omitted.
 
 ---
 
@@ -269,6 +287,23 @@ trailtraining --profile alice run-all --wellness-provider intervals
 trailtraining --profile alice run-all --wellness-provider garmin
 ```
 
+### Manual pipeline (debugging)
+
+If you want to run steps one-by-one:
+
+```bash
+# 1) wellness
+trailtraining --profile alice fetch-intervals --oldest "2023-01-01" --newest "2026-02-27"
+# OR:
+trailtraining --profile alice fetch-garmin
+
+# 2) Strava
+trailtraining --profile alice fetch-strava
+
+# 3) Combine into prompting/combined_summary.json (+ rollups)
+trailtraining --profile alice combine
+```
+
 ### Intervals-only pipeline (legacy alias)
 
 ```bash
@@ -290,6 +325,53 @@ Notes:
 
 ---
 
+## Forecasting (readiness + overreach risk)
+
+After `run-all` (or after you’ve produced `prompting/combined_summary.json`), you can generate a deterministic
+**readiness** and **overreach risk** assessment:
+
+```bash
+trailtraining --profile alice forecast
+```
+
+### Inputs / outputs
+
+Defaults:
+
+* **Input**: the profile’s `prompting/combined_summary.json`
+* **Output**: `prompting/readiness_and_risk_forecast.json`
+
+Point at a specific prompting directory (the directory that contains `combined_summary.json`):
+
+```bash
+trailtraining --profile alice forecast --input /path/to/prompting/
+```
+
+Write the JSON somewhere else:
+
+```bash
+trailtraining --profile alice forecast --output /tmp/readiness_and_risk_forecast.json
+```
+
+### What’s inside `readiness_and_risk_forecast.json`
+
+The file contains:
+
+* `generated_at` (UTC timestamp)
+* `result.date`
+* `result.readiness.score` (0–100) and `result.readiness.status` (`primed` | `steady` | `fatigued`)
+* `result.overreach_risk.score` (0–100) and `result.overreach_risk.level` (`low` | `moderate` | `high`)
+* `result.inputs` (underlying aggregates, like recent RHR and training load)
+* `result.drivers` (human-readable reasons for the scores)
+
+### How the coach uses it
+
+If `readiness_and_risk_forecast.json` exists in the prompting directory, the coach loads it and treats it as
+**authoritative** for readiness/risk signals. If it doesn’t exist, the coach will attempt (best-effort) to compute
+and save it.
+
+---
+
 ## LLM coach (optional)
 
 Set in your profile env:
@@ -301,8 +383,6 @@ TRAILTRAINING_REASONING_EFFORT="medium"   # none|low|medium|high|xhigh
 TRAILTRAINING_VERBOSITY="medium"          # low|medium|high
 TRAILTRAINING_COACH_STYLE="trailrunning"  # trailrunning|triathlon
 ```
-
-### What makes the coach “engineering-grade”
 
 For `training-plan`, the coach:
 
@@ -378,6 +458,14 @@ trailtraining eval-coach \
   --output ~/violations.json
 ```
 
+Optional: write the full scoring report:
+
+```bash
+trailtraining eval-coach \
+  --input ~/trailtraining-data/alice/prompting/coach_brief_training-plan.json \
+  --report ~/full_report.json
+```
+
 ---
 
 ## Outputs and folders
@@ -391,9 +479,14 @@ Within each profile’s `TRAILTRAINING_BASE_DIR` (default `~/trailtraining-data/
 
   * `combined_summary.json`
   * `combined_rollups.json`
+  * `readiness_and_risk_forecast.json`
   * `coach_brief_training-plan.json` (structured)
+  * `coach_brief_training-plan.txt`
   * `coach_brief_recovery-status.md`
   * `coach_brief_meal-plan.md`
+  * `formatted_personal_data.json`
+  * `shortened_rhr.json`
+  * `shortened_sleep.json`
 
 Strava tokens are stored at:
 
@@ -447,16 +540,25 @@ pre-commit run --all-files
 
 ---
 
-## Helpful commands
+## Helpful commands (all CLI commands)
 
 ```bash
+# global help
 trailtraining -h
+
+# each subcommand help
 trailtraining doctor -h
+trailtraining auth-strava -h
+trailtraining fetch-strava -h
+trailtraining fetch-garmin -h
+trailtraining fetch-intervals -h
+trailtraining combine -h
 
 trailtraining run-all -h
-trailtraining fetch-intervals -h
 trailtraining run-all-intervals -h
+trailtraining forecast -h
 
 trailtraining coach -h
 trailtraining eval-coach -h
 ```
+
