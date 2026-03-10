@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -21,6 +21,8 @@ from trailtraining.llm.schemas import (
 )
 from trailtraining.llm.signals import build_retrieval_context
 from trailtraining.util.state import load_json, save_json
+from trailtraining.llm.guardrails import apply_eval_coach_guardrails, build_eval_constraints_block
+
 
 log = logging.getLogger(__name__)
 
@@ -182,6 +184,167 @@ def _extract_json_object(text: str) -> str:
     if start != -1 and end != -1 and end > start:
         return text[start : end + 1]
     return text
+
+
+def _load_or_compute_deterministic_forecast(
+    base_dir: Path,
+    combined: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """
+    Best-effort:
+      1) Load base_dir/readiness_and_risk_forecast.json if it exists
+      2) Else, try to compute via trailtraining.forecast.forecast.compute_readiness_and_risk(combined)
+         and (best-effort) write it back to the same path for next time.
+    """
+    forecast_p = base_dir / "readiness_and_risk_forecast.json"
+    if forecast_p.exists():
+        obj = load_json(forecast_p, default=None)
+        return obj if isinstance(obj, dict) else None
+
+    # Best-effort compute (won't crash coach if module isn't installed yet)
+    try:
+        from trailtraining.forecast.forecast import compute_readiness_and_risk  # type: ignore
+    except Exception:
+        return None
+
+    try:
+        fr = compute_readiness_and_risk(combined)
+        payload: Dict[str, Any] = {
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "result": {
+                "date": getattr(fr, "date", None),
+                "readiness": {
+                    "score": getattr(fr, "readiness_score", None),
+                    "status": getattr(fr, "readiness_status", None),
+                },
+                "overreach_risk": {
+                    "score": getattr(fr, "overreach_risk_score", None),
+                    "level": getattr(fr, "overreach_risk_level", None),
+                },
+                "inputs": getattr(fr, "inputs", None),
+                "drivers": getattr(fr, "drivers", None),
+            },
+        }
+        try:
+            save_json(forecast_p, payload, compact=False)
+        except Exception:
+            pass
+        return payload
+    except Exception:
+        return None
+
+
+def _forecast_signal_rows(det_forecast: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Converts readiness_and_risk_forecast.json into signal_registry rows so the model can cite them.
+    """
+    out: List[Dict[str, Any]] = []
+    if not isinstance(det_forecast, dict):
+        return out
+    res = det_forecast.get("result")
+    if not isinstance(res, dict):
+        return out
+
+    d = res.get("date")
+    date_range = f"{d}..{d}" if isinstance(d, str) and d else ""
+
+    readiness = res.get("readiness")
+    if isinstance(readiness, dict):
+        st = readiness.get("status")
+        sc = readiness.get("score")
+        out.append(
+            {
+                "signal_id": "forecast.readiness.status",
+                "value": st,
+                "unit": "",
+                "source": "readiness_and_risk_forecast.json:result.readiness.status",
+                "date_range": date_range,
+            }
+        )
+        out.append(
+            {
+                "signal_id": "forecast.readiness.score",
+                "value": sc,
+                "unit": "0-100",
+                "source": "readiness_and_risk_forecast.json:result.readiness.score",
+                "date_range": date_range,
+            }
+        )
+
+    risk = res.get("overreach_risk")
+    if isinstance(risk, dict):
+        lv = risk.get("level")
+        sc2 = risk.get("score")
+        out.append(
+            {
+                "signal_id": "forecast.overreach_risk.level",
+                "value": lv,
+                "unit": "",
+                "source": "readiness_and_risk_forecast.json:result.overreach_risk.level",
+                "date_range": date_range,
+            }
+        )
+        out.append(
+            {
+                "signal_id": "forecast.overreach_risk.score",
+                "value": sc2,
+                "unit": "0-100",
+                "source": "readiness_and_risk_forecast.json:result.overreach_risk.score",
+                "date_range": date_range,
+            }
+        )
+
+    return out
+
+
+def _apply_deterministic_readiness_to_plan(
+    plan_obj: Dict[str, Any],
+    det_forecast: Optional[Dict[str, Any]],
+) -> None:
+    """
+    Ensures training-plan output uses the deterministic readiness status.
+    Schema only allows readiness.status + rationale + signal_ids; we update status and annotate rationale.
+    """
+    if not isinstance(det_forecast, dict):
+        return
+    res = det_forecast.get("result")
+    if not isinstance(res, dict):
+        return
+    readiness = res.get("readiness")
+    if not isinstance(readiness, dict):
+        return
+
+    status = readiness.get("status")
+    score = readiness.get("score")
+    if status not in ("primed", "steady", "fatigued"):
+        return
+
+    r = plan_obj.get("readiness")
+    if not isinstance(r, dict):
+        return
+
+    r["status"] = status
+
+    prefix = f"Deterministic readiness: {status}"
+    if isinstance(score, (int, float)):
+        prefix += f" (score {score})."
+    else:
+        prefix += "."
+
+    old = r.get("rationale")
+    if isinstance(old, str) and old.strip():
+        if not old.strip().lower().startswith("deterministic readiness"):
+            r["rationale"] = prefix + " " + old.strip()
+    else:
+        r["rationale"] = prefix
+
+    dn = plan_obj.get("data_notes")
+    if isinstance(dn, list):
+        note = "Readiness status was set from deterministic readiness_and_risk_forecast.json."
+        if note not in dn:
+            dn.append(note)
+
+
 def training_plan_to_text(obj: Dict[str, Any]) -> str:
     """
     Convert a training-plan JSON object into a simple, human-readable text plan.
@@ -326,6 +489,7 @@ def training_plan_to_text(obj: Dict[str, Any]) -> str:
 
     return "\n".join(lines).rstrip() + "\n"
 
+
 def _call_responses_best_effort_schema(client: OpenAI, kwargs: Dict[str, Any], schema: Dict[str, Any]) -> Any:
     """
     Best-effort "structured output" call:
@@ -380,6 +544,7 @@ def _build_prompt_text(
     personal: Any,
     rollups: Optional[Any],
     combined: List[Dict[str, Any]],
+    deterministic_forecast: Optional[Dict[str, Any]],
     *,
     style: str,
     max_chars: int,
@@ -405,6 +570,20 @@ def _build_prompt_text(
             _safe_json_snippet(rollups, max_chars=80_000),
             "",
         ]
+    header += [
+        "## Eval-coach constraints (MUST satisfy)",
+        build_eval_constraints_block(rollups if isinstance(rollups, dict) else None),
+        "",
+    ]
+    if deterministic_forecast is not None:
+        header += [
+            "## Deterministic readiness & overreach risk (authoritative)",
+            _safe_json_snippet(deterministic_forecast, max_chars=40_000),
+            "",
+            "Guidance: Use the deterministic readiness.status for readiness.status in your output. "
+            "You may cite forecast.* signals from the Signal registry, and/or the underlying load/recovery signals.",
+            "",
+        ]
 
     # Retrieval: last N weeks + citeable signal registry
     ctx = build_retrieval_context(
@@ -412,12 +591,20 @@ def _build_prompt_text(
         rollups if isinstance(rollups, dict) else None,
         retrieval_weeks=retrieval_weeks,
     )
+
+    weekly_history = ctx.get("weekly_history")
+    signal_registry = ctx.get("signal_registry")
+
+    # Append forecast into signal registry so the model can cite it (forecast.*)
+    if isinstance(signal_registry, list) and isinstance(deterministic_forecast, dict):
+        signal_registry = list(signal_registry) + _forecast_signal_rows(deterministic_forecast)
+
     header += [
         f"## Retrieved history (weekly summaries; last {retrieval_weeks} weeks)",
-        _safe_json_snippet(ctx.get("weekly_history"), max_chars=50_000),
+        _safe_json_snippet(weekly_history, max_chars=50_000),
         "",
         "## Signal registry (you MUST cite signal_ids from here)",
-        _safe_json_snippet(ctx.get("signal_registry"), max_chars=70_000),
+        _safe_json_snippet(signal_registry, max_chars=80_000),
         "",
     ]
 
@@ -478,6 +665,7 @@ class CoachConfig:
     # prompt preset (per-profile default via env; CLI can override)
     style: str = os.getenv("TRAILTRAINING_COACH_STYLE", "trailrunning")
 
+
 def _recompute_planned_hours_from_days(obj: Dict[str, Any]) -> None:
     """
     Make weekly_totals.planned_moving_time_hours consistent with sum(plan.days[].duration_minutes).
@@ -504,6 +692,7 @@ def _recompute_planned_hours_from_days(obj: Dict[str, Any]) -> None:
 
     wt["planned_moving_time_hours"] = round(total_min / 60.0, 1)
 
+
 def run_coach_brief(
     *,
     prompt: str,
@@ -528,6 +717,9 @@ def run_coach_brief(
     _dedup_activities_in_place(combined)
     combined = _filter_last_days(combined, cfg.days)
 
+    base_dir = summary_p.parent
+    deterministic_forecast = _load_or_compute_deterministic_forecast(base_dir, combined)
+
     detail_days = int(os.getenv("TRAILTRAINING_COACH_DETAIL_DAYS", "14"))
     detail_days = max(1, min(detail_days, len(combined))) if combined else 0
 
@@ -536,6 +728,7 @@ def run_coach_brief(
         personal=personal,
         rollups=rollups,
         combined=combined,
+        deterministic_forecast=deterministic_forecast,
         style=cfg.style,
         max_chars=cfg.max_chars,
         detail_days=detail_days,
@@ -600,7 +793,12 @@ def run_coach_brief(
             repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
             raw2 = _extract_json_object(repaired)
             obj = ensure_training_plan_shape(json.loads(raw2))
+            _recompute_planned_hours_from_days(obj)
 
+        # Force deterministic readiness into the final plan object
+        _apply_deterministic_readiness_to_plan(obj, deterministic_forecast)
+        apply_eval_coach_guardrails(obj, rollups if isinstance(rollups, dict) else None)
+        
         # Save JSON output
         if output_path:
             out_p = Path(output_path).expanduser().resolve()
@@ -609,12 +807,14 @@ def run_coach_brief(
 
         out_p.parent.mkdir(parents=True, exist_ok=True)
         save_json(out_p, obj, compact=False)
+
         # Also write a human-readable interpretation (.txt) next to the JSON
         try:
             txt_p = out_p.parent / f"{out_p.stem}.txt"
             txt_p.write_text(training_plan_to_text(obj), encoding="utf-8")
         except Exception as e:
             log.warning("Failed to write training-plan text interpretation: %s", e)
+
         pretty = json.dumps(obj, indent=2, ensure_ascii=False)
         return pretty, str(out_p)
 

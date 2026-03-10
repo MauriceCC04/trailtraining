@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from trailtraining import config
+from trailtraining.metrics.training_load import activity_training_load_hours
 from trailtraining.util.state import load_json, save_json
 
 
@@ -96,11 +97,25 @@ def _compute_rollup(
     total_distance_m = 0.0
     total_elev_m = 0.0
     total_moving_s = 0.0
+    total_training_load_h = 0.0
+
     hr_sum = 0.0
     hr_n = 0
     activity_count = 0
+
     sports = Counter()
     sleep_days_with_data = 0
+
+    # Per-sport aggregation (distance/time/elev + training load)
+    by_sport: Dict[str, Dict[str, float]] = defaultdict(
+        lambda: {
+            "count": 0.0,
+            "distance_m": 0.0,
+            "elev_m": 0.0,
+            "moving_s": 0.0,
+            "training_load_h": 0.0,
+        }
+    )
 
     for day_obj in combined:
         d_str = day_obj.get("date")
@@ -120,20 +135,33 @@ def _compute_rollup(
         for a in acts:
             if not isinstance(a, dict):
                 continue
+
             activity_count += 1
-            sports[str(a.get("sport_type") or a.get("type") or "unknown")] += 1
+            sport = str(a.get("sport_type") or a.get("type") or "unknown")
+            sports[sport] += 1
+            by_sport[sport]["count"] += 1.0
 
             dist = a.get("distance")
             if isinstance(dist, (int, float)):
                 total_distance_m += float(dist)
+                by_sport[sport]["distance_m"] += float(dist)
 
             elev = a.get("total_elevation_gain")
             if isinstance(elev, (int, float)):
                 total_elev_m += float(elev)
+                by_sport[sport]["elev_m"] += float(elev)
 
             mv = a.get("moving_time")
             if isinstance(mv, (int, float)):
                 total_moving_s += float(mv)
+                by_sport[sport]["moving_s"] += float(mv)
+
+            # Training load: moving_time_hours * load_factor
+            # Distance can be 0: as long as moving_time > 0, this counts as load.
+            tl_h = float(activity_training_load_hours(a))
+            if tl_h > 0:
+                total_training_load_h += tl_h
+                by_sport[sport]["training_load_h"] += tl_h
 
             hr = a.get("average_heartrate")
             if isinstance(hr, (int, float)):
@@ -141,6 +169,16 @@ def _compute_rollup(
                 hr_n += 1
 
     avg_hr = (hr_sum / hr_n) if hr_n else None
+
+    by_sport_out: Dict[str, Any] = {}
+    for sport, agg in by_sport.items():
+        by_sport_out[sport] = {
+            "count": int(agg["count"]),
+            "distance_km": round(float(agg["distance_m"]) / 1000.0, 3),
+            "total_elevation_m": round(float(agg["elev_m"]), 1),
+            "total_moving_time_hours": round(float(agg["moving_s"]) / 3600.0, 3),
+            "training_load_hours": round(float(agg["training_load_h"]), 3),
+        }
 
     return {
         "window_days": window_days,
@@ -151,8 +189,10 @@ def _compute_rollup(
             "total_distance_km": round(total_distance_m / 1000.0, 3),
             "total_elevation_m": round(total_elev_m, 1),
             "total_moving_time_hours": round(total_moving_s / 3600.0, 3),
+            "total_training_load_hours": round(total_training_load_h, 3),
             "average_heartrate_mean": (round(avg_hr, 2) if avg_hr is not None else None),
             "count_by_sport": dict(sports),
+            "by_sport": by_sport_out,
         },
         "sleep_days_with_data": sleep_days_with_data,
     }
@@ -177,7 +217,7 @@ def main() -> None:
         combined.append(
             {
                 "date": d,
-                "sleep": sleep_by_date.get(d),          # <-- will now be a dict for matching days
+                "sleep": sleep_by_date.get(d),
                 "activities": activities_by_date.get(d, []),
             }
         )

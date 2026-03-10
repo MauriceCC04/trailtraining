@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+from trailtraining.metrics.training_load import day_training_load_hours
+
 
 def _as_date(s: str) -> Optional[date]:
     try:
@@ -40,13 +42,14 @@ def _sleep_int(day_obj: Dict[str, Any], key: str) -> Optional[int]:
     return None
 
 
-def _sum_activity_fields(day_obj: Dict[str, Any]) -> Tuple[float, float, float]:
+def _sum_activity_fields(day_obj: Dict[str, Any]) -> Tuple[float, float, float, float]:
     """
-    Returns (distance_km, moving_time_hours, elevation_m) for one day.
+    Returns (distance_km, moving_time_hours, elevation_m, training_load_hours) for one day.
+    training_load_hours is computed from moving_time * load_factor, so distance==0 can still contribute.
     """
     acts = day_obj.get("activities") or []
     if not isinstance(acts, list):
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0
 
     dist_m = 0.0
     mv_s = 0.0
@@ -64,7 +67,8 @@ def _sum_activity_fields(day_obj: Dict[str, Any]) -> Tuple[float, float, float]:
         if isinstance(el, (int, float)):
             elev_m += float(el)
 
-    return dist_m / 1000.0, mv_s / 3600.0, elev_m
+    tlh = float(day_training_load_hours(day_obj))
+    return dist_m / 1000.0, mv_s / 3600.0, elev_m, tlh
 
 
 def build_weekly_history(combined: List[Dict[str, Any]], *, weeks: int) -> List[Dict[str, Any]]:
@@ -77,6 +81,7 @@ def build_weekly_history(combined: List[Dict[str, Any]], *, weeks: int) -> List[
         "distance_km": float,
         "moving_time_hours": float,
         "elevation_m": float,
+        "training_load_hours": float,
         "sleep_hours_mean": float|None,
         "hrv_mean": float|None,
         "rhr_mean": float|None,
@@ -111,6 +116,7 @@ def build_weekly_history(combined: List[Dict[str, Any]], *, weeks: int) -> List[
                 "distance_km": 0.0,
                 "moving_time_hours": 0.0,
                 "elevation_m": 0.0,
+                "training_load_hours": 0.0,
                 "sleep_hours": [],
                 "hrv": [],
                 "rhr": [],
@@ -121,10 +127,11 @@ def build_weekly_history(combined: List[Dict[str, Any]], *, weeks: int) -> List[
         b["min_date"] = min(b["min_date"], d)
         b["max_date"] = max(b["max_date"], d)
 
-        dk, mh, em = _sum_activity_fields(day_obj)
+        dk, mh, em, tlh = _sum_activity_fields(day_obj)
         b["distance_km"] += dk
         b["moving_time_hours"] += mh
         b["elevation_m"] += em
+        b["training_load_hours"] += tlh
 
         sh = _sleep_hours(day_obj)
         if sh is not None:
@@ -157,6 +164,7 @@ def build_weekly_history(combined: List[Dict[str, Any]], *, weeks: int) -> List[
                 "distance_km": round(float(b["distance_km"]), 3),
                 "moving_time_hours": round(float(b["moving_time_hours"]), 3),
                 "elevation_m": round(float(b["elevation_m"]), 1),
+                "training_load_hours": round(float(b["training_load_hours"]), 3),
                 "sleep_hours_mean": (round(_mean(b["sleep_hours"]), 2) if b["sleep_hours"] else None),
                 "hrv_mean": (round(_mean(b["hrv"]), 2) if b["hrv"] else None),
                 "rhr_mean": (round(_mean(b["rhr"]), 2) if b["rhr"] else None),
@@ -193,6 +201,7 @@ def build_signal_registry(combined: List[Dict[str, Any]], rollups: Optional[Dict
                 add("load.last7.distance_km", acts.get("total_distance_km"), "combined_rollups.json:windows.7.activities.total_distance_km", dr, "km")
                 add("load.last7.moving_time_hours", acts.get("total_moving_time_hours"), "combined_rollups.json:windows.7.activities.total_moving_time_hours", dr, "h")
                 add("load.last7.elevation_m", acts.get("total_elevation_m"), "combined_rollups.json:windows.7.activities.total_elevation_m", dr, "m")
+                add("load.last7.training_load_hours", acts.get("total_training_load_hours"), "combined_rollups.json:windows.7.activities.total_training_load_hours", dr, "load_h")
                 add("load.last7.activity_count", acts.get("count"), "combined_rollups.json:windows.7.activities.count", dr, "")
                 add("load.last7.sleep_days_with_data", w7.get("sleep_days_with_data"), "combined_rollups.json:windows.7.sleep_days_with_data", dr, "days")
 
@@ -202,6 +211,7 @@ def build_signal_registry(combined: List[Dict[str, Any]], rollups: Optional[Dict
                 add("load.baseline28.distance_km", acts.get("total_distance_km"), "combined_rollups.json:windows.28.activities.total_distance_km", dr, "km")
                 add("load.baseline28.moving_time_hours", acts.get("total_moving_time_hours"), "combined_rollups.json:windows.28.activities.total_moving_time_hours", dr, "h")
                 add("load.baseline28.elevation_m", acts.get("total_elevation_m"), "combined_rollups.json:windows.28.activities.total_elevation_m", dr, "m")
+                add("load.baseline28.training_load_hours", acts.get("total_training_load_hours"), "combined_rollups.json:windows.28.activities.total_training_load_hours", dr, "load_h")
     except Exception:
         pass
 
@@ -226,10 +236,34 @@ def build_signal_registry(combined: List[Dict[str, Any]], rollups: Optional[Dict
     hrv7 = _mean([float(v) for v in (_sleep_int(d, "avgOvernightHrv") for d in w7_days) if v is not None])
     rhr7 = _mean([float(v) for v in (_sleep_int(d, "restingHeartRate") for d in w7_days) if v is not None])
 
-    add("recovery.last7.sleep_hours_mean", (round(sleep7, 2) if sleep7 is not None else None), "combined_summary.json:sleep.sleepTimeSeconds", f"{(last_d - timedelta(days=6)).isoformat()}..{last_d.isoformat()}", "h")
-    add("recovery.last28.sleep_hours_mean", (round(sleep28, 2) if sleep28 is not None else None), "combined_summary.json:sleep.sleepTimeSeconds", f"{(last_d - timedelta(days=27)).isoformat()}..{last_d.isoformat()}", "h")
-    add("recovery.last7.hrv_mean", (round(hrv7, 2) if hrv7 is not None else None), "combined_summary.json:sleep.avgOvernightHrv", f"{(last_d - timedelta(days=6)).isoformat()}..{last_d.isoformat()}", "ms")
-    add("recovery.last7.rhr_mean", (round(rhr7, 2) if rhr7 is not None else None), "combined_summary.json:sleep.restingHeartRate", f"{(last_d - timedelta(days=6)).isoformat()}..{last_d.isoformat()}", "bpm")
+    add(
+        "recovery.last7.sleep_hours_mean",
+        (round(sleep7, 2) if sleep7 is not None else None),
+        "combined_summary.json:sleep.sleepTimeSeconds",
+        f"{(last_d - timedelta(days=6)).isoformat()}..{last_d.isoformat()}",
+        "h",
+    )
+    add(
+        "recovery.last28.sleep_hours_mean",
+        (round(sleep28, 2) if sleep28 is not None else None),
+        "combined_summary.json:sleep.sleepTimeSeconds",
+        f"{(last_d - timedelta(days=27)).isoformat()}..{last_d.isoformat()}",
+        "h",
+    )
+    add(
+        "recovery.last7.hrv_mean",
+        (round(hrv7, 2) if hrv7 is not None else None),
+        "combined_summary.json:sleep.avgOvernightHrv",
+        f"{(last_d - timedelta(days=6)).isoformat()}..{last_d.isoformat()}",
+        "ms",
+    )
+    add(
+        "recovery.last7.rhr_mean",
+        (round(rhr7, 2) if rhr7 is not None else None),
+        "combined_summary.json:sleep.restingHeartRate",
+        f"{(last_d - timedelta(days=6)).isoformat()}..{last_d.isoformat()}",
+        "bpm",
+    )
 
     return reg
 

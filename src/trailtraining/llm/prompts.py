@@ -89,6 +89,7 @@ Data handling rules:
 - If rollups are present and don’t match your computed totals (because of missing days, deduping, etc.), treat rollups as the authoritative “reported totals” and briefly explain the discrepancy.
 
 Training load & readiness logic (use only available fields):
+- Prefer total_training_load_hours as the primary load metric (moving_time * load_factor), especially when distance is 0
 - Prefer rollups windows["7"] and windows["28"] for load totals and baseline comparison.
 - If rollups missing, estimate from combined_summary.json:
   - volume: total distance_km (7-day)
