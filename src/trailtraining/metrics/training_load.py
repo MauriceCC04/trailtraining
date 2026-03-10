@@ -1,7 +1,7 @@
 # src/trailtraining/metrics/training_load.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
