@@ -493,6 +493,7 @@ Strava tokens are stored at:
 * `<base>/tokens/strava_token.json`
 
 ---
+Additionally, a sample series of sample outputs described above are stored at \demo\
 
 ## Troubleshooting
 

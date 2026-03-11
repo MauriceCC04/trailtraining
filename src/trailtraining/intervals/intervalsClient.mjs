@@ -7,7 +7,7 @@ export async function listWellnessBearer({ accessToken, athleteId = "0", oldest,
 
   const res = await fetch(url, {
     headers: {
-      Authorization: `Bearer ${accessToken}`, // :contentReference[oaicite:13]{index=13}
+      Authorization: `Bearer ${accessToken}`,
       Accept: "application/json",
     },
   });
@@ -17,7 +17,7 @@ export async function listWellnessBearer({ accessToken, athleteId = "0", oldest,
 }
 
 export function normalizeSleepAndHr(w) {
-  // Common wellness fields include sleepSecs/restingHR/avgSleepingHR. :contentReference[oaicite:14]{index=14}
+  // Common wellness fields include sleepSecs/restingHR/avgSleepingHR.
   return {
     day: w.id,
     sleepSecs: w.sleepSecs ?? null,
