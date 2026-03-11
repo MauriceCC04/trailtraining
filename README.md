@@ -484,6 +484,7 @@ Within each profile’s `TRAILTRAINING_BASE_DIR` (default `~/trailtraining-data/
   * `coach_brief_recovery-status.md`
   * `coach_brief_meal-plan.md`
   * `formatted_personal_data.json`
+Additionally, when Garmin is chosen as the wellness provider, the following are also stored:
   * `shortened_rhr.json`
   * `shortened_sleep.json`
 
