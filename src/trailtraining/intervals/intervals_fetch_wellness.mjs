@@ -11,7 +11,7 @@ if (!API_KEY || !OLDEST || !NEWEST) {
   process.exit(1);
 }
 
-// Basic auth: username is literally "API_KEY", password is your actual key. :contentReference[oaicite:5]{index=5}
+// Basic auth: username is literally "API_KEY", password is your actual key.
 const basic = Buffer.from(`API_KEY:${API_KEY}`).toString("base64");
 
 async function listWellness(oldest, newest) {
@@ -33,7 +33,7 @@ async function listWellness(oldest, newest) {
 }
 
 function pickSleepAndHr(w) {
-  // Intervals commonly returns camelCase (sleepSecs/restingHR). :contentReference[oaicite:6]{index=6}
+  // Intervals commonly returns camelCase (sleepSecs/restingHR).
   // Be tolerant: fall back to snake_case variants if you ever see them.
   const sleepSecs = w.sleepSecs ?? w.sleep_secs ?? null;
   const restingHR = w.restingHR ?? w.resting_hr ?? null;

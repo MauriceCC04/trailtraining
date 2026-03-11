@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-03-11T15:29:35.353189Z",
+  "result": {
+    "date": "2026-03-10",
+    "drivers": {
+      "overreach_risk": [
+        "7d training load is elevated vs recent rolling baseline"
+      ],
+      "readiness": [
+        "Recent 7d training load is above your recent rolling baseline"
+      ]
+    },
+    "inputs": {
+      "as_of_date": "2026-03-10",
+      "notes": [
+        "training_load_hours = sum(moving_time_hours * load_factor)",
+        "load_factor uses avgHR/maxHR when available; otherwise defaults to 1.0"
+      ],
+      "rhr_28d_mean_bpm": 51.47,
+      "rhr_28d_std_bpm": 2.39,
+      "rhr_7d_mean_bpm": null,
+      "rhr_delta_bpm": null,
+      "rhr_z": null,
+      "training_load_7d_hours": 32.125,
+      "training_load_delta_hours": 24.726,
+      "training_load_rolling7_mean_hours": 7.399,
+      "training_load_rolling7_std_hours": 7.986,
+      "training_load_z": 3.096
+    },
+    "overreach_risk": {
+      "level": "high",
+      "score": 90.7
+    },
+    "readiness": {
+      "score": 45.2,
+      "status": "fatigued"
+    }
+  }
+}

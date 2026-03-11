@@ -11,7 +11,7 @@ if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
 }
 
 app.get("/auth/intervals/start", (req, res) => {
-  // Scope format: "WELLNESS:READ" etc. :contentReference[oaicite:10]{index=10}
+  // Scope format: "WELLNESS:READ" etc.
   const scope = "WELLNESS:READ";
   const state = req.query.state ?? ""; // attach your user/session id here
 
@@ -30,7 +30,7 @@ app.get("/auth/intervals/callback", async (req, res) => {
   if (error) return res.status(400).send(`OAuth error: ${error}`);
   if (!code) return res.status(400).send("Missing ?code");
 
-  // Exchange code for token within 2 minutes. :contentReference[oaicite:11]{index=11}
+  // Exchange code for token within 2 minutes.
   const tokenRes = await fetch("https://intervals.icu/api/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -46,7 +46,7 @@ app.get("/auth/intervals/callback", async (req, res) => {
   }
 
   const token = await tokenRes.json();
-  // token.access_token, token.scope, token.athlete.id, token.athlete.name :contentReference[oaicite:12]{index=12}
+  // token.access_token, token.scope, token.athlete.id, token.athlete.name
 
   // TODO: store token.access_token + token.athlete.id for your user (identified by state)
   // IMPORTANT: Intervals replaces the token when the user re-authorizes, so overwrite stored token.
