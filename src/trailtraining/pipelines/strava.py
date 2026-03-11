@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -19,6 +19,7 @@ from trailtraining import config
 from trailtraining.data.strava import (
     StravaOAuthConfig,
     build_authorize_url,
+    default_token_path,
     exchange_code_for_token,
     get_valid_token,
     save_token,
@@ -35,7 +36,13 @@ META_JSON = lambda: os.path.join(config.PROCESSING_DIRECTORY, "strava_meta.json"
 
 # Defaults (tweak via env)
 DEFAULT_LOOKBACK_DAYS = int(os.getenv("TRAILTRAINING_STRAVA_LOOKBACK_DAYS", "365"))
-MAX_PAGES = int(os.getenv("TRAILTRAINING_STRAVA_MAX_PAGES", "10"))  # 10 * 200 = 2000 activities max
+
+# 0 = unlimited (recommended; avoids silent truncation for high-volume users)
+MAX_PAGES = int(os.getenv("TRAILTRAINING_STRAVA_MAX_PAGES", "0"))
+
+# Safety cap to prevent runaway loops if something unexpected happens
+HARD_MAX_PAGES = int(os.getenv("TRAILTRAINING_STRAVA_HARD_MAX_PAGES", "1000"))
+
 PER_PAGE = int(os.getenv("TRAILTRAINING_STRAVA_PER_PAGE", "200"))  # Strava max is 200
 AFTER_BUFFER_SECONDS = int(os.getenv("TRAILTRAINING_STRAVA_AFTER_BUFFER_SECONDS", str(7 * 24 * 3600)))  # 7 days
 
@@ -139,6 +146,33 @@ def _get_or_auth_token(cfg: StravaOAuthConfig) -> Dict[str, Any]:
     return token
 
 
+def auth_main(*, force: bool = False) -> None:
+    """
+    Authorize Strava for this profile and write the token file.
+
+    Unlike `main()`, this does NOT fetch activities.
+    """
+    config.ensure_directories()
+    cfg = StravaOAuthConfig.from_env()
+    token_path = default_token_path()
+
+    if not force:
+        token = get_valid_token(cfg, token_path=token_path)
+        if token:
+            print(f"✅ Strava already authorized → {token_path}")
+            return
+
+    start_auth_server(host="127.0.0.1", port=5000)
+    url, _state = build_authorize_url(cfg)
+    print("\nOpen this URL to authorize Strava:\n")
+    print(url)
+    print("\nWaiting for authorization callback...\n")
+    code = wait_for_code(timeout=300.0)
+    token = exchange_code_for_token(cfg, code)
+    save_token(token, token_path)
+    print(f"✅ Saved Strava token → {token_path}")
+
+
 def _compute_after_unix(existing: List[Dict[str, Any]], meta: Dict[str, Any]) -> int:
     """
     Prefer meta.max_start_date_ts (UTC), otherwise compute from existing activities,
@@ -171,9 +205,28 @@ def fetch_activities_incremental(
     after_unix: int,
     per_page: int = PER_PAGE,
     max_pages: int = MAX_PAGES,
-) -> List[Dict[str, Any]]:
+    hard_max_pages: int = HARD_MAX_PAGES,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Returns: (activities, pagination_info)
+    """
     out: List[Dict[str, Any]] = []
-    for page in range(1, max_pages + 1):
+
+    page = 1
+    pages_fetched = 0
+    hit_max_pages = False
+
+    while True:
+        if hard_max_pages > 0 and pages_fetched >= hard_max_pages:
+            raise RuntimeError(
+                f"Strava pagination exceeded TRAILTRAINING_STRAVA_HARD_MAX_PAGES={hard_max_pages}. "
+                "Increase it if this is expected."
+            )
+
+        if max_pages > 0 and pages_fetched >= max_pages:
+            hit_max_pages = True
+            break
+
         items = _api_get(
             session,
             ACTIVITIES_PATH,
@@ -182,10 +235,23 @@ def fetch_activities_incremental(
         )
         if not items:
             break
+
         out.extend(items)
+        pages_fetched += 1
+
         if len(items) < per_page:
             break
-    return out
+
+        page += 1
+
+    info = {
+        "pages_fetched": pages_fetched,
+        "per_page": per_page,
+        "max_pages": max_pages,
+        "hard_max_pages": hard_max_pages,
+        "hit_max_pages": hit_max_pages,
+    }
+    return out, info
 
 
 def _merge_by_id(existing: List[Dict[str, Any]], new_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -223,9 +289,15 @@ def main() -> None:
     after_unix = _compute_after_unix(existing, meta)
 
     session = requests.Session()
-    raw_new = fetch_activities_incremental(session, access_token, after_unix=after_unix)
-    slim_new = [_slim_activity(a) for a in raw_new]
+    raw_new, page_info = fetch_activities_incremental(session, access_token, after_unix=after_unix)
 
+    if page_info.get("hit_max_pages"):
+        print(
+            "⚠️  Strava fetch hit TRAILTRAINING_STRAVA_MAX_PAGES limit. "
+            "Set TRAILTRAINING_STRAVA_MAX_PAGES=0 (unlimited) or increase it to avoid truncation."
+        )
+
+    slim_new = [_slim_activity(a) for a in raw_new]
     merged = _merge_by_id(existing, slim_new)
 
     # update meta
@@ -241,6 +313,7 @@ def main() -> None:
         "max_start_date_ts": max_start_ts,
         "count": len(merged),
         "new_count": len(slim_new),
+        "pagination": page_info,
     }
 
     save_json(ACTIVITIES_JSON(), merged, compact=True)

@@ -77,10 +77,10 @@ def apply_profile(profile: str) -> str:
     return profile
 
 
-def cmd_auth_strava(_args):
+def cmd_auth_strava(args):
     from trailtraining.pipelines import strava
 
-    _run(strava.main)
+    _run(lambda: strava.auth_main(force=getattr(args, "force", False)))
 
 
 def cmd_fetch_strava(_args):
@@ -366,7 +366,13 @@ def main(argv=None):
 
     sub.add_parser("doctor", help="Check configuration + dependencies").set_defaults(func=cmd_doctor)
 
-    sub.add_parser("auth-strava", help="Run Strava auth flow (opens local server)").set_defaults(func=cmd_auth_strava)
+    auth_p = sub.add_parser("auth-strava", help="Run Strava auth flow (opens local server)")
+    auth_p.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reauthorization even if a token exists (useful if you authorized the wrong account).",
+    )
+    auth_p.set_defaults(func=cmd_auth_strava)
     sub.add_parser("fetch-strava", help="Fetch activities from Strava").set_defaults(func=cmd_fetch_strava)
     sub.add_parser("fetch-garmin", help="Fetch/process data from Garmin").set_defaults(func=cmd_fetch_garmin)
     sub.add_parser("combine", help="Combine Garmin + Strava JSONs").set_defaults(func=cmd_combine)
