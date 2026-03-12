@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Pipelines for Garmin/Strava + fatigue modeling"
 readme = "README.md"
 requires-python = ">=3.9"
+license = { file = "LICENSE" }
 
 authors = [{ name = "Cameron Caputa", email = "cameroncaputa@gmail.com" }]
 keywords = ["data-pipeline", "strava", "garmin", "etl", "llm-evaluation", "cli"]
