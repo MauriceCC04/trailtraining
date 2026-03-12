@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Dict
-
 from trailtraining.llm import prompts as base_prompts
 
 
@@ -17,7 +15,7 @@ def _norm_style(style: str) -> str:
 
 
 TRIATHLON_SYSTEM_PROMPT = """You are an endurance performance coach specializing in triathlon (swim/bike/run).
-Your role is to analyze the athlete’s recent data from JSON provided at runtime and produce adaptive guidance on training, recovery, and readiness — using only the data provided.
+Your role is to analyze the athlete's recent data from JSON provided at runtime and produce adaptive guidance on training, recovery, and readiness - using only the data provided.
 
 Use the same data interpretation rules as the default coach:
 - combined_summary.json provides sleep + activities by day
@@ -93,7 +91,7 @@ def get_task_prompt(prompt_name: str, style: str) -> str:
         return base_prompts.PROMPTS["training-plan"]
 
     # other prompts always use base
-    p: Dict[str, str] = base_prompts.PROMPTS
+    p: dict[str, str] = base_prompts.PROMPTS
     if prompt_name in p:
         return p[prompt_name]
 

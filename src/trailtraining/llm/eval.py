@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from trailtraining.llm.constraints import (
     ConstraintConfig,
@@ -14,7 +14,7 @@ from trailtraining.util.state import load_json
 
 def _load_rollups_near(
     path: Path, explicit_rollups: Optional[str] = None
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     if explicit_rollups:
         p = Path(explicit_rollups).expanduser().resolve()
         x = load_json(p, default=None)
@@ -33,7 +33,7 @@ def evaluate_training_plan_file(
     *,
     rollups_path: Optional[str] = None,
     cfg: Optional[ConstraintConfig] = None,
-) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
     Backwards compatible: returns (violations, obj)
     """
@@ -53,7 +53,7 @@ def evaluate_training_plan_quality_file(
     *,
     rollups_path: Optional[str] = None,
     cfg: Optional[ConstraintConfig] = None,
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     New: returns (report, obj)
     report includes score/grade/subscores/stats/violations

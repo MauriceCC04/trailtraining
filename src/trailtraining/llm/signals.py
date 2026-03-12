@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from trailtraining.metrics.training_load import day_training_load_hours
 
@@ -14,14 +14,14 @@ def _as_date(s: str) -> Optional[date]:
         return None
 
 
-def _mean(xs: List[float]) -> Optional[float]:
+def _mean(xs: list[float]) -> Optional[float]:
     xs2 = [x for x in xs if x is not None]
     if not xs2:
         return None
     return sum(xs2) / len(xs2)
 
 
-def _sleep_hours(day_obj: Dict[str, Any]) -> Optional[float]:
+def _sleep_hours(day_obj: dict[str, Any]) -> Optional[float]:
     sleep = day_obj.get("sleep")
     if not isinstance(sleep, dict):
         return None
@@ -31,7 +31,7 @@ def _sleep_hours(day_obj: Dict[str, Any]) -> Optional[float]:
     return None
 
 
-def _sleep_int(day_obj: Dict[str, Any], key: str) -> Optional[int]:
+def _sleep_int(day_obj: dict[str, Any], key: str) -> Optional[int]:
     sleep = day_obj.get("sleep")
     if not isinstance(sleep, dict):
         return None
@@ -42,7 +42,7 @@ def _sleep_int(day_obj: Dict[str, Any], key: str) -> Optional[int]:
     return None
 
 
-def _sum_activity_fields(day_obj: Dict[str, Any]) -> Tuple[float, float, float, float]:
+def _sum_activity_fields(day_obj: dict[str, Any]) -> tuple[float, float, float, float]:
     """
     Returns (distance_km, moving_time_hours, elevation_m, training_load_hours) for one day.
     training_load_hours is computed from moving_time * load_factor, so distance==0 can still contribute.
@@ -71,7 +71,7 @@ def _sum_activity_fields(day_obj: Dict[str, Any]) -> Tuple[float, float, float, 
     return dist_m / 1000.0, mv_s / 3600.0, elev_m, tlh
 
 
-def build_weekly_history(combined: List[Dict[str, Any]], *, weeks: int) -> List[Dict[str, Any]]:
+def build_weekly_history(combined: list[dict[str, Any]], *, weeks: int) -> list[dict[str, Any]]:
     """
     Weekly retrieval summary for the last N weeks.
     Output: list sorted oldest -> newest:
@@ -95,7 +95,7 @@ def build_weekly_history(combined: List[Dict[str, Any]], *, weeks: int) -> List[
     if not last_d:
         return []
 
-    buckets: Dict[str, Dict[str, Any]] = {}
+    buckets: dict[str, dict[str, Any]] = {}
     for day_obj in combined:
         ds = day_obj.get("date")
         if not isinstance(ds, str):
@@ -147,12 +147,9 @@ def build_weekly_history(combined: List[Dict[str, Any]], *, weeks: int) -> List[
             b["rhr"].append(float(rhr))
 
     all_weeks = sorted(buckets.keys())
-    if weeks > 0 and len(all_weeks) > weeks:
-        keep = set(all_weeks[-weeks:])
-    else:
-        keep = set(all_weeks)
+    keep = set(all_weeks[-weeks:]) if weeks > 0 and len(all_weeks) > weeks else set(all_weeks)
 
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for w in all_weeks:
         if w not in keep:
             continue
@@ -177,8 +174,8 @@ def build_weekly_history(combined: List[Dict[str, Any]], *, weeks: int) -> List[
 
 
 def build_signal_registry(
-    combined: List[Dict[str, Any]], rollups: Optional[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
+    combined: list[dict[str, Any]], rollups: Optional[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """
     Creates a citeable registry of signals. The coach must reference signal_ids from this list.
     """
@@ -188,7 +185,7 @@ def build_signal_registry(
     if not last_d:
         return []
 
-    reg: List[Dict[str, Any]] = []
+    reg: list[dict[str, Any]] = []
 
     def add(signal_id: str, value: Any, source: str, date_range: str, unit: str = "") -> None:
         reg.append(
@@ -288,9 +285,9 @@ def build_signal_registry(
         pass
 
     # Derived recovery signals from combined_summary (last 7/28)
-    def window(days: int) -> List[Dict[str, Any]]:
+    def window(days: int) -> list[dict[str, Any]]:
         start = last_d - timedelta(days=days - 1)
-        out2: List[Dict[str, Any]] = []
+        out2: list[dict[str, Any]] = []
         for d in combined:
             ds = d.get("date")
             if not isinstance(ds, str):
@@ -345,11 +342,11 @@ def build_signal_registry(
 
 
 def build_retrieval_context(
-    combined: List[Dict[str, Any]],
-    rollups: Optional[Dict[str, Any]],
+    combined: list[dict[str, Any]],
+    rollups: Optional[dict[str, Any]],
     *,
     retrieval_weeks: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "weekly_history": build_weekly_history(combined, weeks=retrieval_weeks),
         "signal_registry": build_signal_registry(

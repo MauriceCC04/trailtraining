@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from trailtraining import config
 from trailtraining.metrics.training_load import day_training_load_hours
@@ -18,7 +18,7 @@ def _as_date(s: str) -> Optional[date]:
         return None
 
 
-def _sleep_int(day_obj: Dict[str, Any], key: str) -> Optional[float]:
+def _sleep_int(day_obj: dict[str, Any], key: str) -> Optional[float]:
     sleep = day_obj.get("sleep")
     if not isinstance(sleep, dict):
         return None
@@ -29,14 +29,14 @@ def _sleep_int(day_obj: Dict[str, Any], key: str) -> Optional[float]:
     return None
 
 
-def _mean(xs: List[float]) -> Optional[float]:
+def _mean(xs: list[float]) -> Optional[float]:
     xs2 = [x for x in xs if x is not None]
     if not xs2:
         return None
     return sum(xs2) / len(xs2)
 
 
-def _std(xs: List[float]) -> Optional[float]:
+def _std(xs: list[float]) -> Optional[float]:
     xs2 = [x for x in xs if x is not None]
     if len(xs2) < 2:
         return None
@@ -49,9 +49,9 @@ def _clamp(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
 
 
-def _window_days(combined: List[Dict[str, Any]], last_d: date, days: int) -> List[Dict[str, Any]]:
+def _window_days(combined: list[dict[str, Any]], last_d: date, days: int) -> list[dict[str, Any]]:
     start = last_d - timedelta(days=days - 1)
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for d in combined:
         ds = d.get("date")
         if not isinstance(ds, str):
@@ -62,12 +62,12 @@ def _window_days(combined: List[Dict[str, Any]], last_d: date, days: int) -> Lis
     return out
 
 
-def _compute_daily_series(combined: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _compute_daily_series(combined: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Returns list aligned with combined (assumed chronological), each:
       {date, training_load_hours, rhr}
     """
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for day in combined:
         ds = day.get("date")
         if not isinstance(ds, str):
@@ -82,13 +82,13 @@ def _compute_daily_series(combined: List[Dict[str, Any]]) -> List[Dict[str, Any]
     return out
 
 
-def _rolling_sum(values: List[float], window: int) -> List[Optional[float]]:
+def _rolling_sum(values: list[float], window: int) -> list[Optional[float]]:
     """
     rolling sum ending at i (inclusive). For i < window-1 => None
     """
     if window <= 0:
         return [None] * len(values)
-    out: List[Optional[float]] = [None] * len(values)
+    out: list[Optional[float]] = [None] * len(values)
     acc = 0.0
     for i, v in enumerate(values):
         acc += float(v)
@@ -106,12 +106,12 @@ class ForecastResult:
     readiness_status: str
     overreach_risk_score: float
     overreach_risk_level: str
-    inputs: Dict[str, Any]
-    drivers: Dict[str, List[str]]
+    inputs: dict[str, Any]
+    drivers: dict[str, list[str]]
 
 
 def compute_readiness_and_risk(
-    combined: List[Dict[str, Any]],
+    combined: list[dict[str, Any]],
 ) -> ForecastResult:
     if not combined:
         raise ValueError("combined_summary.json is empty")
@@ -143,8 +143,8 @@ def compute_readiness_and_risk(
     base7_std = _std([float(x) for x in prior_roll7]) if prior_roll7 else None
 
     # --- Normalize deltas without hard-coded bpm thresholds ---
-    drivers_readiness: List[str] = []
-    drivers_risk: List[str] = []
+    drivers_readiness: list[str] = []
+    drivers_risk: list[str] = []
 
     # RHR z-score (primary readiness input per your requirement)
     if rhr7 is not None and rhr28 is not None:
@@ -256,7 +256,7 @@ def compute_readiness_and_risk(
 
 def run_forecasts(
     input_dir: Optional[str] = None, output_path: Optional[str] = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     CLI entrypoint used by: trailtraining forecast
     Writes readiness_and_risk_forecast.json by default.

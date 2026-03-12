@@ -1,14 +1,14 @@
 # src/trailtraining/metrics/training_load.py
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
 
 
-def activity_load_factor(activity: Dict[str, Any]) -> float:
+def activity_load_factor(activity: dict[str, Any]) -> float:
     """
     Intensity proxy ("load") used for training load:
       training_load_hours = moving_time_hours * activity_load_factor
@@ -31,7 +31,7 @@ def activity_load_factor(activity: Dict[str, Any]) -> float:
     return 1.0
 
 
-def activity_training_load_hours(activity: Dict[str, Any]) -> float:
+def activity_training_load_hours(activity: dict[str, Any]) -> float:
     """
     Returns training load in "load-hours":
       moving_time_hours * load_factor
@@ -44,7 +44,7 @@ def activity_training_load_hours(activity: Dict[str, Any]) -> float:
     return moving_hours * float(activity_load_factor(activity))
 
 
-def day_training_load_hours(day_obj: Dict[str, Any]) -> float:
+def day_training_load_hours(day_obj: dict[str, Any]) -> float:
     """
     Sum of activity_training_load_hours across a day record from combined_summary.json.
     """

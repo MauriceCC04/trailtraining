@@ -72,17 +72,13 @@ fail_under = 0
 [tool.ruff]
 target-version = "py39"
 line-length = 100
-extend-exclude = [
-  ".venv",
-  "build",
-  "dist",
-  "__pycache__",
-]
 
 [tool.ruff.lint]
-# Solid “professional default” set without being annoying
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]  # let formatter handle line length
+ignore = [
+  "E501",  # formatter handles line length
+  "UP007", # requires Python 3.10 syntax (X | Y); keep 3.9 compatible for now
+]
 
 [tool.ruff.format]
 quote-style = "double"

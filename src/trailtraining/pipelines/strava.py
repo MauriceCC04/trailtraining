@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import requests
 
@@ -30,9 +30,15 @@ from trailtraining.web.auth_server import start_auth_server, wait_for_code
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
 ACTIVITIES_PATH = "/athlete/activities"
 
+
 # Files written/used by this pipeline
-ACTIVITIES_JSON = lambda: os.path.join(config.PROCESSING_DIRECTORY, "strava_activities.json")
-META_JSON = lambda: os.path.join(config.PROCESSING_DIRECTORY, "strava_meta.json")
+def ACTIVITIES_JSON():
+    return os.path.join(config.PROCESSING_DIRECTORY, "strava_activities.json")
+
+
+def META_JSON():
+    return os.path.join(config.PROCESSING_DIRECTORY, "strava_meta.json")
+
 
 # Defaults (tweak via env)
 DEFAULT_LOOKBACK_DAYS = int(os.getenv("TRAILTRAINING_STRAVA_LOOKBACK_DAYS", "365"))
@@ -99,7 +105,7 @@ def _request_with_retry(
 
 
 def _api_get(
-    session: requests.Session, path: str, access_token: str, params: Optional[Dict[str, Any]] = None
+    session: requests.Session, path: str, access_token: str, params: Optional[dict[str, Any]] = None
 ) -> Any:
     resp = _request_with_retry(
         session,
@@ -111,7 +117,7 @@ def _api_get(
     return resp.json()
 
 
-def _slim_activity(a: Dict[str, Any]) -> Dict[str, Any]:
+def _slim_activity(a: dict[str, Any]) -> dict[str, Any]:
     """
     Keep only fields commonly needed downstream.
     Include BOTH start_date (UTC) and start_date_local.
@@ -135,7 +141,7 @@ def _slim_activity(a: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _get_or_auth_token(cfg: StravaOAuthConfig) -> Dict[str, Any]:
+def _get_or_auth_token(cfg: StravaOAuthConfig) -> dict[str, Any]:
     token = get_valid_token(cfg)
     if token:
         return token
@@ -179,7 +185,7 @@ def auth_main(*, force: bool = False) -> None:
     print(f"✅ Saved Strava token → {token_path}")
 
 
-def _compute_after_unix(existing: List[Dict[str, Any]], meta: Dict[str, Any]) -> int:
+def _compute_after_unix(existing: list[dict[str, Any]], meta: dict[str, Any]) -> int:
     """
     Prefer meta.max_start_date_ts (UTC), otherwise compute from existing activities,
     otherwise fall back to NOW - lookback_days.
@@ -212,11 +218,11 @@ def fetch_activities_incremental(
     per_page: int = PER_PAGE,
     max_pages: int = MAX_PAGES,
     hard_max_pages: int = HARD_MAX_PAGES,
-) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
     Returns: (activities, pagination_info)
     """
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
 
     page = 1
     pages_fetched = 0
@@ -261,9 +267,9 @@ def fetch_activities_incremental(
 
 
 def _merge_by_id(
-    existing: List[Dict[str, Any]], new_items: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
-    merged: Dict[str, Dict[str, Any]] = {}
+    existing: list[dict[str, Any]], new_items: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
     for a in existing:
         if a.get("id") is not None:
             merged[str(a["id"])] = a
@@ -272,7 +278,7 @@ def _merge_by_id(
             merged[str(a["id"])] = a
 
     # stable order by start_date desc (fallback by id)
-    def key_fn(x: Dict[str, Any]):
+    def key_fn(x: dict[str, Any]):
         dt = _parse_strava_datetime(x.get("start_date"))
         ts = int(dt.timestamp()) if dt else 0
         return (ts, int(x.get("id") or 0))
@@ -291,8 +297,8 @@ def main() -> None:
     if not access_token:
         raise RuntimeError("Strava token did not include access_token.")
 
-    existing: List[Dict[str, Any]] = load_json(ACTIVITIES_JSON(), default=[]) or []
-    meta: Dict[str, Any] = load_json(META_JSON(), default={}) or {}
+    existing: list[dict[str, Any]] = load_json(ACTIVITIES_JSON(), default=[]) or []
+    meta: dict[str, Any] = load_json(META_JSON(), default={}) or {}
 
     after_unix = _compute_after_unix(existing, meta)
 

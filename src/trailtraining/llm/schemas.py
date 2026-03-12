@@ -1,7 +1,7 @@
 # src/trailtraining/llm/schemas.py
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 _SNAPSHOT_KEYS = [
     "distance_km",
@@ -14,7 +14,7 @@ _SNAPSHOT_KEYS = [
 ]
 
 
-def _snapshot_obj_schema() -> Dict[str, Any]:
+def _snapshot_obj_schema() -> dict[str, Any]:
     # OpenAI strict schema requires:
     # - additionalProperties: false on every object
     # - required must include EVERY key in properties
@@ -35,7 +35,7 @@ def _snapshot_obj_schema() -> Dict[str, Any]:
     }
 
 
-TRAINING_PLAN_SCHEMA: Dict[str, Any] = {
+TRAINING_PLAN_SCHEMA: dict[str, Any] = {
     "name": "trailtraining_training_plan_v1",
     "schema": {
         "type": "object",
@@ -212,7 +212,7 @@ def training_plan_output_contract_text() -> str:
     )
 
 
-def _require(obj: Dict[str, Any], key: str, typ: Any) -> Any:
+def _require(obj: dict[str, Any], key: str, typ: Any) -> Any:
     if key not in obj:
         raise ValueError(f"Missing required key: {key}")
     v = obj[key]
@@ -221,7 +221,7 @@ def _require(obj: Dict[str, Any], key: str, typ: Any) -> Any:
     return v
 
 
-def ensure_training_plan_shape(obj: Any) -> Dict[str, Any]:
+def ensure_training_plan_shape(obj: Any) -> dict[str, Any]:
     if not isinstance(obj, dict):
         raise ValueError("Training plan output must be a JSON object (dict).")
 

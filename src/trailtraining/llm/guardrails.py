@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import replace
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from trailtraining.llm.constraints import ConstraintConfig
 
@@ -31,7 +31,7 @@ def _get_cfg() -> ConstraintConfig:
     return cfg
 
 
-def _get_last7_hours(rollups: Optional[Dict[str, Any]]) -> Optional[float]:
+def _get_last7_hours(rollups: Optional[dict[str, Any]]) -> Optional[float]:
     try:
         v = (
             (rollups or {})
@@ -45,7 +45,7 @@ def _get_last7_hours(rollups: Optional[Dict[str, Any]]) -> Optional[float]:
         return None
 
 
-def _normalize_days(plan_obj: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _normalize_days(plan_obj: dict[str, Any]) -> list[dict[str, Any]]:
     days = (plan_obj.get("plan") or {}).get("days")
     if not isinstance(days, list):
         return []
@@ -56,7 +56,7 @@ def _normalize_days(plan_obj: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
-def _sum_minutes(days: List[Dict[str, Any]]) -> int:
+def _sum_minutes(days: list[dict[str, Any]]) -> int:
     total = 0
     for d in days:
         m = d.get("duration_minutes")
@@ -65,7 +65,7 @@ def _sum_minutes(days: List[Dict[str, Any]]) -> int:
     return total
 
 
-def _set_weekly_hours(plan_obj: Dict[str, Any]) -> float:
+def _set_weekly_hours(plan_obj: dict[str, Any]) -> float:
     """
     Force weekly_totals.planned_moving_time_hours == sum(first7 durations)/60
     (This is what eval should reflect.)
@@ -82,7 +82,7 @@ def _set_weekly_hours(plan_obj: Dict[str, Any]) -> float:
     return hours
 
 
-def _min_minutes_for_day(d: Dict[str, Any]) -> int:
+def _min_minutes_for_day(d: dict[str, Any]) -> int:
     # Allow true rest to be zero.
     if bool(d.get("is_rest_day")) or str(d.get("session_type") or "") == "rest":
         return 0
@@ -103,7 +103,7 @@ def _min_minutes_for_day(d: Dict[str, Any]) -> int:
     return 30
 
 
-def _reduction_priority(d: Dict[str, Any]) -> Tuple[int, int]:
+def _reduction_priority(d: dict[str, Any]) -> tuple[int, int]:
     """
     Lower tuple reduces first.
     We reduce:
@@ -135,7 +135,7 @@ def _reduction_priority(d: Dict[str, Any]) -> Tuple[int, int]:
     return (5, -dur_i)
 
 
-def _reduce_total_minutes(days: List[Dict[str, Any]], reduce_by: int) -> int:
+def _reduce_total_minutes(days: list[dict[str, Any]], reduce_by: int) -> int:
     """
     Greedy reductions until we reduce_by minutes or no capacity left.
     Returns remaining minutes not reduced (0 means success).
@@ -166,7 +166,7 @@ def _reduce_total_minutes(days: List[Dict[str, Any]], reduce_by: int) -> int:
     return remaining
 
 
-def _hard_downgrade_score(d: Dict[str, Any]) -> int:
+def _hard_downgrade_score(d: dict[str, Any]) -> int:
     """
     Higher score => better candidate to flip is_hard_day from True -> False.
     We prefer downgrading long/cross that are mostly aerobic.
@@ -200,8 +200,8 @@ def _hard_downgrade_score(d: Dict[str, Any]) -> int:
     return score
 
 
-def _enforce_max_hard_per_7d(days: List[Dict[str, Any]], max_hard: int) -> List[str]:
-    changed: List[str] = []
+def _enforce_max_hard_per_7d(days: list[dict[str, Any]], max_hard: int) -> list[str]:
+    changed: list[str] = []
     if max_hard <= 0:
         return changed
 
@@ -219,12 +219,12 @@ def _enforce_max_hard_per_7d(days: List[Dict[str, Any]], max_hard: int) -> List[
     return changed
 
 
-def _enforce_max_consecutive_hard(days: List[Dict[str, Any]], max_consec: int) -> List[str]:
-    changed: List[str] = []
+def _enforce_max_consecutive_hard(days: list[dict[str, Any]], max_consec: int) -> list[str]:
+    changed: list[str] = []
     if max_consec <= 0:
         return changed
 
-    streak: List[Dict[str, Any]] = []
+    streak: list[dict[str, Any]] = []
     for d in days:
         if bool(d.get("is_hard_day")) and not bool(d.get("is_rest_day")):
             streak.append(d)
@@ -245,7 +245,7 @@ def _enforce_max_consecutive_hard(days: List[Dict[str, Any]], max_consec: int) -
     return changed
 
 
-def build_eval_constraints_block(rollups: Optional[Dict[str, Any]]) -> str:
+def build_eval_constraints_block(rollups: Optional[dict[str, Any]]) -> str:
     cfg = _get_cfg()
     last7 = _get_last7_hours(rollups)
     allowed = (
@@ -279,7 +279,7 @@ def build_eval_constraints_block(rollups: Optional[Dict[str, Any]]) -> str:
 
 
 def apply_eval_coach_guardrails(
-    plan_obj: Dict[str, Any], rollups: Optional[Dict[str, Any]]
+    plan_obj: dict[str, Any], rollups: Optional[dict[str, Any]]
 ) -> None:
     """
     Mutates plan_obj in-place so it passes eval-coach safety constraints:
@@ -311,7 +311,7 @@ def apply_eval_coach_guardrails(
     if isinstance(last7, (int, float)) and last7 > 0:
         allowed_hours = float(last7) * (1.0 + cfg.max_ramp_pct / 100.0)
 
-        # Use the first 7 days for the sum (that’s what eval assumes)
+        # Use the first 7 days for the sum (that's what eval assumes)
         wk = days[: min(7, len(days))]
         cur_min = _sum_minutes(wk)
         allowed_min = int(round(allowed_hours * 60.0))
@@ -373,7 +373,7 @@ def apply_eval_coach_guardrails(
                 )
 
 
-def _planned_hours_from_obj(plan_obj: Dict[str, Any]) -> Optional[float]:
+def _planned_hours_from_obj(plan_obj: dict[str, Any]) -> Optional[float]:
     wt = (plan_obj.get("plan") or {}).get("weekly_totals") or {}
     v = wt.get("planned_moving_time_hours")
     return float(v) if isinstance(v, (int, float)) else None

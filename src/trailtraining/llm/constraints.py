@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 
 @dataclass(frozen=True)
@@ -51,8 +51,8 @@ def _v(
     message: str,
     *,
     penalty: Optional[int] = None,
-    details: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    details: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     return {
         "code": code,
         "severity": severity,
@@ -63,34 +63,34 @@ def _v(
     }
 
 
-def _chunk7(days: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
-    out: List[List[Dict[str, Any]]] = []
+def _chunk7(days: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    out: list[list[dict[str, Any]]] = []
     for i in range(0, len(days), 7):
         out.append(days[i : i + 7])
     return out
 
 
-def _normalize_days(plan_obj: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _normalize_days(plan_obj: dict[str, Any]) -> list[dict[str, Any]]:
     raw = (plan_obj.get("plan") or {}).get("days")
     if not isinstance(raw, list):
         return []
-    days: List[Dict[str, Any]] = [d for d in raw if isinstance(d, dict)]
+    days: list[dict[str, Any]] = [d for d in raw if isinstance(d, dict)]
 
     # Sort by date if possible; otherwise keep stable-ish order
-    def key(d: Dict[str, Any]) -> Tuple[int, str]:
+    def key(d: dict[str, Any]) -> tuple[int, str]:
         dd = _as_date(d.get("date"))
         return (0, dd.isoformat()) if dd else (1, str(d.get("date") or ""))
 
     return sorted(days, key=key)
 
 
-def _planned_week_hours(plan_obj: Dict[str, Any]) -> Optional[float]:
+def _planned_week_hours(plan_obj: dict[str, Any]) -> Optional[float]:
     wt = (plan_obj.get("plan") or {}).get("weekly_totals") or {}
     v = wt.get("planned_moving_time_hours")
     return float(v) if isinstance(v, (int, float)) else None
 
 
-def _sum_hours(days: List[Dict[str, Any]]) -> float:
+def _sum_hours(days: list[dict[str, Any]]) -> float:
     total_min = 0.0
     for d in days:
         m = d.get("duration_minutes")
@@ -109,11 +109,11 @@ def _pct_diff(a: float, b: float) -> Optional[float]:
 # Existing constraint function
 # -----------------------------
 def validate_training_plan(
-    plan_obj: Dict[str, Any],
-    rollups: Optional[Dict[str, Any]],
+    plan_obj: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
     cfg: ConstraintConfig,
-) -> List[Dict[str, Any]]:
-    violations: List[Dict[str, Any]] = []
+) -> list[dict[str, Any]]:
+    violations: list[dict[str, Any]] = []
 
     # --- Ramp rate ---
     planned = plan_obj.get("plan", {}).get("weekly_totals", {})
@@ -169,10 +169,10 @@ def validate_training_plan(
 # New: quality scoring
 # -----------------------------
 def evaluate_training_plan_quality(
-    plan_obj: Dict[str, Any],
-    rollups: Optional[Dict[str, Any]],
+    plan_obj: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
     cfg: ConstraintConfig,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Returns a report dict:
       {
@@ -184,7 +184,7 @@ def evaluate_training_plan_quality(
       }
     """
     # Start with existing safety constraints
-    violations: List[Dict[str, Any]] = []
+    violations: list[dict[str, Any]] = []
     for v0 in validate_training_plan(plan_obj, rollups, cfg):
         if isinstance(v0, dict):
             # already normalized via _v(), but keep robust
@@ -197,7 +197,7 @@ def evaluate_training_plan_quality(
     # ---- Stats ----
     hard_days = sum(1 for d in days if bool(d.get("is_hard_day")))
     rest_days = sum(1 for d in days if bool(d.get("is_rest_day")))
-    stats: Dict[str, Any] = {"days": len(days), "hard_days": hard_days, "rest_days": rest_days}
+    stats: dict[str, Any] = {"days": len(days), "hard_days": hard_days, "rest_days": rest_days}
 
     # ---- Structure checks ----
     seen = set()
@@ -375,12 +375,12 @@ def evaluate_training_plan_quality(
 
 
 def score_from_violations(
-    violations: List[Dict[str, Any]],
+    violations: list[dict[str, Any]],
     *,
-    stats: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    stats: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     total_pen = 0
-    by_cat: Dict[str, int] = {}
+    by_cat: dict[str, int] = {}
     for v in violations:
         if not isinstance(v, dict):
             continue

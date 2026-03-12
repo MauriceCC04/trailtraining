@@ -164,13 +164,13 @@ def cmd_doctor(_args):
     from trailtraining.data.strava import default_token_path
 
     def ok(label: str, msg: str = "") -> None:
-        print(f"✅ {label}" + (f" — {msg}" if msg else ""))
+        print(f"✅ {label}" + (f" - {msg}" if msg else ""))
 
     def warn(label: str, msg: str = "") -> None:
-        print(f"⚠️  {label}" + (f" — {msg}" if msg else ""))
+        print(f"⚠️  {label}" + (f" - {msg}" if msg else ""))
 
     def bad(label: str, msg: str = "") -> None:
-        print(f"❌ {label}" + (f" — {msg}" if msg else ""))
+        print(f"❌ {label}" + (f" - {msg}" if msg else ""))
 
     print("TrailTraining doctor\n")
 
@@ -258,7 +258,7 @@ def cmd_doctor(_args):
         ok("OpenAI API key set (coach enabled)")
     else:
         warn(
-            "OpenAI API key not set", "Coach won’t run until you set OPENAI_API_KEY (recommended)."
+            "OpenAI API key not set", "Coach won't run until you set OPENAI_API_KEY (recommended)."
         )
 
     print("\nSummary:")

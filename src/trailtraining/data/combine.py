@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from trailtraining import config
 from trailtraining.metrics.training_load import activity_training_load_hours
@@ -19,7 +19,7 @@ def _as_date(s: str) -> Optional[date]:
         return None
 
 
-def _extract_sleep_date(entry: Dict[str, Any]) -> Optional[str]:
+def _extract_sleep_date(entry: dict[str, Any]) -> Optional[str]:
     """
     Garmin/Intervals filtered_sleep.json uses 'calendarDate' (YYYY-MM-DD).
     Be tolerant of other key names and nested dailySleepDTO.
@@ -38,7 +38,7 @@ def _extract_sleep_date(entry: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _date_key_from_activity(a: Dict[str, Any]) -> Optional[str]:
+def _date_key_from_activity(a: dict[str, Any]) -> Optional[str]:
     # Prefer local date for grouping
     s = a.get("start_date_local") or a.get("start_date")
     if not isinstance(s, str) or len(s) < 10:
@@ -46,21 +46,21 @@ def _date_key_from_activity(a: Dict[str, Any]) -> Optional[str]:
     return s[:10]
 
 
-def _load_sleep_by_date(path: str) -> Dict[str, Dict[str, Any]]:
+def _load_sleep_by_date(path: str) -> dict[str, dict[str, Any]]:
     raw = load_json(path, default=None)
     if raw is None:
         return {}
 
     # If it's already dict keyed by date, normalize keys to YYYY-MM-DD
     if isinstance(raw, dict):
-        out: Dict[str, Dict[str, Any]] = {}
+        out: dict[str, dict[str, Any]] = {}
         for k, v in raw.items():
             if isinstance(k, str) and len(k) >= 10 and isinstance(v, dict):
                 out[k[:10]] = v
         return out
 
     # Typical case: list of dict entries with calendarDate
-    out: Dict[str, Dict[str, Any]] = {}
+    out: dict[str, dict[str, Any]] = {}
     if isinstance(raw, list):
         for item in raw:
             if not isinstance(item, dict):
@@ -71,12 +71,12 @@ def _load_sleep_by_date(path: str) -> Dict[str, Dict[str, Any]]:
     return out
 
 
-def _load_activities_by_date(path: str) -> Dict[str, List[Dict[str, Any]]]:
+def _load_activities_by_date(path: str) -> dict[str, list[dict[str, Any]]]:
     raw = load_json(path, default=[])
     if not isinstance(raw, list):
         return {}
 
-    out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    out: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for a in raw:
         if not isinstance(a, dict):
             continue
@@ -87,11 +87,11 @@ def _load_activities_by_date(path: str) -> Dict[str, List[Dict[str, Any]]]:
 
 
 def _compute_rollup(
-    combined: List[Dict[str, Any]],
+    combined: list[dict[str, Any]],
     *,
     end_date: date,
     window_days: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     start_date = end_date - timedelta(days=window_days - 1)
 
     total_distance_m = 0.0
@@ -107,7 +107,7 @@ def _compute_rollup(
     sleep_days_with_data = 0
 
     # Per-sport aggregation (distance/time/elev + training load)
-    by_sport: Dict[str, Dict[str, float]] = defaultdict(
+    by_sport: dict[str, dict[str, float]] = defaultdict(
         lambda: {
             "count": 0.0,
             "distance_m": 0.0,
@@ -170,7 +170,7 @@ def _compute_rollup(
 
     avg_hr = (hr_sum / hr_n) if hr_n else None
 
-    by_sport_out: Dict[str, Any] = {}
+    by_sport_out: dict[str, Any] = {}
     for sport, agg in by_sport.items():
         by_sport_out[sport] = {
             "count": int(agg["count"]),
@@ -211,7 +211,7 @@ def main() -> None:
     print(f"Loaded activity days: {len(activities_by_date)} from {activities_path}")
 
     all_dates = sorted(set(sleep_by_date.keys()) | set(activities_by_date.keys()))
-    combined: List[Dict[str, Any]] = []
+    combined: list[dict[str, Any]] = []
 
     for d in all_dates:
         combined.append(

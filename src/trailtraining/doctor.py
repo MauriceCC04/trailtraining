@@ -11,15 +11,15 @@ from trailtraining.data.strava import default_token_path
 
 
 def _ok(label: str, msg: str = "") -> None:
-    print(f"✅ {label}" + (f" — {msg}" if msg else ""))
+    print(f"✅ {label}" + (f" - {msg}" if msg else ""))
 
 
 def _warn(label: str, msg: str = "") -> None:
-    print(f"⚠️  {label}" + (f" — {msg}" if msg else ""))
+    print(f"⚠️  {label}" + (f" - {msg}" if msg else ""))
 
 
 def _bad(label: str, msg: str = "") -> None:
-    print(f"❌ {label}" + (f" — {msg}" if msg else ""))
+    print(f"❌ {label}" + (f" - {msg}" if msg else ""))
 
 
 def _detect_provider(explicit: Optional[str] = None) -> str:
@@ -126,7 +126,7 @@ def main() -> None:
     if os.getenv("OPENAI_API_KEY") or os.getenv("TRAILTRAINING_OPENAI_API_KEY"):
         _ok("OpenAI API key set (coach enabled)")
     else:
-        _warn("OpenAI API key not set", "Coach won’t run until you set OPENAI_API_KEY.")
+        _warn("OpenAI API key not set", "Coach won't run until you set OPENAI_API_KEY.")
 
     print("\nSummary:")
     if issues:

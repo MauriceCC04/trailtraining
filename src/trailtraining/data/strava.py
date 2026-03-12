@@ -8,7 +8,7 @@ import secrets
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from urllib.parse import urlencode
 
 import requests
@@ -74,7 +74,7 @@ def build_authorize_url(config: StravaOAuthConfig, state: Optional[str] = None) 
 
 def exchange_code_for_token(
     config: StravaOAuthConfig, code: str, session: requests.Session = _SESSION
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     resp = session.post(
         STRAVA_TOKEN_URL,
         data={
@@ -91,7 +91,7 @@ def exchange_code_for_token(
 
 def refresh_access_token(
     config: StravaOAuthConfig, refresh_token: str, session: requests.Session = _SESSION
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     resp = session.post(
         STRAVA_TOKEN_URL,
         data={
@@ -106,14 +106,14 @@ def refresh_access_token(
     return resp.json()
 
 
-def load_token(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+def load_token(path: Optional[Path] = None) -> Optional[dict[str, Any]]:
     path = path or default_token_path()
     if not path.exists():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def save_token(token: Dict[str, Any], path: Optional[Path] = None) -> Path:
+def save_token(token: dict[str, Any], path: Optional[Path] = None) -> Path:
     path = path or default_token_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     # compact is fine (small file)
@@ -121,7 +121,7 @@ def save_token(token: Dict[str, Any], path: Optional[Path] = None) -> Path:
     return path
 
 
-def token_is_valid(token: Dict[str, Any], leeway_seconds: int = 60) -> bool:
+def token_is_valid(token: dict[str, Any], leeway_seconds: int = 60) -> bool:
     expires_at = token.get("expires_at")
     if not isinstance(expires_at, (int, float)):
         return False
@@ -130,7 +130,7 @@ def token_is_valid(token: Dict[str, Any], leeway_seconds: int = 60) -> bool:
 
 def get_valid_token(
     config: StravaOAuthConfig, token_path: Optional[Path] = None
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     token_path = token_path or default_token_path()
     token = load_token(token_path)
     if token is None:

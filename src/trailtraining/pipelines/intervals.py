@@ -5,7 +5,7 @@ import json
 import os
 import time
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import requests
 
@@ -15,7 +15,7 @@ BASE_URL = os.getenv("INTERVALS_BASE_URL", "https://intervals.icu/api/v1")
 _SESSION = requests.Session()
 
 
-def _pick(obj: Dict[str, Any], *keys: str, default: Any = None) -> Any:
+def _pick(obj: dict[str, Any], *keys: str, default: Any = None) -> Any:
     for k in keys:
         if k in obj and obj[k] is not None:
             return obj[k]
@@ -31,7 +31,7 @@ def _to_int(v: Any, default: int = -1) -> int:
         return default
 
 
-def _auth_headers() -> Dict[str, str]:
+def _auth_headers() -> dict[str, str]:
     # If you ever add OAuth later:
     bearer = os.getenv("INTERVALS_ACCESS_TOKEN", "").strip()
     if bearer:
@@ -83,7 +83,7 @@ def _request_with_retry(
     raise RuntimeError(f"HTTP request failed after retries: {method} {url} ({last_err})")
 
 
-def fetch_wellness(oldest: str, newest: str) -> List[Dict[str, Any]]:
+def fetch_wellness(oldest: str, newest: str) -> list[dict[str, Any]]:
     athlete_id = (
         os.getenv("INTERVALS_ATHLETE_ID") or getattr(config, "INTERVALS_ATHLETE_ID", "0")
     ).strip() or "0"
@@ -100,10 +100,10 @@ def fetch_wellness(oldest: str, newest: str) -> List[Dict[str, Any]]:
 
     try:
         data = resp.json()
-    except Exception as e:
+    except Exception as err:
         raise RuntimeError(
-            f"Intervals wellness JSON parse failed: {e}. HTTP {resp.status_code}: {resp.text[:500]}"
-        )
+            f"Intervals wellness JSON parse failed: {err}. HTTP {resp.status_code}: {resp.text[:500]}"
+        ) from err
 
     if not isinstance(data, list):
         raise ValueError(
@@ -112,7 +112,7 @@ def fetch_wellness(oldest: str, newest: str) -> List[Dict[str, Any]]:
     return data
 
 
-def normalize_to_filtered_sleep(entry: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_to_filtered_sleep(entry: dict[str, Any]) -> dict[str, Any]:
     # Date key: Intervals often uses `id` for the day (YYYY-MM-DD)
     day = str(_pick(entry, "id", "day", "date", "calendarDate", default=""))[:10]
     if not day:
@@ -145,8 +145,8 @@ def _validate_ymd(s: str, name: str) -> str:
     s = (s or "").strip()
     try:
         date.fromisoformat(s)
-    except Exception:
-        raise RuntimeError(f"{name} must be YYYY-MM-DD. Got: {s!r}")
+    except ValueError as err:
+        raise RuntimeError(f"{name} must be YYYY-MM-DD. Got: {s!r}") from err
     return s
 
 

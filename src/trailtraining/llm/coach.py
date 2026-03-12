@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from openai import OpenAI
 
@@ -41,7 +42,7 @@ def _resolve_input_paths(
     input_path: Optional[str],
     personal_path: Optional[str],
     summary_path: Optional[str],
-) -> Tuple[Path, Path, Optional[Path]]:
+) -> tuple[Path, Path, Optional[Path]]:
     """
     Mirrors your CLI behavior:
       - if --personal/--summary provided, use them
@@ -64,7 +65,7 @@ def _resolve_input_paths(
     return personal, summary, (rollups if rollups.exists() else None)
 
 
-def _dedup_activities_in_place(combined: List[Dict[str, Any]]) -> None:
+def _dedup_activities_in_place(combined: list[dict[str, Any]]) -> None:
     seen = set()
     for day in combined:
         acts = day.get("activities")
@@ -87,7 +88,7 @@ def _dedup_activities_in_place(combined: List[Dict[str, Any]]) -> None:
         day["activities"] = new_acts
 
 
-def _filter_last_days(combined: List[Dict[str, Any]], days: int) -> List[Dict[str, Any]]:
+def _filter_last_days(combined: list[dict[str, Any]], days: int) -> list[dict[str, Any]]:
     if days <= 0:
         return combined
     if not combined:
@@ -110,7 +111,7 @@ def _filter_last_days(combined: List[Dict[str, Any]], days: int) -> List[Dict[st
     return out
 
 
-def _summarize_activity(a: Dict[str, Any]) -> str:
+def _summarize_activity(a: dict[str, Any]) -> str:
     sport = a.get("sport_type") or a.get("type") or "unknown"
     dist_m = a.get("distance")
     elev_m = a.get("total_elevation_gain")
@@ -134,7 +135,7 @@ def _summarize_activity(a: Dict[str, Any]) -> str:
     return " • " + " | ".join(parts)
 
 
-def _summarize_day(day: Dict[str, Any]) -> str:
+def _summarize_day(day: dict[str, Any]) -> str:
     d = day.get("date", "unknown-date")
     lines = [f"## {d}"]
 
@@ -198,8 +199,8 @@ def _extract_json_object(text: str) -> str:
 
 def _load_or_compute_deterministic_forecast(
     base_dir: Path,
-    combined: List[Dict[str, Any]],
-) -> Optional[Dict[str, Any]]:
+    combined: list[dict[str, Any]],
+) -> Optional[dict[str, Any]]:
     """
     Best-effort:
       1) Load base_dir/readiness_and_risk_forecast.json if it exists
@@ -219,7 +220,7 @@ def _load_or_compute_deterministic_forecast(
 
     try:
         fr = compute_readiness_and_risk(combined)
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "result": {
                 "date": getattr(fr, "date", None),
@@ -235,20 +236,18 @@ def _load_or_compute_deterministic_forecast(
                 "drivers": getattr(fr, "drivers", None),
             },
         }
-        try:
+        with contextlib.suppress(Exception):
             save_json(forecast_p, payload, compact=False)
-        except Exception:
-            pass
         return payload
     except Exception:
         return None
 
 
-def _forecast_signal_rows(det_forecast: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _forecast_signal_rows(det_forecast: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Converts readiness_and_risk_forecast.json into signal_registry rows so the model can cite them.
     """
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     if not isinstance(det_forecast, dict):
         return out
     res = det_forecast.get("result")
@@ -308,8 +307,8 @@ def _forecast_signal_rows(det_forecast: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _apply_deterministic_readiness_to_plan(
-    plan_obj: Dict[str, Any],
-    det_forecast: Optional[Dict[str, Any]],
+    plan_obj: dict[str, Any],
+    det_forecast: Optional[dict[str, Any]],
 ) -> None:
     """
     Ensures training-plan output uses the deterministic readiness status.
@@ -355,7 +354,7 @@ def _apply_deterministic_readiness_to_plan(
             dn.append(note)
 
 
-def training_plan_to_text(obj: Dict[str, Any]) -> str:
+def training_plan_to_text(obj: dict[str, Any]) -> str:
     """
     Convert a training-plan JSON object into a simple, human-readable text plan.
     Output is intended to be saved as a .txt file alongside the JSON.
@@ -381,15 +380,15 @@ def training_plan_to_text(obj: Dict[str, Any]) -> str:
         return float(x) if isinstance(x, (int, float)) else None
 
     # Sort days by ISO date if possible
-    def _day_key(d: Dict[str, Any]) -> str:
+    def _day_key(d: dict[str, Any]) -> str:
         ds = d.get("date")
         return ds if isinstance(ds, str) else "9999-99-99"
 
     day_objs = [d for d in days if isinstance(d, dict)]
     day_objs.sort(key=_day_key)
 
-    lines: List[str] = []
-    lines.append("TrailTraining — Training Plan")
+    lines: list[str] = []
+    lines.append("TrailTraining - Training Plan")
     lines.append("")
 
     # Meta
@@ -422,7 +421,7 @@ def training_plan_to_text(obj: Dict[str, Any]) -> str:
     hours = _safe_num(weekly.get("planned_moving_time_hours"))
     elev_m = _safe_num(weekly.get("planned_elevation_m"))
     if dist_km is not None or hours is not None or elev_m is not None:
-        parts: List[str] = []
+        parts: list[str] = []
         if hours is not None:
             parts.append(f"{hours:.1f} h")
         if dist_km is not None and dist_km > 0:
@@ -448,7 +447,7 @@ def training_plan_to_text(obj: Dict[str, Any]) -> str:
         mins = d.get("duration_minutes")
         dur = f"{mins} min" if isinstance(mins, (int, float)) else "?"
 
-        tag_parts: List[str] = []
+        tag_parts: list[str] = []
         if is_rest:
             tag_parts.append("REST")
         elif session_type:
@@ -503,7 +502,7 @@ def training_plan_to_text(obj: Dict[str, Any]) -> str:
 
 
 def _call_responses_best_effort_schema(
-    client: OpenAI, kwargs: Dict[str, Any], schema: Dict[str, Any]
+    client: OpenAI, kwargs: dict[str, Any], schema: dict[str, Any]
 ) -> Any:
     """
     Best-effort "structured output" call:
@@ -553,7 +552,7 @@ def _prompt_instruction(prompt_name: str, *, style: str) -> str:
     except Exception:
         # Fallbacks (should rarely hit)
         if prompt_name == "training-plan":
-            return "Generate a trail-running training plan for the next 7–14 days based on fatigue, recent volume, and sleep."
+            return "Generate a trail-running training plan for the next 7-14 days based on fatigue, recent volume, and sleep."
         if prompt_name == "recovery-status":
             return "Assess recovery status for the last 7 days and give actionable guidance for today and tomorrow."
         if prompt_name == "meal-plan":
@@ -565,8 +564,8 @@ def _build_prompt_text(
     prompt_name: str,
     personal: Any,
     rollups: Optional[Any],
-    combined: List[Dict[str, Any]],
-    deterministic_forecast: Optional[Dict[str, Any]],
+    combined: list[dict[str, Any]],
+    deterministic_forecast: Optional[dict[str, Any]],
     *,
     style: str,
     max_chars: int,
@@ -649,7 +648,7 @@ def _build_prompt_text(
     budget = max_chars if max_chars > 0 else 200_000
 
     # Start with base; then add day blocks newest→oldest until budget is exhausted
-    text_parts: List[str] = [base]
+    text_parts: list[str] = [base]
     used = len(base)
 
     # Add detailed days newest→oldest
@@ -677,20 +676,37 @@ def _build_prompt_text(
 
 @dataclass(frozen=True)
 class CoachConfig:
-    model: str = os.getenv("TRAILTRAINING_LLM_MODEL", "gpt-5.2")
-    reasoning_effort: str = os.getenv(
-        "TRAILTRAINING_REASONING_EFFORT", "medium"
-    )  # none|low|medium|high|xhigh
-    verbosity: str = os.getenv("TRAILTRAINING_VERBOSITY", "medium")  # low|medium|high
-    days: int = int(os.getenv("TRAILTRAINING_COACH_DAYS", "60"))
-    max_chars: int = int(os.getenv("TRAILTRAINING_COACH_MAX_CHARS", "200000"))
+    # Safe constants as dataclass defaults (no function calls)
+    model: str = "gpt-5.2"
+    reasoning_effort: str = "medium"  # none|low|medium|high|xhigh
+    verbosity: str = "medium"  # low|medium|high
+    days: int = 60
+    max_chars: int = 200_000
     temperature: Optional[float] = None
+    style: str = "trailrunning"
 
-    # prompt preset (per-profile default via env; CLI can override)
-    style: str = os.getenv("TRAILTRAINING_COACH_STYLE", "trailrunning")
+    @classmethod
+    def from_env(cls) -> CoachConfig:
+        def _env_int(name: str, default: int) -> int:
+            v = os.getenv(name)
+            if v is None or not v.strip():
+                return default
+            try:
+                return int(v)
+            except ValueError:
+                return default
+
+        return cls(
+            model=os.getenv("TRAILTRAINING_LLM_MODEL", cls.model),
+            reasoning_effort=os.getenv("TRAILTRAINING_REASONING_EFFORT", cls.reasoning_effort),
+            verbosity=os.getenv("TRAILTRAINING_VERBOSITY", cls.verbosity),
+            days=_env_int("TRAILTRAINING_COACH_DAYS", cls.days),
+            max_chars=_env_int("TRAILTRAINING_COACH_MAX_CHARS", cls.max_chars),
+            style=os.getenv("TRAILTRAINING_COACH_STYLE", cls.style),
+        )
 
 
-def _recompute_planned_hours_from_days(obj: Dict[str, Any]) -> None:
+def _recompute_planned_hours_from_days(obj: dict[str, Any]) -> None:
     """
     Make weekly_totals.planned_moving_time_hours consistent with sum(plan.days[].duration_minutes).
     This prevents false MAX_RAMP_PCT violations caused by rounding / inconsistent totals.
@@ -725,7 +741,7 @@ def run_coach_brief(
     personal_path: Optional[str] = None,
     summary_path: Optional[str] = None,
     output_path: Optional[str] = None,
-) -> Tuple[str, Optional[str]]:
+) -> tuple[str, Optional[str]]:
     config.ensure_directories()
 
     personal_p, summary_p, rollups_p = _resolve_input_paths(input_path, personal_path, summary_path)
@@ -772,7 +788,7 @@ def run_coach_brief(
     # Use style-specific system instructions
     system_instructions = get_system_prompt(cfg.style)
 
-    kwargs: Dict[str, Any] = {
+    kwargs: dict[str, Any] = {
         "model": cfg.model,
         "instructions": system_instructions,
         "input": prompt_text,
@@ -806,7 +822,7 @@ def run_coach_brief(
                 "Your previous output was invalid. Fix it. Here is the invalid output:\n"
                 f"{out_text}\n"
             )
-            repair_kwargs: Dict[str, Any] = {
+            repair_kwargs: dict[str, Any] = {
                 "model": cfg.model,
                 "instructions": system_instructions,
                 "input": repair_prompt,
