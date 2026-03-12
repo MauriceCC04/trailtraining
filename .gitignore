@@ -32,3 +32,6 @@ profiles/mom.env
 trailtraining-data/
 processing/
 prompting/*.egg-info/
+src/trailtraining/.DS_Store
+.DS_Store
+.DS_Store

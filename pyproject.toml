@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 
 # TODO: fill these in if you want publishing-quality metadata
-authors = [{ name = "YOUR NAME", email = "you@example.com" }]
+authors = [{ name = "Cameron Caputa", email = "cameroncaputa@gmail.com" }]
 # license = { file = "LICENSE" }
 keywords = ["data-pipeline", "strava", "garmin", "etl", "llm-evaluation", "cli"]
 classifiers = [

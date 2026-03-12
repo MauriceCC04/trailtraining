@@ -18,8 +18,9 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Optional
 
-from trailtraining import config
+from trailtraining.config import config
 
 
 def _safe_profile_name(name: str) -> str:
@@ -44,15 +45,18 @@ def _atomic_write_json(path: Path, data: dict) -> None:
             pass
 
 
-def write_config() -> None:
+def write_config(active_home: Optional[Path] = None) -> None:
     profile = _safe_profile_name(os.getenv("TRAILTRAINING_PROFILE", "default"))
 
-    # Per-profile stored config
+    # Per-profile stored config (always in your real home)
     stored_dir = Path.home() / ".trailtraining" / "garmin" / profile
     stored_cfg = stored_dir / "GarminConnectConfig.json"
 
-    # Active GarminDb config location
-    active_dir = Path.home() / ".GarminDb"
+    # Active GarminDb config location:
+    # - default: your real home (~/.GarminDb/...)
+    # - when active_home is provided: <active_home>/.GarminDb/...
+    home_root = active_home if active_home is not None else Path.home()
+    active_dir = home_root / ".GarminDb"
     active_cfg = active_dir / "GarminConnectConfig.json"
     active_dir.mkdir(parents=True, exist_ok=True)
 
@@ -100,7 +104,7 @@ def write_config() -> None:
     # Write per-profile config
     _atomic_write_json(stored_cfg, configuration)
 
-    # Point ~/.GarminDb/GarminConnectConfig.json to the per-profile config
+    # Point <HOME>/.GarminDb/GarminConnectConfig.json to the per-profile config
     # Try symlink first; fall back to copying.
     try:
         if active_cfg.exists() or active_cfg.is_symlink():

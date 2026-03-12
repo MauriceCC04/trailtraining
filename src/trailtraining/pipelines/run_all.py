@@ -85,12 +85,9 @@ def main(
 
     if provider == "garmin":
         # Lazy import so Intervals users don't need GarminDb installed.
-        from trailtraining.pipelines import download_garmin_data
         from trailtraining.pipelines import garmin as garmin_pipeline
 
-        # set the garmin config
-        download_garmin_data.write_config()
-        # run the garmin pipeline
+        # garmin_pipeline.main() now handles per-profile GarminDb HOME isolation + config activation
         garmin_pipeline.main()
     else:
         # Lazy import so Garmin users don't need Intervals dependencies.
