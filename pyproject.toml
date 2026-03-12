@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,35 +8,91 @@ version = "0.1.0"
 description = "Pipelines for Garmin/Strava + fatigue modeling"
 readme = "README.md"
 requires-python = ">=3.9"
+
+# TODO: fill these in if you want publishing-quality metadata
+authors = [{ name = "YOUR NAME", email = "you@example.com" }]
+# license = { file = "LICENSE" }
+keywords = ["data-pipeline", "strava", "garmin", "etl", "llm-evaluation", "cli"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: MIT License", # TODO: change/remove if not MIT
+  "Operating System :: OS Independent",
+]
+
+# Runtime deps only (keep this lean)
 dependencies = [
-  "flask",
+  "requests>=2.31",
+  "Flask>=2.3",
   "openai>=1.0.0",
-  "requests",
 ]
 
 [project.optional-dependencies]
+# Everything you need for local dev / CI
 dev = [
-  "pytest>=7",
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
   "ruff>=0.4",
-  "pre-commit>=3",
+  "pre-commit>=3.6",
+  "mypy>=1.8",
+  "types-requests>=2.31",
+]
+
+# Optional: only if you *actually* use these for notebooks/analysis
+analysis = [
+  "numpy>=1.26",
+  "pandas>=2.2",
 ]
 
 [project.scripts]
 trailtraining = "trailtraining.cli:main"
 
+[project.urls]
+Repository = "https://github.com/MauriceCC04/trailtraining"
+Issues = "https://github.com/MauriceCC04/trailtraining/issues"
+
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src/trailtraining/tests"]
+addopts = "-q --disable-warnings --maxfail=1"
+
+[tool.coverage.run]
+branch = true
+source = ["trailtraining"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 0
 
 [tool.ruff]
 target-version = "py39"
 line-length = 100
+extend-exclude = [
+  ".venv",
+  "build",
+  "dist",
+  "__pycache__",
+]
 
 [tool.ruff.lint]
-select = ["F", "E9"]
+# Solid “professional default” set without being annoying
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]  # let formatter handle line length
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_untyped_defs = false
