@@ -33,7 +33,7 @@ trailtraining --profile alice coach --prompt training-plan
 
 # evaluate the plan against constraints (ramp + hard-day streak)
 trailtraining eval-coach --input ~/trailtraining-data/alice/prompting/coach_brief_training-plan.json
-````
+```
 
 ---
 
@@ -534,7 +534,7 @@ Strava tokens are stored at:
 * `<base>/tokens/strava_token.json`
 
 ---
-Additionally, a sample series of sample outputs described above are stored at \demo\
+Sample outputs are stored in \demo
 
 ## Troubleshooting
 
