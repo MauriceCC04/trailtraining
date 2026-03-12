@@ -59,7 +59,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 python -m pip install --upgrade pip
+#for intervals users:
 pip install -e .
+#for garmin users:
+pip install -e ".[garmin]"
 ```
 
 For development (tests + ruff + pre-commit):
@@ -224,6 +227,42 @@ export GARMINGDB_CLI="/full/path/to/garmindb_cli"
 You do **not** need to manually create `~/.GarminDb/GarminConnectConfig.json`.
 The pipeline writes a per-profile config and activates it automatically.
 
+Additionally:
+### GarminDb schema updates (version mismatch)
+
+If GarminDb was updated and you see an error like:
+
+  "DB: <name> version mismatch... Please rebuild the <name> DB"
+
+Rebuilds are **per profile**, because trailtraining isolates GarminDb HOME at:
+  ~/.trailtraining/garmin/<profile>/garmindb_home
+and writes per-profile config automatically.
+
+#### Option 1: Rebuild DB schema (fast, no full re-download)
+
+```bash
+PROFILE=alice
+GDB_HOME="$HOME/.trailtraining/garmin/$PROFILE/garmindb_home"
+CLI="${GARMINGDB_CLI:-$PWD/.venv/bin/garmindb_cli.py}"
+
+HOME="$GDB_HOME" XDG_CONFIG_HOME="$GDB_HOME/.config" XDG_CACHE_HOME="$GDB_HOME/.cache" \
+  .venv/bin/python3 "$CLI" --rebuild_db
+
+# then rerun:
+trailtraining --profile "$PROFILE" fetch-garmin
+```
+#### Option 2: Full rebuild (slow, but most reliable)
+```bash
+BASE_DIR="${TRAILTRAINING_BASE_DIR:-$HOME/trailtraining-data/$PROFILE}"
+BACKUP="$BASE_DIR/db_backup_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP"
+
+find "$BASE_DIR" "$GDB_HOME" -maxdepth 8 -type f \( -iname "garmin*.db" -o -iname "garmin*.sqlite" \) \
+  -exec mv -v {} "$BACKUP"/ \; 2>/dev/null
+
+HOME="$GDB_HOME" XDG_CONFIG_HOME="$GDB_HOME/.config" XDG_CACHE_HOME="$GDB_HOME/.cache" \
+  .venv/bin/python3 "$CLI" --all --download --import --analyze
+```
 Fetch wellness only:
 
 ```bash

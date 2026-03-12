@@ -37,6 +37,11 @@ dev = [
   "types-requests>=2.31",
 ]
 
+[project.optional-garmin]
+garmin = [
+  "garmindb==3.7.0",
+  "tqdm==4.67.1",
+]
 # Optional: only if you *actually* use these for notebooks/analysis
 analysis = [
   "numpy>=1.26",
