@@ -20,7 +20,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from trailtraining.config import config
+from trailtraining import config
 
 
 def _safe_profile_name(name: str) -> str:
