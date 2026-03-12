@@ -9,32 +9,19 @@ description = "Pipelines for Garmin/Strava + fatigue modeling"
 readme = "README.md"
 requires-python = ">=3.9"
 
-# TODO: fill these in if you want publishing-quality metadata
 authors = [{ name = "Cameron Caputa", email = "cameroncaputa@gmail.com" }]
-# license = { file = "LICENSE" }
 keywords = ["data-pipeline", "strava", "garmin", "etl", "llm-evaluation", "cli"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "License :: OSI Approved :: MIT License", # TODO: change/remove if not MIT
+  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
 
-# Runtime deps only (keep this lean)
 dependencies = [
   "requests>=2.31",
   "Flask>=2.3",
   "openai>=1.0.0",
-]
-
-[project.optional-dependencies]
-dev = [
-  "ruff==0.4.10",
-  "pytest>=7.4",
-  "pytest-cov>=4.1",
-  "pre-commit>=3.6",
-  "mypy>=1.8",
-  "types-requests>=2.31",
 ]
 
 [project.optional-dependencies]
@@ -90,8 +77,8 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 ignore = [
-  "E501",  # formatter handles line length
-  "UP007", # requires Python 3.10 syntax (X | Y); keep 3.9 compatible for now
+  "E501",
+  "UP007",
 ]
 
 [tool.ruff.format]
