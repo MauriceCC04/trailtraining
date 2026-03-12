@@ -45,7 +45,9 @@ INTERVALS_CLIENT_SECRET = os.environ.get("INTERVALS_CLIENT_SECRET", "")
 INTERVALS_REDIRECT_URI = os.environ.get("INTERVALS_REDIRECT_URI", "")
 
 # Optional: let your app choose the wellness provider
-WELLNESS_PROVIDER = os.environ.get("WELLNESS_PROVIDER", "intervals")
+WELLNESS_PROVIDER = _env("TRAILTRAINING_WELLNESS_PROVIDER") or _env(
+    "WELLNESS_PROVIDER", "intervals"
+)
 
 
 def ensure_directories() -> None:
