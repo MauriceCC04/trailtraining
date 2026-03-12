@@ -2,7 +2,6 @@
 import argparse
 import logging
 import os
-import shutil
 import sys
 from pathlib import Path
 
@@ -160,114 +159,9 @@ def _detect_provider_for_doctor() -> str:
 
 
 def cmd_doctor(_args):
-    from trailtraining import config
-    from trailtraining.data.strava import default_token_path
+    from trailtraining import doctor
 
-    def ok(label: str, msg: str = "") -> None:
-        print(f"✅ {label}" + (f" - {msg}" if msg else ""))
-
-    def warn(label: str, msg: str = "") -> None:
-        print(f"⚠️  {label}" + (f" - {msg}" if msg else ""))
-
-    def bad(label: str, msg: str = "") -> None:
-        print(f"❌ {label}" + (f" - {msg}" if msg else ""))
-
-    print("TrailTraining doctor\n")
-
-    config.ensure_directories()
-    profile = os.getenv("TRAILTRAINING_PROFILE", "default")
-    base_dir = os.getenv("TRAILTRAINING_BASE_DIR", "")
-    ok("Profile", profile)
-    ok("Base dir", base_dir or "(not set)")
-
-    issues = 0
-
-    # ---- Strava ----
-    if config.STRAVA_ID and config.STRAVA_ID != 0:
-        ok("STRAVA_CLIENT_ID set")
-    else:
-        bad("STRAVA_CLIENT_ID missing", "Set STRAVA_CLIENT_ID in your profile env.")
-        issues += 1
-
-    if (config.STRAVA_SECRET or "").strip():
-        ok("STRAVA_CLIENT_SECRET set")
-    else:
-        bad("STRAVA_CLIENT_SECRET missing", "Set STRAVA_CLIENT_SECRET in your profile env.")
-        issues += 1
-
-    if (config.STRAVA_REDIRECT_URI or "").strip():
-        ok("STRAVA_REDIRECT_URI set", config.STRAVA_REDIRECT_URI)
-    else:
-        warn(
-            "STRAVA_REDIRECT_URI missing",
-            "Default will be used, but set it explicitly to match your Strava app.",
-        )
-
-    token_path = default_token_path()
-    if token_path.exists():
-        ok("Strava token", str(token_path))
-    else:
-        warn("Strava token not found", f"Run: trailtraining --profile {profile} auth-strava")
-
-    # ---- Wellness provider ----
-    provider = _detect_provider_for_doctor()
-    ok("Wellness provider", provider)
-
-    if provider == "intervals":
-        if (config.INTERVALS_API_KEY or "").strip():
-            ok("INTERVALS_API_KEY set")
-        else:
-            bad("INTERVALS_API_KEY missing", "Set INTERVALS_API_KEY (or choose Garmin).")
-            issues += 1
-
-        athlete_id = (config.INTERVALS_ATHLETE_ID or "").strip()
-        if athlete_id:
-            ok("INTERVALS_ATHLETE_ID", athlete_id)
-        else:
-            warn("INTERVALS_ATHLETE_ID not set", "Default '0' may still work (current athlete).")
-
-    if provider == "garmin":
-        if (config.GARMIN_EMAIL or "").strip():
-            ok("GARMIN_EMAIL set")
-        else:
-            bad("GARMIN_EMAIL missing")
-            issues += 1
-
-        if (config.GARMIN_PASSWORD or "").strip():
-            ok("GARMIN_PASSWORD set")
-        else:
-            bad("GARMIN_PASSWORD missing")
-            issues += 1
-
-        script = (
-            os.environ.get("GARMINGDB_CLI")
-            or shutil.which("garmindb_cli")
-            or shutil.which("garmindb_cli.py")
-        )
-        if script:
-            ok("GarminDb CLI found", script)
-        else:
-            bad(
-                "GarminDb CLI missing",
-                "Install GarminDb and ensure garmindb_cli is on PATH (or set GARMINGDB_CLI).",
-            )
-            issues += 1
-
-    # ---- Optional OpenAI ----
-    if os.getenv("OPENAI_API_KEY") or os.getenv("TRAILTRAINING_OPENAI_API_KEY"):
-        ok("OpenAI API key set (coach enabled)")
-    else:
-        warn(
-            "OpenAI API key not set", "Coach won't run until you set OPENAI_API_KEY (recommended)."
-        )
-
-    print("\nSummary:")
-    if issues:
-        bad("Doctor found issues", f"{issues} blocking issue(s).")
-        raise SystemExit(1)
-
-    ok("Doctor OK", "No blocking issues found.")
-    raise SystemExit(0)
+    _run(doctor.main)
 
 
 def cmd_coach(args):
