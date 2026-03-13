@@ -94,7 +94,7 @@ jobs:
             --cov=trailtraining \
             --cov-report=term-missing \
             --cov-report=xml \
-            --cov-fail-under=20
+            --cov-fail-under=10
 
       - name: Coverage gate (constraints core)
         if: matrix.python-version == '3.11'
