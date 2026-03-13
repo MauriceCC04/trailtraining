@@ -112,6 +112,7 @@ class ForecastResult:
 
 def compute_readiness_and_risk(
     combined: list[dict[str, Any]],
+    rollups: Optional[dict[str, Any]] = None,
 ) -> ForecastResult:
     if not combined:
         raise ValueError("combined_summary.json is empty")
@@ -136,6 +137,30 @@ def compute_readiness_and_risk(
     roll7 = _rolling_sum(load_vals, 7)
 
     last7_load = roll7[-1] if roll7 else None
+
+    # NEW: prefer rollups for the last-7 load if present and aligned (avoids stale rollups)
+    used_rollups_last7 = False
+    if isinstance(rollups, dict):
+        try:
+            windows = rollups.get("windows") or {}
+            w7r = windows.get("7")
+            if isinstance(w7r, dict):
+                end_date = w7r.get("end_date")
+                if isinstance(end_date, str):
+                    end_date_s = end_date[:10]
+                else:
+                    end_date_s = str(end_date)[:10] if end_date is not None else ""
+
+                if end_date_s == last_d.isoformat():
+                    acts = w7r.get("activities")
+                    if isinstance(acts, dict):
+                        v = acts.get("total_training_load_hours")
+                        if isinstance(v, (int, float)):
+                            last7_load = float(v)
+                            used_rollups_last7 = True
+        except Exception:
+            # If rollups shape is unexpected, silently fall back to computed rolling sum.
+            pass
 
     # Baseline load distribution: prior rolling windows (exclude the most recent window)
     prior_roll7 = [x for x in roll7[:-1] if x is not None]
@@ -243,6 +268,11 @@ def compute_readiness_and_risk(
         ],
     }
 
+    if used_rollups_last7:
+        inputs["notes"].append(
+            "Used combined_rollups.json windows['7'].activities.total_training_load_hours as authoritative for training_load_7d_hours."
+        )
+
     return ForecastResult(
         date=last_d.isoformat(),
         readiness_score=round(readiness, 1),
@@ -276,7 +306,14 @@ def run_forecasts(
     if not isinstance(combined, list):
         raise ValueError("combined_summary.json must be a list")
 
-    fr = compute_readiness_and_risk(combined)
+    # NEW: load rollups if present and pass into compute_readiness_and_risk
+    rollups_p = base / "combined_rollups.json"
+    rollups: Optional[dict[str, Any]] = None
+    if rollups_p.exists():
+        r = load_json(rollups_p, default=None)
+        rollups = r if isinstance(r, dict) else None
+
+    fr = compute_readiness_and_risk(combined, rollups=rollups)
 
     outp = (
         Path(output_path).expanduser().resolve()

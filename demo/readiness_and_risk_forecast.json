@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-03-11T15:29:35.353189Z",
+  "generated_at": "2026-03-13T07:05:42.309126Z",
   "result": {
-    "date": "2026-03-10",
+    "date": "2026-03-12",
     "drivers": {
       "overreach_risk": [
         "7d training load is elevated vs recent rolling baseline"
@@ -11,29 +11,30 @@
       ]
     },
     "inputs": {
-      "as_of_date": "2026-03-10",
+      "as_of_date": "2026-03-12",
       "notes": [
         "training_load_hours = sum(moving_time_hours * load_factor)",
-        "load_factor uses avgHR/maxHR when available; otherwise defaults to 1.0"
+        "load_factor uses avgHR/maxHR when available; otherwise defaults to 1.0",
+        "Used combined_rollups.json windows['7'].activities.total_training_load_hours as authoritative for training_load_7d_hours."
       ],
-      "rhr_28d_mean_bpm": 51.47,
-      "rhr_28d_std_bpm": 2.39,
+      "rhr_28d_mean_bpm": 51.53,
+      "rhr_28d_std_bpm": 2.5,
       "rhr_7d_mean_bpm": null,
       "rhr_delta_bpm": null,
       "rhr_z": null,
-      "training_load_7d_hours": 32.125,
-      "training_load_delta_hours": 24.726,
-      "training_load_rolling7_mean_hours": 7.399,
-      "training_load_rolling7_std_hours": 7.986,
-      "training_load_z": 3.096
+      "training_load_7d_hours": 21.301,
+      "training_load_delta_hours": 13.864,
+      "training_load_rolling7_mean_hours": 7.437,
+      "training_load_rolling7_std_hours": 8.038,
+      "training_load_z": 1.725
     },
     "overreach_risk": {
-      "level": "high",
-      "score": 90.7
+      "level": "moderate",
+      "score": 66.0
     },
     "readiness": {
-      "score": 45.2,
-      "status": "fatigued"
+      "score": 56.2,
+      "status": "steady"
     }
   }
 }
