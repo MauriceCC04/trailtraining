@@ -1,79 +1,101 @@
 [![CI](https://github.com/MauriceCC04/trailtraining/actions/workflows/ci.yml/badge.svg)](https://github.com/MauriceCC04/trailtraining/actions/workflows/ci.yml)
 
-### Trailrunning/Triathlon Training Project — User Guide
+# trailtraining
 
-This project pulls your **training + wellness** data (**GarminDb or Intervals.icu** + **Strava**), combines it into a clean dataset, and optionally runs an LLM “coach”.
+A Python CLI that pulls your **training + wellness** data (**Strava + (GarminDb or Intervals.icu)**), combines it into a clean dataset, and optionally runs an **LLM “coach”** to generate a structured training plan and evaluate it against safety constraints.
 
-The coach can generate:
-- training plans (structured JSON output)
-- recovery status
-- meal plans
+**Designed for multi-user setups** on the same machine via `--profile` (separate tokens + separate data folders per user).
 
-It supports **multi-user profiles** (separate Strava tokens + separate data folders per user) via `--profile`.
+---
+
+## What it does
+
+**Pipeline**
+- Fetch **wellness** from **GarminDb** *or* **Intervals.icu**
+- Fetch **activities** from **Strava**
+- Combine/normalize into a consistent JSON summary + rollups
+
+**Optional coaching**
+- Generate:
+  - training plan (**structured JSON**)
+  - recovery status
+  - meal plan
+- Evaluate training plans for basic safety/consistency rules (e.g., ramp rate, consecutive hard days)
+
+---
+
+## Demo (no credentials)
+
+You can’t run the full pipeline without provider credentials, but you can still preview outputs.
+
+➡️ **Sample outputs live in [`demo/`](demo/)** (combined summaries, forecasts, and example coach outputs).
 
 ---
 
 ## Quickstart
 
 ```bash
-# install (see Installation)
+# 1) install (see Installation)
 trailtraining --profile alice doctor
 
-# authorize Strava once per profile
+# 2) authorize Strava once per profile
 trailtraining --profile alice auth-strava
 
-# run pipeline (auto-picks Intervals vs Garmin)
+# 3) run the full pipeline (auto-selects Intervals vs Garmin)
 trailtraining --profile alice run-all
 
-# generate deterministic readiness + overreach risk (recommended)
+# 4) compute deterministic readiness + overreach risk (recommended)
 trailtraining --profile alice forecast
 
-# generate a structured training plan (JSON)
+# 5) generate a structured training plan (JSON)
 trailtraining --profile alice coach --prompt training-plan
 
-# evaluate the plan against constraints (ramp + hard-day streak)
+# 6) evaluate the plan against constraints
 trailtraining eval-coach --input ~/trailtraining-data/alice/prompting/coach_brief_training-plan.json
-```
+````
 
 ---
 
 ## Prerequisites
 
 * **Python 3.9+**
-* A **Strava API application** (Client ID + Client Secret) **per user/profile** (see Strava setup)
-* One wellness provider:
+* **Strava API application** (Client ID + Client Secret) **per user/profile**
+* You must create your own strava API application for each user/profile to get unique credentials. Sharing credentials between users is not recommended.
+* Choose **one** wellness provider:
 
-  * **GarminDb** installed and its CLI available (`garmindb_cli` or `garmindb_cli.py`), OR
-  * **Intervals.icu** API access (API key + athlete ID)
+  * **Intervals.icu** API access (API key + athlete ID), **or**
+  * **GarminDb** installed + CLI available (`garmindb_cli` or `garmindb_cli.py`)
 
 Optional:
 
-* **OpenAI API key** for the LLM coach feature
+* **OpenAI API key** for the coach feature
 
 ---
 
 ## Installation (macOS / Linux)
 
 ```bash
-cd /.../trailtraining
+git clone https://github.com/MauriceCC04/trailtraining.git
+cd trailtraining
 
 python3 -m venv .venv
 source .venv/bin/activate
-
 python -m pip install --upgrade pip
-#for intervals users:
+
+# Intervals users:
 pip install -e .
-#for garmin users:
+
+# Garmin users:
 pip install -e ".[garmin]"
 ```
 
-For development (tests + ruff + pre-commit):
+Dev tooling (tests + ruff + pre-commit):
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-Verify the CLI:
+Verify:
 
 ```bash
 trailtraining -h
@@ -83,9 +105,7 @@ trailtraining -h
 
 ## Profiles (multi-user support)
 
-Profiles make it easy to run the tool for multiple people on the same machine.
-
-### How profiles work
+Profiles make it easy to run for multiple people on the same machine.
 
 When you run:
 
@@ -95,37 +115,24 @@ trailtraining --profile alice run-all
 
 the CLI will:
 
-1. Load environment variables from:
+1. Load environment variables from `~/.trailtraining/profiles/alice.env` (if it exists)
+2. Use an isolated default data directory: `~/trailtraining-data/alice/` (overrideable)
+3. Store Strava tokens at: `~/trailtraining-data/alice/tokens/strava_token.json`
+4. If using GarminDb, manage a per-profile config under `~/.trailtraining/garmin/alice/`
 
-   * `~/.trailtraining/profiles/alice.env` (if it exists)
+> The profile env file does **not** override variables already set in your shell (shell vars win).
 
-2. Use an isolated default data directory (unless you override it):
-
-   * `~/trailtraining-data/alice/`
-
-3. Store Strava tokens per profile:
-
-   * `~/trailtraining-data/alice/tokens/strava_token.json`
-
-4. For Garmin users, write a per-profile GarminDb config:
-
-   * `~/.trailtraining/garmin/alice/GarminConnectConfig.json`
-     and make GarminDb’s active config (`~/.GarminDb/GarminConnectConfig.json`) point to the active profile config.
-
-> The profile env file does **not** override variables you already set in your shell. Shell env vars win.
-
-### Create profile files
-
-Create the profile folder:
+### Create a profile env file
 
 ```bash
 mkdir -p ~/.trailtraining/profiles
+nano ~/.trailtraining/profiles/alice.env
 ```
 
-Create one env file per user, e.g. `~/.trailtraining/profiles/alice.env`:
+Template:
 
 ```bash
-# --- Required for Strava (PER USER) ---
+# --- Strava (PER USER) ---
 STRAVA_CLIENT_ID="..."
 STRAVA_CLIENT_SECRET="..."
 STRAVA_REDIRECT_URI="http://127.0.0.1:5000/authorization"
@@ -136,25 +143,21 @@ STRAVA_REDIRECT_URI="http://127.0.0.1:5000/authorization"
 GARMIN_EMAIL="alice@example.com"
 GARMIN_PASSWORD="..."
 
-# Option B: Intervals.icu (instead of Garmin)
+# Option B: Intervals.icu
 # INTERVALS_API_KEY="..."
 # INTERVALS_ATHLETE_ID="0"   # "0" = current athlete
 
-# Optional: force provider selection (otherwise run-all auto-detects)
+# Optional: force provider selection (otherwise auto-detect)
 # TRAILTRAINING_WELLNESS_PROVIDER="auto"   # auto|garmin|intervals
-# WELLNESS_PROVIDER="intervals"            # back-compat
 
-# Optional override: where this profile stores all data
+# Optional: override where this profile stores all data
 # TRAILTRAINING_BASE_DIR="$HOME/trailtraining-data/alice"
 
 # Optional: logging verbosity
 # TRAILTRAINING_LOG_LEVEL="INFO"  # CRITICAL|ERROR|WARNING|INFO|DEBUG
 
 # --- Optional LLM coach ---
-# Prefer OPENAI_API_KEY; TRAILTRAINING_OPENAI_API_KEY also works
 OPENAI_API_KEY="..."
-# TRAILTRAINING_OPENAI_API_KEY="..."
-
 TRAILTRAINING_LLM_MODEL="gpt-5.2"
 TRAILTRAINING_REASONING_EFFORT="medium"   # none|low|medium|high|xhigh
 TRAILTRAINING_VERBOSITY="medium"          # low|medium|high
@@ -163,23 +166,25 @@ TRAILTRAINING_COACH_STYLE="trailrunning"  # trailrunning|triathlon
 
 Repeat for `bob.env`, etc.
 
-> **Garmin concurrency warning:** GarminDb reads one “active” config at `~/.GarminDb/GarminConnectConfig.json`. The pipeline switches it per profile. Don’t run two Garmin profiles at the same time on the same machine unless you isolate HOME (container / separate OS user).
+### Credential hygiene
+
+* Do **not** commit `.env` files or token JSONs.
+* All secrets should live in environment variables (ideally in the profile env file above).
 
 ---
 
 ## Doctor (recommended)
 
-Before doing anything else:
+Run this first whenever you’re setting up a profile:
 
 ```bash
 trailtraining --profile alice doctor
 ```
 
-It checks:
+Checks:
 
-* Strava env vars
-* whether a Strava token exists
-* wellness provider credentials
+* Strava env vars + token presence
+* Wellness provider credentials
 * GarminDb CLI availability (if using Garmin)
 * OpenAI key presence (optional)
 
@@ -187,124 +192,83 @@ It checks:
 
 ## Strava setup (required, per user)
 
-### Create the Strava API application (for each user)
+### 1) Create a Strava API application (per user)
 
-For each user (Alice, Bob, …):
+For each Strava account (Alice, Bob, …):
 
-1. Log into Strava with that user.
-2. Create a Strava API application.
-3. Copy:
+1. Log into Strava
+2. Create a Strava API application
+3. Copy `STRAVA_CLIENT_ID` + `STRAVA_CLIENT_SECRET`
+4. Set redirect URI to: `http://127.0.0.1:5000/authorization`
 
-   * `STRAVA_CLIENT_ID`
-   * `STRAVA_CLIENT_SECRET`
-4. Set the redirect URI to:
+Put those values in the corresponding `~/.trailtraining/profiles/<name>.env`.
 
-   * `http://127.0.0.1:5000/authorization`
-
-Put those values in that user’s profile env file.
-
-### Authorize each Strava account once per profile
+### 2) Authorize once per profile
 
 ```bash
 trailtraining --profile alice auth-strava
 trailtraining --profile bob auth-strava
 ```
 
-Tip: use an **Incognito/Private** window (or log out/in) when switching between accounts so you authorize the correct Strava user.
+Tip: use an Incognito/Private window when switching between Strava accounts.
 
 ---
 
-## Wellness provider: GarminDb (if using Garmin)
+## Wellness provider: Intervals.icu (fastest)
 
-Install GarminDb according to its docs, and make sure the CLI is on your PATH:
-
-* `garmindb_cli` or `garmindb_cli.py`
-
-If it isn’t on your PATH, set:
-
-```bash
-export GARMINGDB_CLI="/full/path/to/garmindb_cli"
-```
-
-You do **not** need to manually create `~/.GarminDb/GarminConnectConfig.json`.
-The pipeline writes a per-profile config and activates it automatically.
-
-Additionally:
-### GarminDb schema updates (version mismatch)
-
-If GarminDb was updated and you see an error like:
-
-  "DB: <name> version mismatch... Please rebuild the <name> DB"
-
-Rebuilds are **per profile**, because trailtraining isolates GarminDb HOME at:
-  ~/.trailtraining/garmin/<profile>/garmindb_home
-and writes per-profile config automatically.
-
-#### Option 1: Rebuild DB schema (fast, no full re-download)
-
-```bash
-PROFILE=alice
-GDB_HOME="$HOME/.trailtraining/garmin/$PROFILE/garmindb_home"
-CLI="${GARMINGDB_CLI:-$PWD/.venv/bin/garmindb_cli.py}"
-
-HOME="$GDB_HOME" XDG_CONFIG_HOME="$GDB_HOME/.config" XDG_CACHE_HOME="$GDB_HOME/.cache" \
-  .venv/bin/python3 "$CLI" --rebuild_db
-
-# then rerun:
-trailtraining --profile "$PROFILE" fetch-garmin
-```
-#### Option 2: Full rebuild (slow, but most reliable)
-```bash
-BASE_DIR="${TRAILTRAINING_BASE_DIR:-$HOME/trailtraining-data/$PROFILE}"
-BACKUP="$BASE_DIR/db_backup_$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$BACKUP"
-
-find "$BASE_DIR" "$GDB_HOME" -maxdepth 8 -type f \( -iname "garmin*.db" -o -iname "garmin*.sqlite" \) \
-  -exec mv -v {} "$BACKUP"/ \; 2>/dev/null
-
-HOME="$GDB_HOME" XDG_CONFIG_HOME="$GDB_HOME/.config" XDG_CACHE_HOME="$GDB_HOME/.cache" \
-  .venv/bin/python3 "$CLI" --all --download --import --analyze
-```
-Fetch wellness only:
-
-```bash
-trailtraining --profile alice fetch-garmin
-```
-
----
-
-## Wellness provider: Intervals.icu (faster)
-
-If you use Intervals.icu, set these in your profile env instead of Garmin credentials:
+Set in your profile env:
 
 ```bash
 INTERVALS_API_KEY="..."
 INTERVALS_ATHLETE_ID="0"
 ```
 
-Optional date range (env):
+Fetch wellness only:
 
 ```bash
-TRAILTRAINING_WELLNESS_OLDEST="2023-01-01"
-TRAILTRAINING_WELLNESS_NEWEST="2026-02-27"
+trailtraining --profile alice fetch-intervals
 ```
 
-Fetch wellness only:
+Optional date range:
 
 ```bash
 trailtraining --profile alice fetch-intervals --oldest "2023-01-01" --newest "2026-02-27"
 ```
 
-Notes:
+---
 
-* `--oldest` defaults to a lookback window if omitted.
-* `--newest` defaults to “today” if omitted.
+## Wellness provider: GarminDb
+
+Install GarminDb per its documentation and ensure the CLI is available:
+
+* `garmindb_cli` or `garmindb_cli.py`
+
+If needed:
+
+```bash
+export GARMINGDB_CLI="/full/path/to/garmindb_cli"
+```
+
+Fetch wellness only:
+
+```bash
+trailtraining --profile alice fetch-garmin
+```
+
+### Garmin concurrency warning
+
+GarminDb reads one “active” config at `~/.GarminDb/GarminConnectConfig.json`. `trailtraining` switches it per profile.
+Don’t run two Garmin profiles at the same time on the same machine unless you isolate HOME (container / separate OS user).
+
+### GarminDb schema version mismatch
+
+If GarminDb updates and you see “DB version mismatch… rebuild DB”, rebuild per-profile (see the Troubleshooting section below).
 
 ---
 
-## Running the full pipeline
+## Running the pipeline
 
-### Run everything (auto-selects Intervals vs Garmin)
+### Run everything
 
 ```bash
 trailtraining --profile alice run-all
@@ -313,7 +277,7 @@ trailtraining --profile alice run-all
 Provider selection order:
 
 1. `--wellness-provider auto|garmin|intervals`
-2. `TRAILTRAINING_WELLNESS_PROVIDER` or `WELLNESS_PROVIDER`
+2. `TRAILTRAINING_WELLNESS_PROVIDER` (or legacy `WELLNESS_PROVIDER`)
 3. Auto-detect:
 
    * Intervals if `INTERVALS_API_KEY` is set
@@ -327,27 +291,19 @@ trailtraining --profile alice run-all --wellness-provider intervals
 trailtraining --profile alice run-all --wellness-provider garmin
 ```
 
-### Manual pipeline (debugging)
-
-If you want to run steps one-by-one:
+### Manual steps (debugging)
 
 ```bash
 # 1) wellness
-trailtraining --profile alice fetch-intervals --oldest "2023-01-01" --newest "2026-02-27"
-# OR:
+trailtraining --profile alice fetch-intervals
+# or:
 trailtraining --profile alice fetch-garmin
 
 # 2) Strava
 trailtraining --profile alice fetch-strava
 
-# 3) Combine into prompting/combined_summary.json (+ rollups)
+# 3) combine into prompting/combined_summary.json (+ rollups)
 trailtraining --profile alice combine
-```
-
-### Intervals-only pipeline (legacy alias)
-
-```bash
-trailtraining --profile alice run-all-intervals
 ```
 
 ### Cleaning options
@@ -360,86 +316,36 @@ trailtraining --profile alice run-all --clean-prompting
 
 Notes:
 
-* By default, `processing/` is preserved so Strava can remain **incremental**.
-* Use `--clean-processing` if you want to force a full Strava refetch.
+* `processing/` is preserved by default so Strava can remain incremental.
+* Use `--clean-processing` to force a full Strava refetch.
 
 ---
 
 ## Forecasting (readiness + overreach risk)
 
-After `run-all` (or after you’ve produced `prompting/combined_summary.json`), you can generate a deterministic
-**readiness** and **overreach risk** assessment:
+After `run-all` (or after `combined_summary.json` exists):
 
 ```bash
 trailtraining --profile alice forecast
 ```
 
-### Inputs / outputs
-
 Defaults:
 
-* **Input**: the profile’s `prompting/combined_summary.json`
-* **Output**: `prompting/readiness_and_risk_forecast.json`
+* Input: `<base>/prompting/combined_summary.json`
+* Output: `<base>/prompting/readiness_and_risk_forecast.json`
 
-Point at a specific prompting directory (the directory that contains `combined_summary.json`):
+Override:
 
 ```bash
 trailtraining --profile alice forecast --input /path/to/prompting/
-```
-
-Write the JSON somewhere else:
-
-```bash
 trailtraining --profile alice forecast --output /tmp/readiness_and_risk_forecast.json
 ```
-
-### What’s inside `readiness_and_risk_forecast.json`
-
-The file contains:
-
-* `generated_at` (UTC timestamp)
-* `result.date`
-* `result.readiness.score` (0–100) and `result.readiness.status` (`primed` | `steady` | `fatigued`)
-* `result.overreach_risk.score` (0–100) and `result.overreach_risk.level` (`low` | `moderate` | `high`)
-* `result.inputs` (underlying aggregates, like recent RHR and training load)
-* `result.drivers` (human-readable reasons for the scores)
-
-### How the coach uses it
-
-If `readiness_and_risk_forecast.json` exists in the prompting directory, the coach loads it and treats it as
-**authoritative** for readiness/risk signals. If it doesn’t exist, the coach will attempt (best-effort) to compute
-and save it.
 
 ---
 
 ## LLM coach (optional)
 
-Set in your profile env:
-
-```bash
-OPENAI_API_KEY="..."
-TRAILTRAINING_LLM_MODEL="gpt-5.2"
-TRAILTRAINING_REASONING_EFFORT="medium"   # none|low|medium|high|xhigh
-TRAILTRAINING_VERBOSITY="medium"          # low|medium|high
-TRAILTRAINING_COACH_STYLE="trailrunning"  # trailrunning|triathlon
-```
-
-For `training-plan`, the coach:
-
-* uses **retrieved history** (weekly summaries for the last N weeks)
-* uses a **signal registry** and must cite `signal_ids` that justify recommendations
-* returns **structured JSON** (machine readable)
-
-Control retrieval / prompt size (env):
-
-```bash
-TRAILTRAINING_COACH_RETRIEVAL_WEEKS="8"   # weekly history window
-TRAILTRAINING_COACH_DETAIL_DAYS="14"      # number of recent daily blocks included
-TRAILTRAINING_COACH_DAYS="60"             # how many combined_summary days to consider
-TRAILTRAINING_COACH_MAX_CHARS="200000"    # max prompt text length budget
-```
-
-### Run prompts
+Run prompts:
 
 ```bash
 trailtraining --profile alice coach --prompt training-plan
@@ -447,26 +353,22 @@ trailtraining --profile alice coach --prompt recovery-status
 trailtraining --profile alice coach --prompt meal-plan
 ```
 
-* `training-plan` saves: `coach_brief_training-plan.json`
-* `recovery-status` saves: `coach_brief_recovery-status.md`
-* `meal-plan` saves: `coach_brief_meal-plan.md`
+Files written under `<base>/prompting/`:
 
-Override sport style on the CLI:
+* `coach_brief_training-plan.json` (structured)
+* `coach_brief_recovery-status.md`
+* `coach_brief_meal-plan.md`
+
+Override style:
 
 ```bash
 trailtraining --profile alice coach --prompt training-plan --style triathlon
-trailtraining --profile bob   coach --prompt training-plan --style trailrunning
-```
-
-Point at a specific prompting directory:
-
-```bash
-trailtraining --profile alice coach --prompt recovery-status --input /path/to/prompting/
+trailtraining --profile alice coach --prompt training-plan --style trailrunning
 ```
 
 ---
 
-## Coach evaluation harness (recommended)
+## Coach evaluation harness
 
 Evaluate a `training-plan` JSON against safety/consistency constraints:
 
@@ -483,123 +385,90 @@ trailtraining eval-coach \
   --max-consecutive-hard 2
 ```
 
-Env defaults:
+Write outputs:
 
 ```bash
-TRAILTRAINING_MAX_RAMP_PCT="10"
-TRAILTRAINING_MAX_CONSEC_HARD="2"
-```
-
-Optional: write violations to a JSON file:
-
-```bash
-trailtraining eval-coach \
-  --input ~/trailtraining-data/alice/prompting/coach_brief_training-plan.json \
-  --output ~/violations.json
-```
-
-Optional: write the full scoring report:
-
-```bash
-trailtraining eval-coach \
-  --input ~/trailtraining-data/alice/prompting/coach_brief_training-plan.json \
-  --report ~/full_report.json
+trailtraining eval-coach --input ... --output ~/violations.json
+trailtraining eval-coach --input ... --report ~/full_report.json
 ```
 
 ---
 
-## Outputs and folders
+## Outputs
 
-Within each profile’s `TRAILTRAINING_BASE_DIR` (default `~/trailtraining-data/<profile>/`):
+Within each profile’s `TRAILTRAINING_BASE_DIR` (default: `~/trailtraining-data/<profile>/`):
 
 * `processing/`
-  Intermediate state (including Strava incremental metadata). Usually keep this.
+  Intermediate state (including incremental Strava metadata). Usually keep this.
 * `prompting/`
-  Combined JSON outputs used by the coach:
+  Combined outputs used by forecasting + coach:
 
   * `combined_summary.json`
   * `combined_rollups.json`
   * `readiness_and_risk_forecast.json`
-  * `coach_brief_training-plan.json` (structured)
-  * `coach_brief_training-plan.txt`
-  * `coach_brief_recovery-status.md`
-  * `coach_brief_meal-plan.md`
+  * coach outputs (plan/status/meal files)
   * `formatted_personal_data.json`
-Additionally, when Garmin is chosen as the wellness provider, the following are also stored:
-  * `shortened_rhr.json`
-  * `shortened_sleep.json`
 
-Strava tokens are stored at:
+Strava token:
 
 * `<base>/tokens/strava_token.json`
 
 ---
-Sample outputs are in [demo/](demo/).
 
 ## Troubleshooting
 
-Increase logging verbosity:
+### Increase logging
 
 ```bash
 trailtraining --profile alice --log-level DEBUG run-all
-```
-
-Or set:
-
-```bash
+# or:
 export TRAILTRAINING_LOG_LEVEL="DEBUG"
 ```
 
-Run doctor:
+### GarminDb schema rebuild (version mismatch)
+
+Fast rebuild (no full re-download):
 
 ```bash
-trailtraining --profile alice doctor
+PROFILE=alice
+GDB_HOME="$HOME/.trailtraining/garmin/$PROFILE/garmindb_home"
+CLI="${GARMINGDB_CLI:-$PWD/.venv/bin/garmindb_cli.py}"
+
+HOME="$GDB_HOME" XDG_CONFIG_HOME="$GDB_HOME/.config" XDG_CACHE_HOME="$GDB_HOME/.cache" \
+  .venv/bin/python3 "$CLI" --rebuild_db
+
+trailtraining --profile "$PROFILE" fetch-garmin
 ```
+
+Full rebuild (slower, most reliable) is possible if needed.
 
 ---
 
 ## Development
 
-Run tests:
-
 ```bash
 pytest -q
-```
-
-Lint / format:
-
-```bash
 ruff check .
 ruff format .
-```
-
-Pre-commit (optional):
-
-```bash
 pre-commit install
 pre-commit run --all-files
 ```
 
 ---
 
-## Helpful commands (all CLI commands)
+## CLI reference
 
 ```bash
-# global help
 trailtraining -h
-
-# each subcommand help
 trailtraining doctor -h
 trailtraining auth-strava -h
 trailtraining fetch-strava -h
 trailtraining fetch-garmin -h
 trailtraining fetch-intervals -h
 trailtraining combine -h
-
 trailtraining run-all -h
 trailtraining run-all-intervals -h
 trailtraining forecast -h
-
 trailtraining coach -h
 trailtraining eval-coach -h
 ```
