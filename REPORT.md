@@ -12,7 +12,7 @@ Data Sources & Processing
 
 The pipeline pulls two main categories of data:
 
-1. Data collected from the Garmin watch (excluding activities) via the GarminDB library. By using the GarminDB library one can incrementally update their data without having to donwload every day again. After download, the processing step cleans it by removing irrelevant fields (stuff which either has not been properly collected or tells no useful information) and creates 3 JSON files that could be used for analysis by an LLM. 
+1. Data collected from the Garmin watch (excluding activities) via the GarminDB library. By using the GarminDB library one can incrementally update their data without having to donwload every day again. After download, the processing step cleans it by removing irrelevant fields (stuff which either has not been properly collected or tells no useful information) and creates 3 JSON files that could be used for analysis by an LLM.
 - formatted_personal_data.json contains some of the user's constant biometric data like age, height and weight
 - shortened_rhr.json contains the user's resting heart rate data over a shortened time frame
 - shortened_sleep.json contains the user's sleep data including how long they slept and how 'restorative'
@@ -22,7 +22,7 @@ The pipeline pulls two main categories of data:
 
 Integration & Output Artifacts
 
-A dedicated combine step merges the Garmin data's sleep json and the strava activities to create a day by day chronological json called combined_summary.json. This contains for every day, the sleep data and which activity happened on which day tying directly activity to day. It also includes the time of day that an activity happened because that may also be relevant in analysis, especially if there are multiple activities per day. 
+A dedicated combine step merges the Garmin data's sleep json and the strava activities to create a day by day chronological json called combined_summary.json. This contains for every day, the sleep data and which activity happened on which day tying directly activity to day. It also includes the time of day that an activity happened because that may also be relevant in analysis, especially if there are multiple activities per day.
 In the end, the implementation was a bit messy because when working with the optimal way to prompt the LLM, I was testing with other json files, thus the creation of a processing directory. Additionally, I did not personally use the json of pure resting heart rate data because apparently, that was also included as an element of ones sleep. One thing to note is that if the user achieved a resting heart rate lower outside of sleep it would not be accounted for.
 
 LM Coaching Extension

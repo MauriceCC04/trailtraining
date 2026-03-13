@@ -26,7 +26,7 @@ Your last 7 days show **high volume** (10.175 h moving time; **182.816 km**; **1
 - Banana + a handful of almonds (or trail mix)
 
 **Lunch**
-- Big grain bowl: quinoa/rice + chicken/tofu + mixed veg + olive oil/lemon dressing  
+- Big grain bowl: quinoa/rice + chicken/tofu + mixed veg + olive oil/lemon dressing
 - Add bread or fruit if you’re hungry
 
 **Snack**
@@ -102,7 +102,7 @@ If you do a long session (especially vert): this is your **highest-carb day**.
 - Include **electrolytes** (see hydration section)
 
 **Post‑session (within 30–60 min)**
-- Recovery meal/snack: chocolate milk (or soy choc milk) + a sandwich  
+- Recovery meal/snack: chocolate milk (or soy choc milk) + a sandwich
   *Target:* carbs + ~25–35 g protein
 
 **Lunch**
@@ -114,7 +114,7 @@ If you do a long session (especially vert): this is your **highest-carb day**.
 **Dinner**
 - Pasta with tomato sauce + ground turkey/lentils + salad + bread
 
-**Macro emphasis:** **High carb** (fuel the work, protect recovery).  
+**Macro emphasis:** **High carb** (fuel the work, protect recovery).
 **If you *don’t* go long:** keep breakfast the same but reduce pasta/bread portions at lunch/dinner.
 
 ---

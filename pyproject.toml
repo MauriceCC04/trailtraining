@@ -61,6 +61,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests", "src/trailtraining/tests"]
 addopts = "-q --disable-warnings --maxfail=1"
+pythonpath = ["src"]
 
 [tool.coverage.run]
 branch = true
@@ -69,7 +70,7 @@ source = ["trailtraining"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 0
+fail_under = 10
 
 [tool.ruff]
 target-version = "py39"
@@ -86,10 +87,17 @@ ignore = [
 quote-style = "double"
 indent-style = "space"
 
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.10.0"
+
 [tool.mypy]
-python_version = "3.9"
-warn_return_any = true
+python_version = "3.11"
 warn_unused_ignores = true
-no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_configs = true
 check_untyped_defs = true
-disallow_untyped_defs = false
+no_implicit_optional = true
+disallow_incomplete_defs = true
+
+# Start pragmatic; tighten later
+ignore_missing_imports = true

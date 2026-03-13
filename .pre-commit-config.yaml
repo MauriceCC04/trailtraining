@@ -1,13 +1,28 @@
 repos:
-  - repo: local
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
     hooks:
       - id: ruff
-        name: ruff (lint)
-        entry: ruff check
-        language: system
-        types: [python]
+        args: [--fix]
       - id: ruff-format
-        name: ruff (format)
-        entry: ruff format
-        language: system
-        types: [python]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        name: mypy (core)
+        args: ["--config-file=pyproject.toml"]
+        files: ^src/trailtraining/llm/constraints\.py$
+        additional_dependencies:
+          - types-requests
+          - Flask
+          - openai
