@@ -87,9 +87,6 @@ ignore = [
 quote-style = "double"
 indent-style = "space"
 
-[tool.poetry.group.dev.dependencies]
-mypy = "^1.10.0"
-
 [tool.mypy]
 python_version = "3.11"
 warn_unused_ignores = true

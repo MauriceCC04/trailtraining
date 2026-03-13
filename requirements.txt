@@ -1,6 +1,0 @@
-Flask
-openai>=1.0.0
-requests
-pytest
-numpy
-pandas
