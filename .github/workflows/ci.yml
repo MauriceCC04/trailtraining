@@ -99,10 +99,12 @@ jobs:
       - name: Coverage gate (constraints core)
         if: matrix.python-version == '3.11'
         run: |
-          python -m pytest -q src/trailtraining/tests/test_coach_constraints.py \
+          python -m pytest -q tests \
             --cov=trailtraining.llm.constraints \
             --cov-report=term-missing \
             --cov-fail-under=70
+
+
 
       - name: Upload coverage artifact
         if: matrix.python-version == '3.11'

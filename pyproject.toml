@@ -55,7 +55,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "src/trailtraining/tests"]
+testpaths = ["tests"]
 addopts = "-q --disable-warnings --maxfail=1"
 pythonpath = ["src"]
 
