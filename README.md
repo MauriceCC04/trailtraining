@@ -534,7 +534,7 @@ Strava tokens are stored at:
 * `<base>/tokens/strava_token.json`
 
 ---
-Sample outputs are stored in \demo
+Sample outputs are in [demo/](demo/).
 
 ## Troubleshooting
 
@@ -603,4 +603,3 @@ trailtraining forecast -h
 trailtraining coach -h
 trailtraining eval-coach -h
 ```
-

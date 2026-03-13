@@ -138,16 +138,6 @@ def cmd_run_all_intervals(args):
         )
     )
 
-
-def _detect_provider_for_doctor() -> str:
-    # Prefer explicit env var, otherwise auto.
-    env_v = (os.getenv("TRAILTRAINING_WELLNESS_PROVIDER") or "").strip() or (
-        os.getenv("WELLNESS_PROVIDER") or ""
-    ).strip()
-    v = env_v.lower() if env_v else "auto"
-    if v in {"garmin", "intervals"}:
-        return v
-
     # auto-detect
     from trailtraining import config
 

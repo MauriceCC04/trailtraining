@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   lint:
-    name: Lint (ruff)
+    name: Lint + Types (ruff, mypy, pre-commit)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,17 +30,22 @@ jobs:
       - name: Install package (dev extras)
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install -e ".[dev]"
 
       - name: Ruff format check
-        run: ruff format --check .
+        run: python -m ruff format --check .
 
       - name: Ruff lint
-        run: ruff check .
+        run: python -m ruff check .
 
-      # Optional (enable once mypy is clean)
-      # - name: Mypy (optional)
-      #   run: mypy src
+      - name: Mypy (core)
+        run: python -m mypy src/trailtraining/llm/constraints.py
+
+      # Run the rest of your pre-commit hooks without re-running ruff/mypy
+      - name: Pre-commit (all files)
+        env:
+          SKIP: ruff,ruff-format,mypy
+        run: python -m pre_commit run --all-files --show-diff-on-failure
 
   test:
     name: Tests (pytest)
@@ -63,14 +68,30 @@ jobs:
       - name: Install package (dev extras)
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install -e ".[dev]"
 
-      - name: Run tests with coverage
+      - name: Run tests (no coverage)
+        if: matrix.python-version != '3.11'
+        run: python -m pytest
+
+      # Overall coverage is currently low because many modules are untested.
+      # Gate it gently for now, and add a strong gate on the core constraints module.
+      - name: Run tests with coverage (overall gate)
+        if: matrix.python-version == '3.11'
         run: |
-          pytest -q --maxfail=1 --disable-warnings \
-            --cov=trailtraining --cov-report=term-missing --cov-report=xml
+          python -m pytest \
+            --cov=trailtraining --cov-report=term-missing --cov-report=xml \
+            --cov-fail-under=10
+
+      - name: Coverage gate (constraints core)
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m pytest -q src/trailtraining/tests/test_coach_constraints.py \
+            --cov=trailtraining.llm.constraints --cov-report=term-missing \
+            --cov-fail-under=70
 
       - name: Upload coverage artifact
+        if: matrix.python-version == '3.11'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.python-version }}
@@ -94,5 +115,5 @@ jobs:
       - name: Build sdist/wheel
         run: |
           python -m pip install --upgrade pip
-          pip install build
+          python -m pip install build
           python -m build

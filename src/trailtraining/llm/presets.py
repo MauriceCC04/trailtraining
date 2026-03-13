@@ -59,7 +59,7 @@ Constraints:
   - 1 longer aerobic ride or long run (choose based on recent pattern/load)
 - Hard-day spacing rule: NEVER output more than 2 consecutive days with is_hard_day=true.
   If you want 3 quality touches, make one of them technique/aerobic and set is_hard_day=false.
-  
+
 Output: A Coach Brief with:
 - Snapshot (prefer rollups: last 7 days totals + notable sessions; otherwise estimate from summary)
 - Readiness interpretation (primed/steady/fatigued) tied to data
