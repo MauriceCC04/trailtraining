@@ -2,7 +2,7 @@
 
 # trailtraining
 
-A Python CLI that pulls your **training + wellness** data (**Strava + (GarminDb or Intervals.icu)**), combines it into a clean dataset, and optionally runs an **LLM “coach”** to generate a structured training plan and evaluate it against safety constraints.
+A Python CLI that pulls your **training + wellness** data (**Strava + (GarminDB or Intervals.icu)**), combines it into a clean dataset, and optionally runs an **LLM “coach”** to generate a structured training plan and evaluate it against safety constraints.
 
 **Designed for multi-user setups** on the same machine via `--profile` (separate tokens + separate data folders per user).
 
@@ -11,7 +11,7 @@ A Python CLI that pulls your **training + wellness** data (**Strava + (GarminDb 
 ## What it does
 
 **Pipeline**
-- Fetch **wellness** from **GarminDb** *or* **Intervals.icu**
+- Fetch **wellness** from **Garmin (via GarminDB)** *or* **Intervals.icu**
 - Fetch **activities** from **Strava**
 - Combine/normalize into a consistent JSON summary + rollups
 
@@ -64,7 +64,7 @@ trailtraining eval-coach --input ~/trailtraining-data/alice/prompting/coach_brie
 * Choose **one** wellness provider:
 
   * **Intervals.icu** API access (API key + athlete ID), **or**
-  * **GarminDb** installed + CLI available (`garmindb_cli` or `garmindb_cli.py`)
+  * **GarminDB** installed + CLI available (`garmindb_cli` or `garmindb_cli.py`)
 
 Optional:
 
@@ -118,7 +118,7 @@ the CLI will:
 1. Load environment variables from `~/.trailtraining/profiles/alice.env` (if it exists)
 2. Use an isolated default data directory: `~/trailtraining-data/alice/` (overrideable)
 3. Store Strava tokens at: `~/trailtraining-data/alice/tokens/strava_token.json`
-4. If using GarminDb, manage a per-profile config under `~/.trailtraining/garmin/alice/`
+4. If using GarminDB, manage a per-profile config under `~/.trailtraining/garmin/alice/`
 
 > The profile env file does **not** override variables already set in your shell (shell vars win).
 
@@ -185,7 +185,7 @@ Checks:
 
 * Strava env vars + token presence
 * Wellness provider credentials
-* GarminDb CLI availability (if using Garmin)
+* GarminDB CLI availability (if using Garmin)
 * OpenAI key presence (optional)
 
 ---
@@ -237,10 +237,10 @@ trailtraining --profile alice fetch-intervals --oldest "2023-01-01" --newest "20
 
 ---
 
-## Wellness provider: GarminDb
+## Wellness provider: GarminDB
 
-Install GarminDb per its documentation and ensure the CLI is available:
-
+Install GarminDB per its documentation: https://github.com/tcgoetz/GarminDB and ensure the CLI is available:
+* `pip install garmindb` in the terminal
 * `garmindb_cli` or `garmindb_cli.py`
 
 If needed:
@@ -257,12 +257,12 @@ trailtraining --profile alice fetch-garmin
 
 ### Garmin concurrency warning
 
-GarminDb reads one “active” config at `~/.GarminDb/GarminConnectConfig.json`. `trailtraining` switches it per profile.
+GarminDB reads one “active” config at `~/.GarminDB/GarminConnectConfig.json`. `trailtraining` switches it per profile.
 Don’t run two Garmin profiles at the same time on the same machine unless you isolate HOME (container / separate OS user).
 
-### GarminDb schema version mismatch
+### GarminDB schema version mismatch
 
-If GarminDb updates and you see “DB version mismatch… rebuild DB”, rebuild per-profile (see the Troubleshooting section below).
+If GarminDB updates and you see “DB version mismatch… rebuild DB”, rebuild per-profile (see the Troubleshooting section below).
 
 ---
 
@@ -425,7 +425,7 @@ trailtraining --profile alice --log-level DEBUG run-all
 export TRAILTRAINING_LOG_LEVEL="DEBUG"
 ```
 
-### GarminDb schema rebuild (version mismatch)
+### GarminDB schema rebuild (version mismatch)
 
 Fast rebuild (no full re-download):
 
