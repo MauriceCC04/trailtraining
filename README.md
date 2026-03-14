@@ -1,40 +1,102 @@
 # trailtraining
 
-[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+![CI](https://github.com/MauriceCC04/trailtraining/actions/workflows/ci.yml/badge.svg)
 
-`trailtraining` is a Python CLI for building local training datasets from Strava plus either GarminDB or Intervals.icu. It can also generate readiness forecasts, structured coaching outputs, and rule-based evaluations of generated plans.
+`trailtraining` is a Python CLI for turning wearable and training-platform data into something actually useful.
 
-## Features
+It started from a simple frustration: people collect huge amounts of data from smartwatches, Strava, Garmin, and similar tools, but very little of it gets turned into actionable training decisions. At the same time, the first wave of LLM features inside fitness products felt shallow, generic, and mostly useless for real training.
 
-- Pulls activities from Strava
-- Pulls wellness data from GarminDB or Intervals.icu
-- Merges data into local JSON artifacts
-- Computes readiness and overreach-risk forecasts
-- Generates structured coaching outputs
-- Evaluates training plans against simple safety rules
-- Supports isolated multi-profile setups with `--profile`
+So I built the tool I wanted for myself: a local, inspectable system that pulls together training and recovery data, estimates readiness and overreach risk, generates structured coaching outputs, and evaluates plans against simple safety rules.
 
-## Repo layout
+This is **not** a chatbot wrapper around fitness data. The goal is to make wearable data more useful for actual decision-making.
 
-```text
-.
-├── .github/workflows/
-├── demo/
-├── src/trailtraining/
-├── tests/
-├── README.md
-└── pyproject.toml
-````
+## Quick look: inspect sample outputs
 
-## Requirements
+You do **not** need API keys to understand what the project produces.
 
-* Python 3.9+
-* A Strava API application
-* One wellness source:
+For representative outputs, see [demo/](demo).
+For implementation details, see [docs/engineering.md](docs/engineering.md).
 
-  * GarminDB, or
-  * Intervals.icu API access
-* An OpenAI API key for `coach`
+- `demo/rollups/combined_rollups.json`
+- `demo/plans/training-plan.json`
+- `demo/plans/training-plan.txt`
+- `demo/status/recovery-status.md`
+- `demo/status/meal-plan.md`
+
+![Example generated training plan](docs/images/training-plan-output.png)
+
+Example generated weekly plan showing readiness context, load-aware reasoning, day-by-day structure, recovery priorities, and explicit cautions.
+
+![System overview](docs/images/forecast-pipeline.png)
+
+High-level pipeline: unify wearable and training-platform data, derive training-load and recovery context, generate structured coaching output, and evaluate the result against rule-based constraints.
+
+## What it does
+
+`trailtraining` can:
+
+- pull activities from Strava
+- pull wellness/recovery data from GarminDB or Intervals.icu
+- merge both into local JSON artifacts
+- compute readiness and overreach-risk forecasts
+- generate structured coaching outputs
+- evaluate generated training plans against rule-based safety checks
+- support isolated multi-profile setups with `--profile`
+
+## Why this project exists
+
+Most fitness platforms are good at collecting data and bad at using it.
+
+You can record heart rate, sleep, training load, pace, HRV, recovery signals, and workout history for months or years, but the end result is usually one of the following:
+
+- dashboards without clear recommendations
+- generic “AI insights” that say very little
+- training suggestions that ignore context
+- black-box outputs with no clear reasoning
+
+`trailtraining` is an attempt to do something better:
+
+- keep the workflow local and inspectable
+- combine multiple sources into a usable training view
+- produce structured outputs instead of vague summaries
+- add explicit constraints and safety checks
+- make generated plans easier to review instead of blindly trust
+
+## What makes it different
+
+The point is not just to “use an LLM for coaching.”
+
+The point is to build a pipeline where:
+1. training and wellness data are collected from real sources,
+2. useful rollups and forecasts are computed locally,
+3. coaching outputs are generated from that context,
+4. plans can be checked against simple rules before you use them.
+
+That makes this closer to an **auditable training-planning tool** than a generic AI assistant.
+
+If you are just reviewing the project, start there.
+
+These files show the kind of local rollups, generated plans, and structured outputs the pipeline produces.
+
+## What you can do without setup
+
+Without creating any API credentials, you can:
+
+- read the sample outputs in `demo/`
+- inspect the repo structure
+- review the command surface
+- understand the end-to-end workflow
+
+## What requires setup
+
+To run the full pipeline on your own data, you need:
+
+- Python 3.9+
+- a Strava API application
+- one wellness source:
+  - GarminDB, or
+  - Intervals.icu API access
+- an OpenAI API key for `coach`
 
 ## Installation
 
@@ -65,7 +127,7 @@ trailtraining -h
 
 Profiles load environment variables from:
 
-```text
+```bash
 ~/.trailtraining/profiles/<profile>.env
 ```
 
@@ -98,11 +160,11 @@ OPENAI_API_KEY="..."
 
 By default, per-profile data is stored under:
 
-```text
+```bash
 ~/trailtraining-data/<profile>
 ```
 
-## Quickstart
+## Typical workflow
 
 Check setup:
 
@@ -152,13 +214,38 @@ trailtraining --profile alice eval-coach \
 
 Typical outputs live under:
 
-```text
+```bash
 ~/trailtraining-data/<profile>/
 ├── processing/
 └── prompting/
 ```
 
-The `demo/` directory contains representative artifacts you can inspect without credentials.
+In practice, these outputs are intended to answer questions like:
+
+* How recovered do I look right now?
+* Am I trending toward overreach?
+* What kind of week makes sense from here?
+* Does the generated plan violate obvious training constraints?
+* Is this output actually useful, or just polished nonsense?
+
+## Repo layout
+
+```text
+.
+├── .github/workflows/
+├── demo/
+│   ├── README.md
+│   ├── rollups/
+│   ├── plans/
+│   └── status/
+├── docs/
+│   ├── engineering.md
+│   └── images/
+├── src/trailtraining/
+├── tests/
+├── README.md
+└── pyproject.toml
+```
 
 ## Command reference
 
@@ -206,16 +293,25 @@ ruff check .
 mypy src
 ```
 
-## Limitations
+## Current limitations
 
-* Requires user-managed API credentials and local setup
-* Data quality depends on upstream providers
-* Coaching outputs are experimental
-* Garmin workflows depend on GarminDB
+- full runs require user-managed credentials and local setup
+- data quality depends on upstream providers
+- coaching outputs are experimental
+- Garmin workflows depend on GarminDB
+- this is built for practical usefulness, not as a polished consumer product
 
 ## Safety
 
-This project is a personal training-data and planning tool. It is not medical software, and generated outputs should not be treated as medical advice.
+This is a personal training-data and planning tool.
+
+It is **not** medical software, and generated outputs should not be treated as medical advice. Any training recommendation should be reviewed with common sense and adjusted for injury status, recovery, and individual context.
+
+## Why I think this matters
+
+Wearables already collect more than enough useful data.
+
+The missing piece is turning that data into something useful, reviewable, and grounded enough to help real training decisions. That is what `trailtraining` is trying to do.
 
 ## License
 
