@@ -10,14 +10,19 @@
 
 
 # python build artifacts
+# Python cache / build artifacts
 __pycache__/
 *.pyc
 build/
 dist/
 *.egg-info/
-dist/
-build/
-/trailtraining.egg-info/
+.trailtraining.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 
 # IDE
 .idea/
