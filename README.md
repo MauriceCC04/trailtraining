@@ -2,7 +2,8 @@
 
 ![CI](https://github.com/MauriceCC04/trailtraining/actions/workflows/ci.yml/badge.svg)
 
-`trailtraining` is a Python CLI for turning wearable and training-platform data into something actually useful.
+trailtraining is a local Python CLI for turning activity data and optional recovery telemetry into inspectable training guidance.
+It computes simple recent-load and recovery-aware signals, generates coaching outputs from that local context, and evaluates generated training plans against explicit guardrails.
 
 It started from a simple frustration: people collect huge amounts of data from smartwatches, Strava, Garmin, and similar tools, but very little of it gets turned into actionable training decisions. At the same time, the first wave of LLM features inside fitness products felt shallow, generic, and mostly useless for real training.
 
@@ -35,13 +36,14 @@ High-level pipeline: unify wearable and training-platform data, derive training-
 
 `trailtraining` can:
 
-- pull activities from Strava
-- pull wellness/recovery data from GarminDB or Intervals.icu
-- merge both into local JSON artifacts
-- compute readiness and overreach-risk forecasts
-- generate structured coaching outputs
-- evaluate generated training plans against rule-based safety checks
+- pull activity history from Strava
+- optionally pull recovery telemetry from GarminDB or Intervals.icu
+- merge local activity and recovery artifacts
+- compute simple recent-load, readiness, and overreach-risk signals
+- generate a structured weekly training plan plus lighter advisory outputs
+- evaluate generated training plans against explicit safety and consistency rules
 - support isolated multi-profile setups with `--profile`
+
 
 ## Why this project exists
 
@@ -78,7 +80,27 @@ If you are just reviewing the project, start there.
 
 These files show the kind of local rollups, generated plans, and structured outputs the pipeline produces.
 
-## What you can do without setup
+## Handling incomplete data
+
+`trailtraining` is designed to degrade gracefully when recovery telemetry is incomplete.
+
+It can operate on activity-only data and improves when recent sleep, resting HR, or HRV data are available.
+When recovery telemetry is sparse, forecasts and generated plans should be interpreted more conservatively.
+
+## Plan evaluation
+
+Generated plans are not treated as correct just because they sound plausible.
+
+`eval-coach` checks plans against explicit constraints such as:
+- excessive ramp versus recent load
+- poor spacing of hard sessions
+- insufficient rest
+- inconsistencies between day-level sessions and weekly totals
+- weak or missing signal grounding
+
+This makes the project closer to a decision-support pipeline than a generic AI coaching wrapper.
+
+# What you can do without setup
 
 Without creating any API credentials, you can:
 
