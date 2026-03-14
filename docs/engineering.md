@@ -50,7 +50,9 @@ The top-level workflow is:
 - generate coaching outputs,
 - evaluate generated plans.
 
-The README contains the higher-level system diagram. This page focuses on the engineering logic behind that pipeline.
+![System overview](docs/images/forecast-pipeline.png)
+
+High-level pipeline: unify wearable and training-platform data, derive training-load and recovery context, generate structured coaching output, and evaluate the result against rule-based constraints.
 
 ## Data sources
 

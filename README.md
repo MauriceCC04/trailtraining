@@ -48,9 +48,24 @@ For implementation details, see [docs/engineering.md](docs/engineering.md).
 
 Example generated weekly plan showing readiness context, load-aware reasoning, day-by-day structure, recovery priorities, and explicit cautions.
 
-![System overview](docs/images/forecast-pipeline.png)
-
-High-level pipeline: unify wearable and training-platform data, derive training-load and recovery context, generate structured coaching output, and evaluate the result against rule-based constraints.
+```
+Strava API ─────┐
+                ├──► combine.py ──► combined_summary.json
+Intervals.icu ──┘                         │
+                                          ▼
+                              forecast.py (deterministic)
+                                          │
+                                          ▼
+                              coach.py (LLM generation)
+                                          │
+                                          ▼
+                              eval.py + constraints.py
+                                          │
+                                          ▼
+                         eval_report.json (score, grade, violations)
+## What it produces
+```
+The simplified pipeline: unify data → compute signals → generate plan → evaluate plan
 
 ## What it does
 
@@ -229,26 +244,6 @@ trailtraining --profile alice eval-coach \
   --input ~/trailtraining-data/alice/prompting/coach_brief_training-plan.json
 ```
 
-The numbered comments make the pipeline structure obvious in 10 seconds. Right now the flow is implicit.
-
-**Add a brief architecture section to `docs/engineering.md`**
-
-The engineering doc is good but it describes the logic in prose. Add a data-flow diagram (even a simple ASCII one) showing the pipeline stages:
-```
-Strava API ─────┐
-                ├──► combine.py ──► combined_summary.json
-Intervals.icu ──┘                         │
-                                          ▼
-                              forecast.py (deterministic)
-                                          │
-                                          ▼
-                              coach.py (LLM generation)
-                                          │
-                                          ▼
-                              eval.py + constraints.py
-                                          │
-                                          ▼
-                         eval_report.json (score, grade, violations)
 ## What it produces
 
 ```
