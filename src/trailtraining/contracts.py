@@ -1,0 +1,163 @@
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+# ---------- training-plan artifact ----------
+
+
+class SnapshotStats(StrictModel):
+    distance_km: str
+    moving_time_hours: str
+    elevation_m: str
+    activity_count: str
+    sleep_hours_mean: str
+    hrv_mean: str
+    rhr_mean: str
+
+
+class TrainingMeta(StrictModel):
+    today: str
+    plan_start: str
+    plan_days: int = Field(ge=1, le=21)
+    style: str
+
+
+class Readiness(StrictModel):
+    status: Literal["primed", "steady", "fatigued"]
+    rationale: str
+    signal_ids: list[str] = Field(default_factory=list)
+
+
+class WeeklyTotals(StrictModel):
+    planned_distance_km: float = Field(ge=0)
+    planned_moving_time_hours: float = Field(ge=0)
+    planned_elevation_m: float = Field(ge=0)
+
+
+class PlanDay(StrictModel):
+    date: str
+    title: str
+    session_type: Literal[
+        "rest", "easy", "aerobic", "long", "tempo", "intervals", "hills", "strength", "cross"
+    ]
+    is_rest_day: bool
+    is_hard_day: bool
+    duration_minutes: int = Field(ge=0, le=420)
+    target_intensity: str
+    terrain: str
+    workout: str
+    purpose: str
+    signal_ids: list[str] = Field(default_factory=list)
+
+
+class Plan(StrictModel):
+    weekly_totals: WeeklyTotals
+    days: list[PlanDay] = Field(min_length=1, max_length=21)
+
+
+class Recovery(StrictModel):
+    actions: list[str] = Field(default_factory=list)
+    signal_ids: list[str] = Field(default_factory=list)
+
+
+class RiskItem(StrictModel):
+    severity: Literal["low", "medium", "high"]
+    message: str
+    signal_ids: list[str] = Field(default_factory=list)
+
+
+class Citation(StrictModel):
+    signal_id: str
+    source: str
+    date_range: str
+    value: str
+
+
+class Snapshot(StrictModel):
+    last7: SnapshotStats
+    baseline28: SnapshotStats
+    notes: str
+
+
+class TrainingPlanArtifact(StrictModel):
+    meta: TrainingMeta
+    snapshot: Snapshot
+    readiness: Readiness
+    plan: Plan
+    recovery: Recovery
+    risks: list[RiskItem] = Field(default_factory=list)
+    data_notes: list[str] = Field(default_factory=list)
+    citations: list[Citation] = Field(default_factory=list)
+
+
+# ---------- eval-coach artifact ----------
+
+
+class Violation(StrictModel):
+    code: str
+    severity: Literal["low", "medium", "high"]
+    category: str
+    penalty: int
+    message: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class EvaluationReportArtifact(StrictModel):
+    score: int | float
+    grade: str
+    subscores: dict[str, int | float] = Field(default_factory=dict)
+    stats: dict[str, Any] = Field(default_factory=dict)
+    violations: list[Violation] = Field(default_factory=list)
+
+
+# ---------- forecast artifact ----------
+
+
+class ForecastInputs(StrictModel):
+    as_of_date: str
+    rhr_7d_mean_bpm: float | None = None
+    rhr_28d_mean_bpm: float | None = None
+    rhr_28d_std_bpm: float | None = None
+    rhr_delta_bpm: float | None = None
+    rhr_z: float | None = None
+    training_load_7d_hours: float | None = None
+    training_load_rolling7_mean_hours: float | None = None
+    training_load_rolling7_std_hours: float | None = None
+    training_load_delta_hours: float | None = None
+    training_load_z: float | None = None
+    notes: list[str] = Field(default_factory=list)
+
+
+class ForecastDrivers(StrictModel):
+    readiness: list[str] = Field(default_factory=list)
+    overreach_risk: list[str] = Field(default_factory=list)
+
+
+class ForecastReadiness(StrictModel):
+    score: float
+    status: Literal["primed", "steady", "fatigued"]
+
+
+class ForecastRisk(StrictModel):
+    score: float
+    level: Literal["low", "moderate", "high"]
+
+
+class ForecastResultArtifact(StrictModel):
+    date: str
+    readiness: ForecastReadiness
+    overreach_risk: ForecastRisk
+    inputs: ForecastInputs
+    drivers: ForecastDrivers
+
+
+class ForecastArtifact(StrictModel):
+    generated_at: str
+    result: ForecastResultArtifact

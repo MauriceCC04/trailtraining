@@ -38,6 +38,22 @@ def _coerce_path(p: Optional[str]) -> Optional[Path]:
     return Path(p).expanduser().resolve() if p else None
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _as_str(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _as_float(value: Any) -> Optional[float]:
+    return float(value) if isinstance(value, (int, float)) else None
+
+
 def _resolve_input_paths(
     input_path: Optional[str],
     personal_path: Optional[str],
@@ -214,7 +230,7 @@ def _load_or_compute_deterministic_forecast(
 
     # Best-effort compute (won't crash coach if module isn't installed yet)
     try:
-        from trailtraining.forecast.forecast import compute_readiness_and_risk  # type: ignore
+        from trailtraining.forecast.forecast import compute_readiness_and_risk
     except Exception:
         return None
 
@@ -310,29 +326,23 @@ def _apply_deterministic_readiness_to_plan(
     plan_obj: dict[str, Any],
     det_forecast: Optional[dict[str, Any]],
 ) -> None:
-    """
-    Ensures training-plan output uses the deterministic readiness status.
-    Schema only allows readiness.status + rationale + signal_ids; we update status and annotate rationale.
-    """
     if not isinstance(det_forecast, dict):
         return
-    res = det_forecast.get("result")
-    if not isinstance(res, dict):
-        return
-    readiness = res.get("readiness")
-    if not isinstance(readiness, dict):
-        return
 
-    status = readiness.get("status")
+    res = _as_dict(det_forecast.get("result"))
+    readiness = _as_dict(res.get("readiness"))
+
+    status_raw = readiness.get("status")
     score = readiness.get("score")
-    if status not in ("primed", "steady", "fatigued"):
+    if status_raw not in ("primed", "steady", "fatigued"):
+        return
+    status = str(status_raw)
+
+    plan_readiness = _as_dict(plan_obj.get("readiness"))
+    if not plan_readiness:
         return
 
-    r = plan_obj.get("readiness")
-    if not isinstance(r, dict):
-        return
-
-    r["status"] = status
+    plan_readiness["status"] = status
 
     prefix = f"Deterministic readiness: {status}"
     if isinstance(score, (int, float)):
@@ -340,75 +350,60 @@ def _apply_deterministic_readiness_to_plan(
     else:
         prefix += "."
 
-    old = r.get("rationale")
+    old = plan_readiness.get("rationale")
     if isinstance(old, str) and old.strip():
         if not old.strip().lower().startswith("deterministic readiness"):
-            r["rationale"] = prefix + " " + old.strip()
+            plan_readiness["rationale"] = prefix + " " + old.strip()
     else:
-        r["rationale"] = prefix
+        plan_readiness["rationale"] = prefix
 
-    dn = plan_obj.get("data_notes")
-    if isinstance(dn, list):
-        note = "Readiness status was set from deterministic readiness_and_risk_forecast.json."
-        if note not in dn:
-            dn.append(note)
+    plan_obj["readiness"] = plan_readiness
+
+    data_notes = _as_list(plan_obj.get("data_notes"))
+    note = "Readiness status was set from deterministic readiness_and_risk_forecast.json."
+    if note not in data_notes:
+        data_notes.append(note)
+    plan_obj["data_notes"] = data_notes
 
 
 def training_plan_to_text(obj: dict[str, Any]) -> str:
-    """
-    Convert a training-plan JSON object into a simple, human-readable text plan.
-    Output is intended to be saved as a .txt file alongside the JSON.
-    """
-    meta = obj.get("meta") if isinstance(obj.get("meta"), dict) else {}
-    readiness = obj.get("readiness") if isinstance(obj.get("readiness"), dict) else {}
-    plan = obj.get("plan") if isinstance(obj.get("plan"), dict) else {}
-    weekly = plan.get("weekly_totals") if isinstance(plan.get("weekly_totals"), dict) else {}
-    days = plan.get("days") if isinstance(plan.get("days"), list) else []
+    meta = _as_dict(obj.get("meta"))
+    readiness = _as_dict(obj.get("readiness"))
+    plan = _as_dict(obj.get("plan"))
+    weekly = _as_dict(plan.get("weekly_totals"))
+    days_raw = _as_list(plan.get("days"))
+    day_objs = [d for d in days_raw if isinstance(d, dict)]
 
     def _fmt_weekday(ds: str) -> str:
-        if not isinstance(ds, str):
-            return ""
         try:
             return date.fromisoformat(ds).strftime("%a")
         except Exception:
             return ""
 
-    def _safe_str(x: Any) -> str:
-        return x.strip() if isinstance(x, str) else ""
-
-    def _safe_num(x: Any) -> Optional[float]:
-        return float(x) if isinstance(x, (int, float)) else None
-
-    # Sort days by ISO date if possible
-    def _day_key(d: dict[str, Any]) -> str:
-        ds = d.get("date")
+    def _day_key(day_obj: dict[str, Any]) -> str:
+        ds = day_obj.get("date")
         return ds if isinstance(ds, str) else "9999-99-99"
 
-    day_objs = [d for d in days if isinstance(d, dict)]
     day_objs.sort(key=_day_key)
 
-    lines: list[str] = []
-    lines.append("TrailTraining - Training Plan")
-    lines.append("")
+    lines: list[str] = ["TrailTraining - Training Plan", ""]
 
-    # Meta
-    plan_start = _safe_str(meta.get("plan_start"))
+    plan_start = _as_str(meta.get("plan_start"))
     plan_days = meta.get("plan_days")
-    style = _safe_str(meta.get("style"))
-    today = _safe_str(meta.get("today"))
+    style = _as_str(meta.get("style"))
+    today = _as_str(meta.get("today"))
 
     if today:
         lines.append(f"Generated: {today}")
-    if plan_start or plan_days:
+    if plan_start or plan_days is not None:
         lines.append(
             f"Plan start: {plan_start or '(unknown)'}   Days: {plan_days if plan_days is not None else '(unknown)'}"
         )
     if style:
         lines.append(f"Style: {style}")
 
-    # Readiness
-    status = _safe_str(readiness.get("status"))
-    rationale = _safe_str(readiness.get("rationale"))
+    status = _as_str(readiness.get("status"))
+    rationale = _as_str(readiness.get("rationale"))
     if status or rationale:
         lines.append("")
         if status:
@@ -416,10 +411,10 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
         if rationale:
             lines.append(f"Why: {rationale}")
 
-    # Weekly totals (best-effort)
-    dist_km = _safe_num(weekly.get("planned_distance_km"))
-    hours = _safe_num(weekly.get("planned_moving_time_hours"))
-    elev_m = _safe_num(weekly.get("planned_elevation_m"))
+    dist_km = _as_float(weekly.get("planned_distance_km"))
+    hours = _as_float(weekly.get("planned_moving_time_hours"))
+    elev_m = _as_float(weekly.get("planned_elevation_m"))
+
     if dist_km is not None or hours is not None or elev_m is not None:
         parts: list[str] = []
         if hours is not None:
@@ -432,19 +427,18 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
             lines.append("")
             lines.append("Weekly totals: " + " • ".join(parts))
 
-    # Day-by-day
     lines.append("")
     lines.append("Day-by-day")
     lines.append("-" * 10)
 
-    for d in day_objs:
-        ds = _safe_str(d.get("date"))
-        wd = _fmt_weekday(ds)
-        title = _safe_str(d.get("title")) or "(no title)"
-        session_type = _safe_str(d.get("session_type"))
-        is_rest = bool(d.get("is_rest_day"))
-        is_hard = bool(d.get("is_hard_day"))
-        mins = d.get("duration_minutes")
+    for day_obj in day_objs:
+        ds = _as_str(day_obj.get("date"))
+        wd = _fmt_weekday(ds) if ds else ""
+        title = _as_str(day_obj.get("title")) or "(no title)"
+        session_type = _as_str(day_obj.get("session_type"))
+        is_rest = bool(day_obj.get("is_rest_day"))
+        is_hard = bool(day_obj.get("is_hard_day"))
+        mins = day_obj.get("duration_minutes")
         dur = f"{mins} min" if isinstance(mins, (int, float)) else "?"
 
         tag_parts: list[str] = []
@@ -459,10 +453,10 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
         date_label = f"{wd} {ds}".strip() if wd or ds else "(unknown date)"
         lines.append(f"{date_label}: {title} ({tag}, {dur})")
 
-        target_intensity = _safe_str(d.get("target_intensity"))
-        terrain = _safe_str(d.get("terrain"))
-        workout = _safe_str(d.get("workout"))
-        purpose = _safe_str(d.get("purpose"))
+        target_intensity = _as_str(day_obj.get("target_intensity"))
+        terrain = _as_str(day_obj.get("terrain"))
+        workout = _as_str(day_obj.get("workout"))
+        purpose = _as_str(day_obj.get("purpose"))
 
         if target_intensity:
             lines.append(f"  Intensity: {target_intensity}")
@@ -475,26 +469,22 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
 
         lines.append("")
 
-    # Recovery actions
-    rec = obj.get("recovery") if isinstance(obj.get("recovery"), dict) else {}
-    actions = rec.get("actions") if isinstance(rec.get("actions"), list) else []
-    actions = [a for a in actions if isinstance(a, str) and a.strip()]
+    recovery = _as_dict(obj.get("recovery"))
+    actions = [a for a in _as_list(recovery.get("actions")) if isinstance(a, str) and a.strip()]
     if actions:
         lines.append("Recovery focus")
         lines.append("-" * 14)
-        for a in actions:
-            lines.append(f"- {a.strip()}")
+        for action in actions:
+            lines.append(f"- {action.strip()}")
         lines.append("")
 
-    # Risks
-    risks = obj.get("risks") if isinstance(obj.get("risks"), list) else []
-    risks = [r for r in risks if isinstance(r, dict)]
+    risks = [r for r in _as_list(obj.get("risks")) if isinstance(r, dict)]
     if risks:
         lines.append("Risks / cautions")
         lines.append("-" * 15)
-        for r in risks:
-            sev = _safe_str(r.get("severity")) or "unknown"
-            msg = _safe_str(r.get("message")) or "(no message)"
+        for risk in risks:
+            sev = _as_str(risk.get("severity")) or "unknown"
+            msg = _as_str(risk.get("message")) or "(no message)"
             lines.append(f"- [{sev}] {msg}")
         lines.append("")
 

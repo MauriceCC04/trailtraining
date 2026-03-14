@@ -31,7 +31,7 @@ Most training apps are good at storage and visualization, but weak at:
 - Normalizes and combines the data into a consistent summary format
 - Produces rollups and downstream artifacts for analysis and planning
 
-### Optional coaching layer
+### Coaching layer
 - Generates structured outputs such as:
   - training plan JSON
   - recovery status
@@ -101,7 +101,6 @@ Requirements
 	•	One wellness provider:
 	◦	Intervals.icu API access, or
 	◦	GarminDB installed locally
-Optional:
 	•	OpenAI API key for coach features
 Install
 ```bash
@@ -156,7 +155,7 @@ GARMIN_PASSWORD="..."
 # TRAILTRAINING_BASE_DIR="$HOME/trailtraining-data/alice"
 # TRAILTRAINING_LOG_LEVEL="INFO"
 
-# Optional LLM coach
+# LLM coach
 OPENAI_API_KEY="..."
 TRAILTRAINING_LLM_MODEL="gpt-5.2"
 TRAILTRAINING_REASONING_EFFORT="medium"
@@ -168,11 +167,11 @@ A standard run looks like this:
 	3	Normalize and merge records
 	4	Save derived summaries and rollups
 	5	Run deterministic forecast logic
-	6	Optionally generate a structured plan
+	6	Generate a structured plan
 	7	Evaluate the generated plan against safety rules
 This separation is intentional:
 	•	the data pipeline is deterministic and reproducible
-	•	the coach layer is optional and clearly isolated
+	•	the coaching layer is the core product experience, while remaining cleanly separated from the deterministic pipeline
 
 Outputs
 Depending on commands and provider setup, the project can produce artifacts such as:

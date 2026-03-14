@@ -39,14 +39,8 @@ jobs:
       - name: Ruff lint
         run: python -m ruff check .
 
-      - name: Mypy (core)
-        run: |
-          python -m mypy \
-            src/trailtraining/cli.py \
-            src/trailtraining/doctor.py \
-            src/trailtraining/forecast/forecast.py \
-            src/trailtraining/llm/constraints.py \
-            src/trailtraining/pipelines/run_all.py
+      - name: Mypy (package)
+        run: python -m mypy src/trailtraining tests
 
   test:
     name: Tests (pytest)

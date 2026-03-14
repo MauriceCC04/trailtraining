@@ -1,14 +1,44 @@
 # src/trailtraining/forecast/forecast.py
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional, cast
 
 from trailtraining import config
+from trailtraining.contracts import (
+    ForecastArtifact,
+    ForecastDrivers,
+    ForecastInputs,
+    ForecastReadiness,
+    ForecastResultArtifact,
+    ForecastRisk,
+)
 from trailtraining.metrics.training_load import day_training_load_hours
 from trailtraining.util.state import load_json, save_json
+
+ReadinessStatus = Literal["primed", "steady", "fatigued"]
+RiskLevel = Literal["low", "moderate", "high"]
+
+
+def _to_float(value: object) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def normalize_readiness_status(value: str) -> ReadinessStatus:
+    if value not in {"primed", "steady", "fatigued"}:
+        raise ValueError(f"Invalid readiness status: {value}")
+    return cast(ReadinessStatus, value)
+
+
+def normalize_risk_level(value: str) -> RiskLevel:
+    if value not in {"low", "moderate", "high"}:
+        raise ValueError(f"Invalid risk level: {value}")
+    return cast(RiskLevel, value)
 
 
 def _as_date(s: str) -> Optional[date]:
@@ -42,7 +72,7 @@ def _std(xs: list[float]) -> Optional[float]:
         return None
     m = sum(xs2) / len(xs2)
     var = sum((x - m) ** 2 for x in xs2) / (len(xs2) - 1)
-    return var**0.5
+    return math.sqrt(var)
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
@@ -322,16 +352,22 @@ def run_forecasts(
         if output_path
         else (base / "readiness_and_risk_forecast.json")
     )
-    payload = {
-        "generated_at": datetime.utcnow().isoformat() + "Z",
-        "result": {
-            "date": fr.date,
-            "readiness": {"score": fr.readiness_score, "status": fr.readiness_status},
-            "overreach_risk": {"score": fr.overreach_risk_score, "level": fr.overreach_risk_level},
-            "inputs": fr.inputs,
-            "drivers": fr.drivers,
-        },
-    }
-    save_json(outp, payload, compact=False)
+    payload = ForecastArtifact(
+        generated_at=datetime.utcnow().isoformat() + "Z",
+        result=ForecastResultArtifact(
+            date=fr.date,
+            readiness=ForecastReadiness(
+                score=fr.readiness_score,
+                status=normalize_readiness_status(fr.readiness_status),
+            ),
+            overreach_risk=ForecastRisk(
+                score=fr.overreach_risk_score,
+                level=normalize_risk_level(fr.overreach_risk_level),
+            ),
+            inputs=ForecastInputs.model_validate(fr.inputs),
+            drivers=ForecastDrivers.model_validate(fr.drivers),
+        ),
+    )
 
-    return {"saved": str(outp), "result": payload}
+    save_json(outp, payload.model_dump(mode="json"), compact=False)
+    return {"saved": str(outp), "result": payload.model_dump(mode="json")}

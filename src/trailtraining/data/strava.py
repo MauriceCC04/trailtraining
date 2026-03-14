@@ -8,7 +8,7 @@ import secrets
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from urllib.parse import urlencode
 
 import requests
@@ -21,9 +21,35 @@ STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 _SESSION = requests.Session()
 
 
+def _json_dict(resp: requests.Response) -> dict[str, Any]:
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise ValueError("Expected JSON object response")
+    return cast(dict[str, Any], data)
+
+
+def _json_dict_or_none(resp: requests.Response) -> dict[str, Any] | None:
+    data = resp.json()
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise ValueError("Expected JSON object response")
+    return cast(dict[str, Any], data)
+
+
 def _get_env(name: str, required: bool = True, default: Optional[str] = None) -> Optional[str]:
     value = os.getenv(name, default)
     if required and (value is None or value.strip() == ""):
+        raise RuntimeError(
+            f"Missing environment variable: {name}\n"
+            f"Set it in your shell or a .env file (but do NOT commit secrets)."
+        )
+    return value
+
+
+def _require_env(name: str) -> str:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
         raise RuntimeError(
             f"Missing environment variable: {name}\n"
             f"Set it in your shell or a .env file (but do NOT commit secrets)."
@@ -41,9 +67,9 @@ class StravaOAuthConfig:
     @staticmethod
     def from_env() -> StravaOAuthConfig:
         return StravaOAuthConfig(
-            client_id=_get_env("STRAVA_CLIENT_ID"),
-            client_secret=_get_env("STRAVA_CLIENT_SECRET"),
-            redirect_uri=_get_env("STRAVA_REDIRECT_URI"),
+            client_id=_require_env("STRAVA_CLIENT_ID"),
+            client_secret=_require_env("STRAVA_CLIENT_SECRET"),
+            redirect_uri=_require_env("STRAVA_REDIRECT_URI"),
             scope=os.getenv("STRAVA_SCOPE", "read,activity:read_all"),
         )
 
@@ -86,7 +112,7 @@ def exchange_code_for_token(
         timeout=30,
     )
     resp.raise_for_status()
-    return resp.json()
+    return _json_dict(resp)
 
 
 def refresh_access_token(
@@ -103,14 +129,20 @@ def refresh_access_token(
         timeout=30,
     )
     resp.raise_for_status()
-    return resp.json()
+    return _json_dict(resp)
 
 
 def load_token(path: Optional[Path] = None) -> Optional[dict[str, Any]]:
     path = path or default_token_path()
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("Token file must contain a JSON object")
+    return cast(dict[str, Any], raw)
 
 
 def save_token(token: dict[str, Any], path: Optional[Path] = None) -> Path:

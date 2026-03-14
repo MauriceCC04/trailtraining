@@ -51,24 +51,24 @@ def _load_sleep_by_date(path: str) -> dict[str, dict[str, Any]]:
     if raw is None:
         return {}
 
-    # If it's already dict keyed by date, normalize keys to YYYY-MM-DD
     if isinstance(raw, dict):
-        out: dict[str, dict[str, Any]] = {}
+        out_by_date: dict[str, dict[str, Any]] = {}
         for k, v in raw.items():
             if isinstance(k, str) and len(k) >= 10 and isinstance(v, dict):
-                out[k[:10]] = v
-        return out
+                out_by_date[k[:10]] = v
+        return out_by_date
 
-    # Typical case: list of dict entries with calendarDate
-    out: dict[str, dict[str, Any]] = {}
     if isinstance(raw, list):
+        list_out: dict[str, dict[str, Any]] = {}
         for item in raw:
             if not isinstance(item, dict):
                 continue
             d = _extract_sleep_date(item)
             if d:
-                out[d] = item
-    return out
+                list_out[d] = item
+        return list_out
+
+    return {}
 
 
 def _load_activities_by_date(path: str) -> dict[str, list[dict[str, Any]]]:
@@ -103,7 +103,7 @@ def _compute_rollup(
     hr_n = 0
     activity_count = 0
 
-    sports = Counter()
+    sports: Counter[str] = Counter()
     sleep_days_with_data = 0
 
     # Per-sport aggregation (distance/time/elev + training load)

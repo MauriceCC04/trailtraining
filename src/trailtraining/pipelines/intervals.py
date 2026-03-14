@@ -15,6 +15,11 @@ BASE_URL = os.getenv("INTERVALS_BASE_URL", "https://intervals.icu/api/v1")
 _SESSION = requests.Session()
 
 
+def _env_str(name: str, default: str = "") -> str:
+    value = os.getenv(name)
+    return value.strip() if isinstance(value, str) else default
+
+
 def _pick(obj: dict[str, Any], *keys: str, default: Any = None) -> Any:
     for k in keys:
         if k in obj and obj[k] is not None:
@@ -32,13 +37,14 @@ def _to_int(v: Any, default: int = -1) -> int:
 
 
 def _auth_headers() -> dict[str, str]:
-    # If you ever add OAuth later:
-    bearer = os.getenv("INTERVALS_ACCESS_TOKEN", "").strip()
+    bearer = _env_str("INTERVALS_ACCESS_TOKEN")
     if bearer:
         return {"Authorization": f"Bearer {bearer}"}
 
-    # API key (personal use): Basic auth where username is literally "API_KEY"
-    api_key = (os.getenv("INTERVALS_API_KEY") or getattr(config, "INTERVALS_API_KEY", "")).strip()
+    config_api_key = getattr(config, "INTERVALS_API_KEY", "")
+    config_api_key_str = config_api_key.strip() if isinstance(config_api_key, str) else ""
+    api_key = _env_str("INTERVALS_API_KEY") or config_api_key_str
+
     if not api_key:
         raise RuntimeError("Missing INTERVALS_API_KEY (or INTERVALS_ACCESS_TOKEN).")
 
@@ -84,9 +90,13 @@ def _request_with_retry(
 
 
 def fetch_wellness(oldest: str, newest: str) -> list[dict[str, Any]]:
-    athlete_id = (
-        os.getenv("INTERVALS_ATHLETE_ID") or getattr(config, "INTERVALS_ATHLETE_ID", "0")
-    ).strip() or "0"
+    athlete_id_env = _env_str("INTERVALS_ATHLETE_ID")
+    athlete_id_cfg = getattr(config, "INTERVALS_ATHLETE_ID", "0")
+    athlete_id_cfg_str = (
+        athlete_id_cfg.strip() if isinstance(athlete_id_cfg, str) else str(athlete_id_cfg)
+    )
+    athlete_id = athlete_id_env or athlete_id_cfg_str or "0"
+
     url = f"{BASE_URL}/athlete/{athlete_id}/wellness"
     params = {"oldest": oldest, "newest": newest}
 
@@ -136,7 +146,12 @@ def ensure_personal_stub() -> None:
     out_path = os.path.join(config.PROMPTING_DIRECTORY, "formatted_personal_data.json")
     if os.path.exists(out_path):
         return
-    stub = {"userInfo": {}, "biometricProfile": {}}
+
+    stub: dict[str, dict[str, Any]] = {
+        "userInfo": {},
+        "biometricProfile": {},
+    }
+
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(stub, f, indent=2)
 

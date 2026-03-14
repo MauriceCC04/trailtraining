@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
+from trailtraining.contracts import EvaluationReportArtifact, TrainingPlanArtifact
 from trailtraining.llm.constraints import (
     ConstraintConfig,
     evaluate_training_plan_quality,
@@ -51,19 +52,17 @@ def evaluate_training_plan_file(
 def evaluate_training_plan_quality_file(
     coach_json_path: str,
     *,
-    rollups_path: Optional[str] = None,
-    cfg: Optional[ConstraintConfig] = None,
+    rollups_path: str | None = None,
+    cfg: ConstraintConfig | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """
-    New: returns (report, obj)
-    report includes score/grade/subscores/stats/violations
-    """
     p = Path(coach_json_path).expanduser().resolve()
-    obj = load_json(p, default=None)
-    if not isinstance(obj, dict):
-        raise ValueError("Coach JSON must be an object (dict).")
+    raw_obj = load_json(p, default=None)
+    obj = TrainingPlanArtifact.model_validate(raw_obj)
 
     rollups = _load_rollups_near(p, rollups_path)
     ccfg = cfg or ConstraintConfig()
-    report = evaluate_training_plan_quality(obj, rollups, ccfg)
-    return report, obj
+
+    report_raw = evaluate_training_plan_quality(obj.model_dump(mode="python"), rollups, ccfg)
+    report = EvaluationReportArtifact.model_validate(report_raw)
+
+    return report.model_dump(mode="json"), obj.model_dump(mode="json")

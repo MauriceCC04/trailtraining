@@ -21,8 +21,9 @@ repos:
       - id: mypy
         name: mypy (core)
         args: ["--config-file=pyproject.toml"]
-        files: ^src/trailtraining/llm/constraints\.py$
+        files: ^src/trailtraining/|^tests/
         additional_dependencies:
           - types-requests
           - Flask
           - openai
+          - pydantic

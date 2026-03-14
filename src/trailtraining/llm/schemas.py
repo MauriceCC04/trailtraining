@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from trailtraining.contracts import TrainingPlanArtifact
+
 _SNAPSHOT_KEYS = [
     "distance_km",
     "moving_time_hours",
@@ -12,6 +14,10 @@ _SNAPSHOT_KEYS = [
     "hrv_mean",
     "rhr_mean",
 ]
+
+
+def ensure_training_plan_shape(obj: Any) -> dict[str, Any]:
+    return TrainingPlanArtifact.model_validate(obj).model_dump(mode="python")
 
 
 def _snapshot_obj_schema() -> dict[str, Any]:
@@ -219,39 +225,3 @@ def _require(obj: dict[str, Any], key: str, typ: Any) -> Any:
     if not isinstance(v, typ):
         raise ValueError(f"Key {key} must be {typ}, got {type(v)}")
     return v
-
-
-def ensure_training_plan_shape(obj: Any) -> dict[str, Any]:
-    if not isinstance(obj, dict):
-        raise ValueError("Training plan output must be a JSON object (dict).")
-
-    _require(obj, "meta", dict)
-    _require(obj, "snapshot", dict)
-    _require(obj, "readiness", dict)
-    _require(obj, "plan", dict)
-    _require(obj, "recovery", dict)
-    _require(obj, "risks", list)
-    _require(obj, "data_notes", list)
-    _require(obj, "citations", list)
-
-    plan = obj["plan"]
-    _require(plan, "weekly_totals", dict)
-    days = _require(plan, "days", list)
-    if not days:
-        raise ValueError("plan.days must be a non-empty list.")
-
-    for i, d in enumerate(days):
-        if not isinstance(d, dict):
-            raise ValueError(f"plan.days[{i}] must be an object.")
-        for k in (
-            "date",
-            "session_type",
-            "is_hard_day",
-            "is_rest_day",
-            "duration_minutes",
-            "signal_ids",
-        ):
-            if k not in d:
-                raise ValueError(f"plan.days[{i}] missing required key: {k}")
-
-    return obj

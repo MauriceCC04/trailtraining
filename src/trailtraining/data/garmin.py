@@ -185,7 +185,7 @@ def filter_sleep(input_path: str, output_path: str) -> None:
         cal = pick(entry, "calendarDate")
         cal_s = str(cal)[:10] if cal else ""
 
-        row = {"calendarDate": cal_s}
+        row: dict[str, object] = {"calendarDate": cal_s}
         for k in wanted_numeric:
             row[k] = to_int(pick(entry, k))
 
