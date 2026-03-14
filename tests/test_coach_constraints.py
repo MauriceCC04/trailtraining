@@ -7,7 +7,7 @@ from trailtraining.llm.constraints import (
 
 
 def test_constraints_ramp_and_consecutive_hard():
-    # last 7 = 10h, planned = 12h -> +20% (violates max 10%)
+    # last 7 = 10h, actual first 7 planned = 12h -> +20% (violates max 10%)
     rollups = {"windows": {"7": {"activities": {"total_moving_time_hours": 10.0}}}}
 
     plan_obj = {
@@ -22,7 +22,7 @@ def test_constraints_ramp_and_consecutive_hard():
                     "date": "2026-03-01",
                     "is_hard_day": True,
                     "is_rest_day": False,
-                    "duration_minutes": 60,
+                    "duration_minutes": 240,
                     "session_type": "tempo",
                     "signal_ids": [],
                 },
@@ -30,7 +30,7 @@ def test_constraints_ramp_and_consecutive_hard():
                     "date": "2026-03-02",
                     "is_hard_day": True,
                     "is_rest_day": False,
-                    "duration_minutes": 60,
+                    "duration_minutes": 240,
                     "session_type": "intervals",
                     "signal_ids": [],
                 },
@@ -38,7 +38,7 @@ def test_constraints_ramp_and_consecutive_hard():
                     "date": "2026-03-03",
                     "is_hard_day": True,
                     "is_rest_day": False,
-                    "duration_minutes": 60,
+                    "duration_minutes": 240,
                     "session_type": "hills",
                     "signal_ids": [],
                 },
