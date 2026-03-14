@@ -12,7 +12,7 @@ class ConstraintConfig:
     max_ramp_pct: float = 10.0
     max_consecutive_hard: int = 2
 
-    # --- new quality knobs (defaults; CLI can keep using only the existing args) ---
+    # existing quality knobs
     max_hard_per_7d: int = 3
     min_rest_per_7d: int = 1
     min_signal_ids_per_day: int = 1
@@ -23,6 +23,16 @@ class ConstraintConfig:
     # Rest-day expectations
     rest_day_max_minutes: int = 30
     require_rest_session_type: bool = True
+
+    # --- new forecast-aware conservative overlays ---
+    fatigued_max_hard_per_7d: int = 1
+    high_risk_max_hard_per_7d: int = 1
+    high_risk_max_consecutive_hard: int = 1
+    high_risk_max_ramp_pct: float = 0.0
+
+    # When telemetry is sparse, be somewhat more conservative
+    sparse_data_max_hard_per_7d: int = 2
+    sparse_data_max_ramp_pct: float = 5.0
 
 
 def _pct_increase(new: float, old: Optional[float]) -> Optional[float]:
@@ -63,11 +73,83 @@ def _v(
     }
 
 
-def _chunk7(days: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
-    out: list[list[dict[str, Any]]] = []
-    for i in range(0, len(days), 7):
-        out.append(days[i : i + 7])
-    return out
+def _rolling7(days: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    if not days:
+        return []
+    if len(days) <= 7:
+        return [days]
+    return [days[i : i + 7] for i in range(0, len(days) - 7 + 1)]
+
+
+def _as_clean_str(v: Any) -> Optional[str]:
+    if not isinstance(v, str):
+        return None
+    s = v.strip()
+    return s or None
+
+
+def _citation_value(plan_obj: dict[str, Any], signal_id: str) -> Any:
+    cits = plan_obj.get("citations")
+    if not isinstance(cits, list):
+        return None
+    for c in cits:
+        if not isinstance(c, dict):
+            continue
+        if c.get("signal_id") != signal_id:
+            continue
+        if "value" in c:
+            return c.get("value")
+        if isinstance(c.get("quote"), str):
+            return c.get("quote")
+        if isinstance(c.get("text"), str):
+            return c.get("text")
+    return None
+
+
+def _extract_forecast_context(plan_obj: dict[str, Any]) -> dict[str, Optional[str]]:
+    readiness = _as_clean_str(_citation_value(plan_obj, "forecast.readiness.status"))
+    overreach = _as_clean_str(_citation_value(plan_obj, "forecast.overreach_risk.level"))
+    capability_key = _as_clean_str(_citation_value(plan_obj, "forecast.recovery_capability.key"))
+    capability_label = _as_clean_str(
+        _citation_value(plan_obj, "forecast.recovery_capability.label")
+    )
+
+    return {
+        "readiness_status": readiness.lower() if readiness else None,
+        "overreach_risk_level": overreach.lower() if overreach else None,
+        "recovery_capability_key": capability_key.lower() if capability_key else None,
+        "recovery_capability_label": capability_label,
+    }
+
+
+def _is_sparse_capability(ctx: dict[str, Optional[str]]) -> bool:
+    key = ctx.get("recovery_capability_key")
+    label = (ctx.get("recovery_capability_label") or "").lower()
+
+    if key in {"load_only", "load_sleep", "load_resting_hr", "load_hrv"}:
+        return True
+
+    # fallback for older artifacts that only carry the label
+    if "only have training data" in label:
+        return True
+
+    return label.startswith("i have load + ") and " only" in label
+
+
+def _forecast_reason_text(ctx: dict[str, Optional[str]]) -> str:
+    reasons: list[str] = []
+
+    if ctx.get("readiness_status") == "fatigued":
+        reasons.append("readiness is fatigued")
+    if ctx.get("overreach_risk_level") == "high":
+        reasons.append("overreach risk is high")
+    if _is_sparse_capability(ctx):
+        reasons.append("recovery telemetry is sparse")
+
+    if not reasons:
+        return "current forecast context"
+
+    return "; ".join(reasons)
 
 
 def _normalize_days(plan_obj: dict[str, Any]) -> list[dict[str, Any]]:
@@ -114,10 +196,12 @@ def validate_training_plan(
     cfg: ConstraintConfig,
 ) -> list[dict[str, Any]]:
     violations: list[dict[str, Any]] = []
+    days = _normalize_days(plan_obj)
 
-    # --- Ramp rate ---
-    planned = plan_obj.get("plan", {}).get("weekly_totals", {})
-    planned_hours = planned.get("planned_moving_time_hours")
+    # --- Ramp rate: use actual first-7 planned durations, not weekly_totals ---
+    declared_planned_hours = _planned_week_hours(plan_obj)
+    actual_first7_hours = _sum_hours(days[: min(7, len(days))]) if days else None
+
     last7_hours = None
     try:
         w7 = (rollups or {}).get("windows", {}).get("7", {})
@@ -125,17 +209,23 @@ def validate_training_plan(
     except Exception:
         last7_hours = None
 
-    if isinstance(planned_hours, (int, float)) and isinstance(last7_hours, (int, float)):
-        inc = _pct_increase(float(planned_hours), float(last7_hours))
+    ramp_basis_hours = (
+        actual_first7_hours if actual_first7_hours is not None else declared_planned_hours
+    )
+
+    if isinstance(ramp_basis_hours, (int, float)) and isinstance(last7_hours, (int, float)):
+        inc = _pct_increase(float(ramp_basis_hours), float(last7_hours))
         if inc is not None and inc > cfg.max_ramp_pct:
             violations.append(
                 _v(
                     "MAX_RAMP_PCT",
                     "high",
                     "safety",
-                    f"Planned moving time ramps {inc:.1f}% vs last 7 days (max {cfg.max_ramp_pct:.1f}%).",
+                    f"Planned first-7-day moving time ramps {inc:.1f}% vs last 7 days "
+                    f"(max {cfg.max_ramp_pct:.1f}%).",
                     details={
-                        "planned_hours": planned_hours,
+                        "ramp_basis_hours": ramp_basis_hours,
+                        "declared_planned_hours": declared_planned_hours,
                         "last7_hours": last7_hours,
                         "ramp_pct": inc,
                     },
@@ -143,7 +233,6 @@ def validate_training_plan(
             )
 
     # --- Too many hard days in a row ---
-    days = plan_obj.get("plan", {}).get("days", [])
     consec = 0
     for d in days:
         hard = bool(d.get("is_hard_day"))
@@ -198,7 +287,33 @@ def evaluate_training_plan_quality(
     hard_days = sum(1 for d in days if bool(d.get("is_hard_day")))
     rest_days = sum(1 for d in days if bool(d.get("is_rest_day")))
     stats: dict[str, Any] = {"days": len(days), "hard_days": hard_days, "rest_days": rest_days}
+    # ---- Forecast-aware context ----
+    fx = _extract_forecast_context(plan_obj)
+    for k, v in fx.items():
+        if v is not None:
+            stats[k] = v
 
+    effective_max_hard_per_7d = cfg.max_hard_per_7d
+    effective_max_consecutive_hard = cfg.max_consecutive_hard
+    effective_max_ramp_pct = cfg.max_ramp_pct
+
+    if fx.get("readiness_status") == "fatigued":
+        effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.fatigued_max_hard_per_7d)
+
+    if fx.get("overreach_risk_level") == "high":
+        effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.high_risk_max_hard_per_7d)
+        effective_max_consecutive_hard = min(
+            effective_max_consecutive_hard, cfg.high_risk_max_consecutive_hard
+        )
+        effective_max_ramp_pct = min(effective_max_ramp_pct, cfg.high_risk_max_ramp_pct)
+
+    if _is_sparse_capability(fx):
+        effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.sparse_data_max_hard_per_7d)
+        effective_max_ramp_pct = min(effective_max_ramp_pct, cfg.sparse_data_max_ramp_pct)
+
+    stats["effective_max_hard_per_7d"] = effective_max_hard_per_7d
+    stats["effective_max_consecutive_hard"] = effective_max_consecutive_hard
+    stats["effective_max_ramp_pct"] = effective_max_ramp_pct
     # ---- Structure checks ----
     seen = set()
     prev: Optional[date] = None
@@ -261,22 +376,64 @@ def evaluate_training_plan_quality(
                     },
                 )
             )
+    # ---- Forecast-aware ramp overlay ----
+    last7_hours = None
+    try:
+        w7 = (rollups or {}).get("windows", {}).get("7", {})
+        last7_hours = w7.get("activities", {}).get("total_moving_time_hours")
+    except Exception:
+        last7_hours = None
 
+    actual_first7_hours = _sum_hours(days[: min(7, len(days))]) if days else None
+    ramp_basis_hours = actual_first7_hours if actual_first7_hours is not None else planned_hours
+
+    if isinstance(ramp_basis_hours, (int, float)) and isinstance(last7_hours, (int, float)):
+        inc = _pct_increase(float(ramp_basis_hours), float(last7_hours))
+        if (
+            inc is not None
+            and inc > effective_max_ramp_pct
+            and effective_max_ramp_pct < cfg.max_ramp_pct
+        ):
+            reason_text = _forecast_reason_text(fx)
+            sev = "high" if fx.get("overreach_risk_level") == "high" else "medium"
+            violations.append(
+                _v(
+                    "FORECAST_RAMP_TOO_AGGRESSIVE",
+                    sev,
+                    "safety",
+                    f"Planned first-7-day moving time ramps {inc:.1f}% vs last 7 days, "
+                    f"but limit is {effective_max_ramp_pct:.1f}% because {reason_text}.",
+                    details={
+                        "ramp_basis_hours": ramp_basis_hours,
+                        "last7_hours": last7_hours,
+                        "ramp_pct": inc,
+                        "effective_max_ramp_pct": effective_max_ramp_pct,
+                        "forecast_context": fx,
+                    },
+                    penalty=35 if sev == "high" else 15,
+                )
+            )
     # ---- Safety/consistency checks (new) ----
-    for i, wk in enumerate(_chunk7(days)):
+    # ---- Safety/consistency checks (rolling 7-day windows) ----
+    for i, wk in enumerate(_rolling7(days)):
         h = sum(1 for d in wk if bool(d.get("is_hard_day")))
         if h > cfg.max_hard_per_7d:
             violations.append(
                 _v(
-                    "TOO_MANY_HARD_PER_WEEK",
+                    "TOO_MANY_HARD_PER_7D",
                     "high",
                     "safety",
-                    f"Week-chunk {i} has {h} hard days (max {cfg.max_hard_per_7d}).",
-                    details={"week_index": i, "hard_days": h},
+                    f"Rolling 7-day window {i} has {h} hard days (max {cfg.max_hard_per_7d}).",
+                    details={
+                        "window_index": i,
+                        "window_start": wk[0].get("date"),
+                        "window_end": wk[-1].get("date"),
+                        "hard_days": h,
+                    },
                 )
             )
 
-    for i, wk in enumerate(_chunk7(days)):
+    for i, wk in enumerate(_rolling7(days)):
         r = sum(1 for d in wk if bool(d.get("is_rest_day")))
         if r < cfg.min_rest_per_7d:
             sev = "high" if r == 0 else "medium"
@@ -285,12 +442,76 @@ def evaluate_training_plan_quality(
                     "NOT_ENOUGH_REST",
                     sev,
                     "safety",
-                    f"Week-chunk {i} has {r} rest days (min {cfg.min_rest_per_7d}).",
-                    details={"week_index": i, "rest_days": r},
+                    f"Rolling 7-day window {i} has {r} rest days (min {cfg.min_rest_per_7d}).",
+                    details={
+                        "window_index": i,
+                        "window_start": wk[0].get("date"),
+                        "window_end": wk[-1].get("date"),
+                        "rest_days": r,
+                    },
                     penalty=35 if sev == "high" else 15,
                 )
             )
 
+    # ---- Forecast-aware hard-day overlay ----
+    if effective_max_hard_per_7d < cfg.max_hard_per_7d:
+        reason_text = _forecast_reason_text(fx)
+        sev = "high" if fx.get("overreach_risk_level") == "high" else "medium"
+
+        for i, wk in enumerate(_rolling7(days)):
+            h = sum(1 for d in wk if bool(d.get("is_hard_day")))
+            if h > effective_max_hard_per_7d:
+                violations.append(
+                    _v(
+                        "FORECAST_HARD_DAY_LIMIT",
+                        sev,
+                        "safety",
+                        f"Rolling 7-day window {i} has {h} hard days, but limit is "
+                        f"{effective_max_hard_per_7d} because {reason_text}.",
+                        details={
+                            "window_index": i,
+                            "window_start": wk[0].get("date"),
+                            "window_end": wk[-1].get("date"),
+                            "hard_days": h,
+                            "effective_max_hard_per_7d": effective_max_hard_per_7d,
+                            "forecast_context": fx,
+                        },
+                        penalty=35 if sev == "high" else 15,
+                    )
+                )
+
+    # ---- Forecast-aware consecutive-hard overlay ----
+    if effective_max_consecutive_hard < cfg.max_consecutive_hard:
+        reason_text = _forecast_reason_text(fx)
+        consec = 0
+        streak_start: Optional[str] = None
+
+        for d in days:
+            if bool(d.get("is_hard_day")):
+                consec += 1
+                if consec == 1:
+                    streak_start = d.get("date")
+                if consec > effective_max_consecutive_hard:
+                    violations.append(
+                        _v(
+                            "FORECAST_CONSEC_HARD_LIMIT",
+                            "high",
+                            "safety",
+                            f"More than {effective_max_consecutive_hard} hard days in a row "
+                            f"because {reason_text}.",
+                            details={
+                                "streak_start": streak_start,
+                                "date": d.get("date"),
+                                "consecutive_hard_days": consec,
+                                "effective_max_consecutive_hard": effective_max_consecutive_hard,
+                                "forecast_context": fx,
+                            },
+                            penalty=35,
+                        )
+                    )
+            else:
+                consec = 0
+                streak_start = None
     for d in days:
         if not bool(d.get("is_rest_day")):
             continue
