@@ -90,7 +90,7 @@ Conceptually:
 
 ```text
 training_load_hours = moving_time_hours × load_factor
-````
+```
 
 Where:
 
