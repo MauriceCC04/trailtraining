@@ -11,6 +11,26 @@ So I built the tool I wanted for myself: a local, inspectable system that pulls 
 
 This is **not** a chatbot wrapper around fitness data. The goal is to make wearable data more useful for actual decision-making.
 
+
+## Engineering highlights
+
+This project is an end-to-end ML-adjacent pipeline built around three ideas:
+
+- **LLM outputs should be evaluated, not trusted.** The `eval-coach` layer
+  runs generated training plans through rule-based constraint checks — ramp rate,
+  hard-day limits, rest requirements, citation grounding — and returns a structured
+  violation report with per-category scores. The LLM is the generator; the evaluator
+  is deterministic.
+
+- **Context quality determines output quality.** The pipeline assembles a
+  structured local context (load rollups, recovery signals, deterministic readiness
+  forecast) before calling the LLM. This is the pipeline design: ingest → compute
+  signals → generate from signals → evaluate output.
+
+- **Structured contracts prevent schema drift.** All artifacts (training plans,
+  evaluation reports, forecasts) are validated against Pydantic v2 models with
+  strict schemas. The OpenAI structured output call uses a matching JSON Schema.
+
 ## Quick look: inspect sample outputs
 
 You do **not** need API keys to understand what the project produces.
@@ -188,54 +208,51 @@ By default, per-profile data is stored under:
 
 ## Typical workflow
 
-Check setup:
-
 ```bash
+# 1. Check setup
 trailtraining --profile alice doctor
-```
 
-Authorize Strava once:
-
-```bash
+# 2. Authorize data sources
 trailtraining --profile alice auth-strava
-```
 
-Run the full pipeline:
-
-```bash
+# 3. Ingest data
 trailtraining --profile alice run-all
-```
 
-Force a wellness provider if needed:
-
-```bash
-trailtraining --profile alice run-all --wellness-provider intervals
-trailtraining --profile alice run-all --wellness-provider garmin
-```
-
-Generate a forecast:
-
-```bash
+# 4. Compute signals
 trailtraining --profile alice forecast
-```
 
-Generate a training plan:
-
-```bash
+# 5. Generate coaching output
 trailtraining --profile alice coach --prompt training-plan
-```
 
-Evaluate a generated plan:
-
-```bash
+# 6. Evaluate the output
 trailtraining --profile alice eval-coach \
   --input ~/trailtraining-data/alice/prompting/coach_brief_training-plan.json
 ```
 
+The numbered comments make the pipeline structure obvious in 10 seconds. Right now the flow is implicit.
+
+**Add a brief architecture section to `docs/engineering.md`**
+
+The engineering doc is good but it describes the logic in prose. Add a data-flow diagram (even a simple ASCII one) showing the pipeline stages:
+```
+Strava API ─────┐
+                ├──► combine.py ──► combined_summary.json
+Intervals.icu ──┘                         │
+                                          ▼
+                              forecast.py (deterministic)
+                                          │
+                                          ▼
+                              coach.py (LLM generation)
+                                          │
+                                          ▼
+                              eval.py + constraints.py
+                                          │
+                                          ▼
+                         eval_report.json (score, grade, violations)
 ## What it produces
 
+```
 Typical outputs live under:
-
 ```bash
 ~/trailtraining-data/<profile>/
 ├── processing/
