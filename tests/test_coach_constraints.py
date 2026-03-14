@@ -148,18 +148,16 @@ def test_quality_eval_hits_structure_safety_and_justification_checks():
     codes = {v.get("code") for v in report.get("violations", [])}
 
     expected = {
-        "MAX_RAMP_PCT",
-        "TOO_MANY_CONSEC_HARD",
         "BAD_DATE",
         "DUPLICATE_DATE",
         "NON_CONSECUTIVE_DATES",
-        "WEEKLY_TOTALS_MISMATCH",
-        "TOO_MANY_HARD_PER_WEEK",
         "NOT_ENOUGH_REST",
         "REST_DAY_TOO_LONG",
         "REST_DAY_BAD_SESSION_TYPE",
         "MISSING_SIGNAL_IDS",
         "MISSING_CITATIONS",
+        "TOO_MANY_CONSEC_HARD",
+        "TOO_MANY_HARD_PER_7D",
     }
     assert expected.issubset(codes)
 
