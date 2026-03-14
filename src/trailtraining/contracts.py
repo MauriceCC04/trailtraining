@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,7 +45,15 @@ class PlanDay(StrictModel):
     date: str
     title: str
     session_type: Literal[
-        "rest", "easy", "aerobic", "long", "tempo", "intervals", "hills", "strength", "cross"
+        "rest",
+        "easy",
+        "aerobic",
+        "long",
+        "tempo",
+        "intervals",
+        "hills",
+        "strength",
+        "cross",
     ]
     is_rest_day: bool
     is_hard_day: bool
@@ -110,9 +118,9 @@ class Violation(StrictModel):
 
 
 class EvaluationReportArtifact(StrictModel):
-    score: int | float
+    score: Union[int, float]
     grade: str
-    subscores: dict[str, int | float] = Field(default_factory=dict)
+    subscores: dict[str, Union[int, float]] = Field(default_factory=dict)
     stats: dict[str, Any] = Field(default_factory=dict)
     violations: list[Violation] = Field(default_factory=list)
 
@@ -122,16 +130,16 @@ class EvaluationReportArtifact(StrictModel):
 
 class ForecastInputs(StrictModel):
     as_of_date: str
-    rhr_7d_mean_bpm: float | None = None
-    rhr_28d_mean_bpm: float | None = None
-    rhr_28d_std_bpm: float | None = None
-    rhr_delta_bpm: float | None = None
-    rhr_z: float | None = None
-    training_load_7d_hours: float | None = None
-    training_load_rolling7_mean_hours: float | None = None
-    training_load_rolling7_std_hours: float | None = None
-    training_load_delta_hours: float | None = None
-    training_load_z: float | None = None
+    rhr_7d_mean_bpm: Optional[float] = None
+    rhr_28d_mean_bpm: Optional[float] = None
+    rhr_28d_std_bpm: Optional[float] = None
+    rhr_delta_bpm: Optional[float] = None
+    rhr_z: Optional[float] = None
+    training_load_7d_hours: Optional[float] = None
+    training_load_rolling7_mean_hours: Optional[float] = None
+    training_load_rolling7_std_hours: Optional[float] = None
+    training_load_delta_hours: Optional[float] = None
+    training_load_z: Optional[float] = None
     notes: list[str] = Field(default_factory=list)
 
 
