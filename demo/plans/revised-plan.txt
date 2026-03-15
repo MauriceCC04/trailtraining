@@ -1,0 +1,76 @@
+TrailTraining - Training Plan
+
+Generated: 2026-03-13
+Plan start: 2026-03-14   Days: 7
+Style: trailrunning
+Primary goal: to become a faster trail runner
+
+Readiness: steady
+Why: Deterministic readiness is steady with moderate overreach risk driven by elevated recent training load versus your recent rolling baseline. With 0 sleep days in the last 7 days, we’ll keep intensity controlled and prioritize run-specific quality (for speed on trails) while limiting long-run duration and guarding against intensity creep as you shift from cycling-dominant training to more running.
+
+Weekly totals: 8.2 h • 80 km • 1600 m+
+
+Day-by-day
+----------
+Sat 2026-03-14: Rest + mobility reset (REST, 0 min)
+  Intensity: Off
+  Terrain: N/A
+  Workout: No training. Optional: 15–20 min easy mobility (hips/ankles/T-spine) + 5–10 min light foam roll.
+  Purpose: Absorb the elevated recent load and create space for run-quality later in the week.
+
+Sun 2026-03-15: Easy run + strides (leg speed without fatigue) (EASY, 60 min)
+  Intensity: Easy conversational (RPE ~2–3/10). Finish with 6–8 x 12–15s strides (fast but relaxed), full walk-back recovery.
+  Terrain: Flat to gently rolling; smooth surface/trail
+  Workout: 10–15 min easy warm-up → 35–40 min easy (cap effort; no pushing hills) → 6–8 strides → easy cool-down.
+  Purpose: Increase run frequency and neuromuscular speed for faster trail running while keeping overall stress controlled during the bike-to-run transition.
+
+Mon 2026-03-16: Aerobic ride (support volume, low impact) (AEROBIC, 90 min)
+  Intensity: Mostly easy aerobic (steady, you can talk). Avoid turning it into a smash-fest.
+  Terrain: Road/gravel; keep it smooth
+  Workout: 90 min continuous aerobic. Optional: include 3 x 6 min high-cadence (95–105 rpm) with 3 min easy between.
+  Purpose: Maintain aerobic engine with low mechanical stress so your run quality can be better later this week while your legs adapt to more run-specific loading.
+
+Tue 2026-03-17: Trail hill strength-tempo (quality #1) (HILLS, HARD, 70 min)
+  Intensity: Controlled hard (RPE ~7/10) on the ups: strong, rhythmic, sustainable; recover fully on the downs. Stop the set if posture collapses or you can’t keep the effort smooth.
+  Terrain: Trail with a runnable climb (4–10 min) + safe descent
+  Workout: 15 min warm-up easy → 4 x 6 min uphill at strong/controlled effort (jog/walk back down for recovery) → 10–15 min cool-down. Keep total hard work = 24 min.
+  Purpose: Build uphill power + lactate management specific to faster trail running (quality stimulus without needing a huge long run).
+
+Wed 2026-03-18: Easy run + trail-specific strength (durability) (STRENGTH, 65 min)
+  Intensity: Run easy (RPE ~2–3/10); strength controlled (leave 2–3 reps in reserve). Keep everything crisp—no grinding.
+  Terrain: Easy terrain; avoid steep/technical if sore
+  Workout: Run 45 min easy (include a few short hikes if you’re on trail, but keep effort capped) + 20 min strength (trail durability emphasis):
+- Rear-foot-elevated split squat or split squat (2–3 x 6–10/side)
+- Step-downs (2–3 x 6–10/side, slow eccentric)
+- Single-leg calf raises (2–3 x 8–15/side)
+- Hip hinge (RDL) (2–3 x 6–10)
+- Lateral band walks or hip airplanes (2 x 8–12/side)
+- Side plank (2 x 30–45s/side)
+Optional finisher if fresh: 2 x 20–30s single-leg balance (barefoot if safe) to reinforce ankle stability for uneven trails.
+  Purpose: Reinforce trail-specific durability (single-leg strength, stability, calf/ankle stiffness) to support climbing/descending economy without adding another hard day.
+
+Thu 2026-03-19: Short intervals (quality #2, controlled) (INTERVALS, HARD, 55 min)
+  Intensity: Fast but controlled; finish feeling like you could do 1–2 more reps. If you’re straining early, slow the fast reps and keep them smooth.
+  Terrain: Flat or gentle grade; firm surface
+  Workout: 15 min warm-up easy + drills → 10 x 1 min fast / 1 min easy → 10–15 min cool-down easy. Keep the fast reps smooth (no sprinting).
+  Purpose: Improve speed and VO2-style stimulus that carries over to faster trail pace, while staying within a manageable weekly stress during the run-volume transition.
+
+Fri 2026-03-20: Long easy trail (endurance + climbing economy, capped duration) (LONG, 150 min)
+  Intensity: Easy aerobic all the way (RPE ~2–3/10). Effort ceiling: if you can’t speak in full sentences on climbs, hike and/or slow down. No ‘steady’ pushes today.
+  Terrain: Trail, preferably mostly runnable and non-technical. Choose steady grades; avoid highly technical descents or very steep downhill pounding to prevent intensity creep when fatigued.
+  Workout: 2:30 easy trail time-on-feet. Include continuous climb segments, but no hard surges. Plan: (1) first 20–30 min deliberately easier than you think, (2) hike steeper grades early to keep effort capped, (3) keep descents smooth and controlled (no chasing pace). Practice fueling: start at ~30 min, then every 20–30 min.
+  Purpose: Build trail-specific endurance and climbing efficiency while reducing fatigue risk (capped long-run duration) during a cycling-to-running transition week.
+
+Recovery focus
+--------------
+- Because last 7 days have 0 sleep records, prioritize consistent sleep opportunity this week; aim to match your 28-day average sleep pattern (baseline sleep is present over 28 days, but missing recently).
+- Transition-week monitoring (simple, practical): if you wake up feeling unusually sore/heavy for 2+ days, or your easy warm-up effort feels abnormally high for the pace (RPE drift), downgrade the next quality session to 30–45 min easy. Missing recent sleep data makes these subjective checks more important.
+- Fuel the two quality days: a carb-forward meal 2–4 hours pre-session; 20–30 g protein within ~1–2 hours post.
+- Long trail day: practice fueling/hydration early and consistently (don’t wait until you feel depleted). Keep descents controlled to reduce muscle damage that can blunt the next week’s run progression.
+- Daily 5–10 min ankle/calf/hip mobility to support climbing/descending economy.
+
+Risks / cautions
+---------------
+- [medium] Overreach risk is moderate and driven by elevated recent training load; keep intensity capped to 2 quality sessions and protect the long run from drifting into moderate/hard effort. Long-run duration is intentionally capped (2:30) to reduce fatigue risk this week.
+- [medium] Recovery data gap: 0 sleep days with data in the last 7 days reduces confidence in readiness; if you feel unusually flat/irritable, or your easy warm-up feels much harder than normal, downgrade quality sessions to easy aerobic and keep the long run strictly easy (hike early/often on climbs).
+- [low] Recent week is cycling-heavy; increasing run specificity supports your goal, but keep the ramp gradual. This week increases run frequency and adds two controlled quality sessions while capping long-run duration; in future weeks, progress by adding small increments (e.g., +10–15 min long run or +1–2 km easy volume) rather than adding another hard day.

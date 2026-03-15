@@ -96,7 +96,9 @@
     "Last 7 days have no sleep records (sleep_days_with_data=0), so last-7 averages for sleep/HRV/RHR are unavailable; avoided making recovery trend claims from missing data.",
     "Deterministic readiness inputs are as-of 2026-03-12, while rollup window ends 2026-03-13; small differences in reported 7-day training load are expected due to the different end dates.",
     "Readiness status was set from deterministic readiness_and_risk_forecast.json.",
-    "Guardrails: enforced ramp rate (max_ramp_pct=10.0%). last7_hours=11.324, allowed_hours=12.456, planned_hours=8.700."
+    "Weekly moving-time math (minutes): 0 + 60 + 90 + 70 + 65 + 55 + 150 = 490 min = 8.17 hours (matches plan.weekly_totals.planned_moving_time_hours).",
+    "Guardrails: last7_hours=11.324; planned_hours=8.17, which stays below last-7 moving time while keeping only 2 hard days in a moderate overreach context.",
+    "Guardrails: enforced ramp rate (max_ramp_pct=10.0%). last7_hours=11.324, allowed_hours=12.456, planned_hours=8.200."
   ],
   "meta": {
     "plan_days": 7,
@@ -129,24 +131,24 @@
         "duration_minutes": 60,
         "is_hard_day": false,
         "is_rest_day": false,
-        "purpose": "Increase run frequency and neuromuscular speed for faster trail running while keeping overall stress controlled.",
+        "purpose": "Increase run frequency and neuromuscular speed for faster trail running while keeping overall stress controlled during the bike-to-run transition.",
         "session_type": "easy",
         "signal_ids": [
           "forecast.readiness.status",
           "load.last7.moving_time_hours",
           "load.last7.activity_count"
         ],
-        "target_intensity": "Easy conversational. Finish with 6–8 x 12–15s strides (fast but relaxed), full walk-back recovery.",
+        "target_intensity": "Easy conversational (RPE ~2–3/10). Finish with 6–8 x 12–15s strides (fast but relaxed), full walk-back recovery.",
         "terrain": "Flat to gently rolling; smooth surface/trail",
         "title": "Easy run + strides (leg speed without fatigue)",
-        "workout": "10–15 min easy warm-up → 35–40 min easy → 6–8 strides → easy cool-down."
+        "workout": "10–15 min easy warm-up → 35–40 min easy (cap effort; no pushing hills) → 6–8 strides → easy cool-down."
       },
       {
         "date": "2026-03-16",
         "duration_minutes": 90,
         "is_hard_day": false,
         "is_rest_day": false,
-        "purpose": "Maintain aerobic engine with low mechanical stress so your run quality can be better later this week.",
+        "purpose": "Maintain aerobic engine with low mechanical stress so your run quality can be better later this week while your legs adapt to more run-specific loading.",
         "session_type": "aerobic",
         "signal_ids": [
           "load.last7.activity_count",
@@ -171,7 +173,7 @@
           "load.last7.training_load_hours",
           "load.last7.elevation_m"
         ],
-        "target_intensity": "Controlled hard: strong uphill effort you can sustain; downhill easy/jog to recover. Stop if form breaks.",
+        "target_intensity": "Controlled hard (RPE ~7/10) on the ups: strong, rhythmic, sustainable; recover fully on the downs. Stop the set if posture collapses or you can’t keep the effort smooth.",
         "terrain": "Trail with a runnable climb (4–10 min) + safe descent",
         "title": "Trail hill strength-tempo (quality #1)",
         "workout": "15 min warm-up easy → 4 x 6 min uphill at strong/controlled effort (jog/walk back down for recovery) → 10–15 min cool-down. Keep total hard work = 24 min."
@@ -181,61 +183,61 @@
         "duration_minutes": 65,
         "is_hard_day": false,
         "is_rest_day": false,
-        "purpose": "Reinforce tissue durability for trails and support faster running economy without adding another hard day.",
+        "purpose": "Reinforce trail-specific durability (single-leg strength, stability, calf/ankle stiffness) to support climbing/descending economy without adding another hard day.",
         "session_type": "strength",
         "signal_ids": [
           "forecast.overreach_risk.level",
           "load.last7.moving_time_hours",
           "load.last7.sleep_days_with_data"
         ],
-        "target_intensity": "Run easy; strength controlled (leave 2–3 reps in reserve).",
+        "target_intensity": "Run easy (RPE ~2–3/10); strength controlled (leave 2–3 reps in reserve). Keep everything crisp—no grinding.",
         "terrain": "Easy terrain; avoid steep/technical if sore",
-        "title": "Easy run + strength (durability)",
-        "workout": "Run 45 min easy + 20 min strength: split squats, calf raises, hip hinges (RDL), side planks, step-downs. Keep it crisp, not maximal."
+        "title": "Easy run + trail-specific strength (durability)",
+        "workout": "Run 45 min easy (include a few short hikes if you’re on trail, but keep effort capped) + 20 min strength (trail durability emphasis):\n- Rear-foot-elevated split squat or split squat (2–3 x 6–10/side)\n- Step-downs (2–3 x 6–10/side, slow eccentric)\n- Single-leg calf raises (2–3 x 8–15/side)\n- Hip hinge (RDL) (2–3 x 6–10)\n- Lateral band walks or hip airplanes (2 x 8–12/side)\n- Side plank (2 x 30–45s/side)\nOptional finisher if fresh: 2 x 20–30s single-leg balance (barefoot if safe) to reinforce ankle stability for uneven trails."
       },
       {
         "date": "2026-03-19",
         "duration_minutes": 55,
         "is_hard_day": true,
         "is_rest_day": false,
-        "purpose": "Improve speed and VO2-style stimulus that carries over to faster trail pace, while staying within a manageable weekly stress.",
+        "purpose": "Improve speed and VO2-style stimulus that carries over to faster trail pace, while staying within a manageable weekly stress during the run-volume transition.",
         "session_type": "intervals",
         "signal_ids": [
           "forecast.readiness.status",
           "forecast.overreach_risk.level",
           "load.last7.training_load_hours"
         ],
-        "target_intensity": "Fast but controlled; you should finish feeling like you could do 1–2 more reps.",
+        "target_intensity": "Fast but controlled; finish feeling like you could do 1–2 more reps. If you’re straining early, slow the fast reps and keep them smooth.",
         "terrain": "Flat or gentle grade; firm surface",
         "title": "Short intervals (quality #2, controlled)",
         "workout": "15 min warm-up easy + drills → 10 x 1 min fast / 1 min easy → 10–15 min cool-down easy. Keep the fast reps smooth (no sprinting)."
       },
       {
         "date": "2026-03-20",
-        "duration_minutes": 180,
+        "duration_minutes": 150,
         "is_hard_day": false,
         "is_rest_day": false,
-        "purpose": "Build trail-specific endurance and climbing efficiency to support faster performance without turning the week into a high-intensity block.",
+        "purpose": "Build trail-specific endurance and climbing efficiency while reducing fatigue risk (capped long-run duration) during a cycling-to-running transition week.",
         "session_type": "long",
         "signal_ids": [
           "load.last7.elevation_m",
           "load.baseline28.elevation_m",
           "forecast.overreach_risk.level"
         ],
-        "target_intensity": "Easy aerobic all the way; hike the steeps. Keep it honest-easy after yesterday’s quality.",
-        "terrain": "Trail; aim for steady climbing, avoid overly technical descents if fatigued",
-        "title": "Long easy trail (endurance + climbing economy)",
-        "workout": "3:00 easy trail time-on-feet. Include continuous climb segments, but no hard surges. Practice fueling: start at ~30 min, then every 20–30 min."
+        "target_intensity": "Easy aerobic all the way (RPE ~2–3/10). Effort ceiling: if you can’t speak in full sentences on climbs, hike and/or slow down. No ‘steady’ pushes today.",
+        "terrain": "Trail, preferably mostly runnable and non-technical. Choose steady grades; avoid highly technical descents or very steep downhill pounding to prevent intensity creep when fatigued.",
+        "title": "Long easy trail (endurance + climbing economy, capped duration)",
+        "workout": "2:30 easy trail time-on-feet. Include continuous climb segments, but no hard surges. Plan: (1) first 20–30 min deliberately easier than you think, (2) hike steeper grades early to keep effort capped, (3) keep descents smooth and controlled (no chasing pace). Practice fueling: start at ~30 min, then every 20–30 min."
       }
     ],
     "weekly_totals": {
-      "planned_distance_km": 90.0,
-      "planned_elevation_m": 1900.0,
-      "planned_moving_time_hours": 8.7
+      "planned_distance_km": 80.0,
+      "planned_elevation_m": 1600.0,
+      "planned_moving_time_hours": 8.2
     }
   },
   "readiness": {
-    "rationale": "Deterministic readiness is steady with moderate overreach risk driven by elevated recent training load versus your recent rolling baseline. With 0 sleep days in the last 7 days, we’ll keep intensity controlled and prioritize run-specific quality (for speed on trails) without adding extra overall load.",
+    "rationale": "Deterministic readiness is steady with moderate overreach risk driven by elevated recent training load versus your recent rolling baseline. With 0 sleep days in the last 7 days, we’ll keep intensity controlled and prioritize run-specific quality (for speed on trails) while limiting long-run duration and guarding against intensity creep as you shift from cycling-dominant training to more running.",
     "signal_ids": [
       "forecast.readiness.status",
       "forecast.readiness.score",
@@ -250,8 +252,9 @@
   "recovery": {
     "actions": [
       "Because last 7 days have 0 sleep records, prioritize consistent sleep opportunity this week; aim to match your 28-day average sleep pattern (baseline sleep is present over 28 days, but missing recently).",
+      "Transition-week monitoring (simple, practical): if you wake up feeling unusually sore/heavy for 2+ days, or your easy warm-up effort feels abnormally high for the pace (RPE drift), downgrade the next quality session to 30–45 min easy. Missing recent sleep data makes these subjective checks more important.",
       "Fuel the two quality days: a carb-forward meal 2–4 hours pre-session; 20–30 g protein within ~1–2 hours post.",
-      "Long trail day: practice fueling/hydration early and consistently (don’t wait until you feel depleted).",
+      "Long trail day: practice fueling/hydration early and consistently (don’t wait until you feel depleted). Keep descents controlled to reduce muscle damage that can blunt the next week’s run progression.",
       "Daily 5–10 min ankle/calf/hip mobility to support climbing/descending economy."
     ],
     "signal_ids": [
@@ -262,7 +265,7 @@
   },
   "risks": [
     {
-      "message": "Overreach risk is moderate and driven by elevated recent training load; keep intensity capped to 2 quality sessions and protect the long run from drifting into moderate/hard effort.",
+      "message": "Overreach risk is moderate and driven by elevated recent training load; keep intensity capped to 2 quality sessions and protect the long run from drifting into moderate/hard effort. Long-run duration is intentionally capped (2:30) to reduce fatigue risk this week.",
       "severity": "medium",
       "signal_ids": [
         "forecast.overreach_risk.level",
@@ -271,7 +274,7 @@
       ]
     },
     {
-      "message": "Recovery data gap: 0 sleep days with data in the last 7 days reduces confidence in readiness; if you feel unusually flat/irritable or HR is unusually high during warm-ups, downgrade quality sessions to easy aerobic.",
+      "message": "Recovery data gap: 0 sleep days with data in the last 7 days reduces confidence in readiness; if you feel unusually flat/irritable, or your easy warm-up feels much harder than normal, downgrade quality sessions to easy aerobic and keep the long run strictly easy (hike early/often on climbs).",
       "severity": "medium",
       "signal_ids": [
         "load.last7.sleep_days_with_data",
@@ -279,7 +282,7 @@
       ]
     },
     {
-      "message": "Recent week is cycling-heavy; increasing run specificity is important for the goal, but keep the ramp gradual by focusing on time-on-feet and controlled quality rather than adding big extra volume.",
+      "message": "Recent week is cycling-heavy; increasing run specificity supports your goal, but keep the ramp gradual. This week increases run frequency and adds two controlled quality sessions while capping long-run duration; in future weeks, progress by adding small increments (e.g., +10–15 min long run or +1–2 km easy volume) rather than adding another hard day.",
       "severity": "low",
       "signal_ids": [
         "load.last7.activity_count",
@@ -307,6 +310,6 @@
       "rhr_mean": "",
       "sleep_hours_mean": ""
     },
-    "notes": "Last 7 days are high total volume and training load and are cycling-dominant (6 rides, 1 trail run). No sleep data recorded in the last 7 days, so recovery interpretation is limited."
+    "notes": "Last 7 days are high total volume and training load and are cycling-dominant (6 rides, 1 trail run). No sleep data recorded in the last 7 days, so recovery interpretation is limited. This week is a transition week that increases run frequency/quality while keeping total stress controlled; the long run duration is capped to reduce fatigue risk during the bike-to-run shift."
   }
 }

@@ -1,92 +1,236 @@
 # Engineering notes
 
-This document explains the main design choices behind `trailtraining` and how the current pipeline works.
+This document explains the architecture and design choices behind `trailtraining`.
 
-## Overview
+The current system is no longer just a data-to-plan generator. It is now a local artifact pipeline that can:
 
-`trailtraining` is a local-first pipeline for turning wearable and training-platform data into structured training guidance.
+1. ingest activity and optional recovery data
+2. compute deterministic training context
+3. generate structured coaching artifacts
+4. evaluate those artifacts deterministically
+5. optionally evaluate them qualitatively with a second model
+6. revise the original plan from the evaluation report
+7. re-evaluate the revised artifact
 
-At a high level, the system:
+The project should be read as an engineering system, not just a prompt wrapper.
 
-1. pulls activity and recovery data from external sources,
-2. combines them into a local unified dataset,
-3. derives a simple training-load metric and recovery context,
-4. computes readiness and overreach-related signals,
-5. uses that context to generate structured coaching outputs,
-6. evaluates generated plans against rule-based constraints.
+## System goal
 
-The goal is not to build a generic fitness chatbot. The goal is to make collected data more useful for actual training decisions in a way that remains inspectable.
+`trailtraining` is a local-first training-planning pipeline for turning wearable and platform data into structured, inspectable, and reviewable guidance.
 
-## Design goals
+The goal is not to build a generic fitness chatbot.
 
-The project is built around a few core principles:
+The goal is to make collected data more useful for real training decisions by building a pipeline where:
+
+- inputs are explicit
+- intermediate artifacts are saved locally
+- deterministic signals are computed before generation
+- generated outputs are evaluated after generation
+- plans can be revised from critique rather than accepted blindly
+
+## Design principles
 
 ### 1. Local and inspectable
-Fitness and recovery data are sensitive, and generated plans should be understandable. The pipeline keeps intermediate artifacts local and makes them easy to inspect.
+
+Fitness data are sensitive and generated plans should be easy to inspect.
+
+`trailtraining` therefore writes intermediate artifacts locally rather than hiding everything behind a single opaque command. This improves:
+
+- debugging
+- iteration speed
+- transparency
+- prompt and forecast development
+- trust in downstream outputs
 
 ### 2. Useful over flashy
-Most training products already visualize data. The harder problem is turning that data into something actionable. The system is designed to produce outputs that help answer practical questions such as:
+
+Most fitness products already visualize data well enough.
+
+The harder problem is turning that data into something actionable. The system is designed to help answer practical questions such as:
 
 - How hard has the recent week actually been?
-- Does the current training load look elevated versus baseline?
-- Does recovery look stable or uncertain?
-- What kind of week is reasonable from here?
+- Am I above recent baseline load?
+- Does recovery look stable, elevated-risk, or uncertain?
+- What kind of week makes sense from here?
+- Does the generated plan actually hold up under review?
+- Does a revised plan improve after critique?
 
-### 3. Structured outputs over vague summaries
-Rather than producing generic text, the pipeline tries to generate structured plans with explicit rationale, weekly totals, day-by-day sessions, and cautions.
+### 3. Structured artifacts over vague prose
 
-### 4. LLM outputs should be constrained and reviewable
-A generated training plan should not be treated as correct just because it sounds confident. The project therefore includes rule-based evaluation to make outputs easier to review and less likely to drift into obviously poor recommendations.
+The pipeline prefers structured outputs with explicit fields over generic text.
 
-## System overview
+A training plan artifact includes:
 
-The top-level workflow is:
+- metadata and primary goal
+- recent snapshots
+- readiness state
+- weekly totals
+- day-by-day sessions
+- recovery actions
+- risks
+- data notes
+- citations
 
-- collect activity data from Strava,
-- collect recovery / wellness data from GarminDB or Intervals.icu,
-- merge them into local summary artifacts,
-- derive training-load and recovery context,
-- forecast readiness / overreach-related state,
-- generate coaching outputs,
-- evaluate generated plans.
+That structure makes both evaluation and revision easier.
 
-![System overview](images/forecast-pipeline.png)
+### 4. Generation should be constrained and reviewed
 
-High-level pipeline: unify wearable and training-platform data, derive training-load and recovery context, generate structured coaching output, and evaluate the result against rule-based constraints.
+A plan is not trusted just because it sounds confident.
+
+This project explicitly separates:
+
+- deterministic forecasting
+- LLM generation
+- deterministic evaluation
+- qualitative judging
+- revision from critique
+
+That separation is one of the most important architectural decisions in the repo.
+
+## End-to-end pipeline
+
+The current pipeline is:
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                INPUT LAYER                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Strava activity history                                                   │
+│  GarminDB wellness data (optional)                                         │
+│  Intervals.icu wellness data (optional)                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           INGEST + LOCAL ARTIFACTS                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  fetch-strava / fetch-garmin / fetch-intervals                             │
+│  combine                                                                    │
+│  outputs: combined_summary.json, combined_rollups.json                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         DETERMINISTIC SIGNAL LAYER                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  forecast                                                                   │
+│  computes readiness + overreach context from recent load and recovery data │
+│  output: readiness_and_risk_forecast.json                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              GENERATION LAYER                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  coach --prompt training-plan                                              │
+│  output: coach_brief_training-plan.json / .txt                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         DETERMINISTIC EVALUATION LAYER                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  eval-coach                                                                 │
+│  constraint checks, scoring, violation reporting                            │
+│  output: eval_report.json                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                           ┌──────────┴──────────┐
+                           │                     │
+                           ▼                     ▼
+┌────────────────────────────────────┐  ┌────────────────────────────────────┐
+│  score / grade / violations         │  │     SOFT EVALUATION LAYER         │
+│  deterministic quality signals      │  ├────────────────────────────────────┤
+│                                      │  │  eval-coach --soft-eval           │
+│                                      │  │  second-model judge               │
+│                                      │  │  rubric scores + markers          │
+└────────────────────────────────────┘  │  strengths / concerns / fixes      │
+                                        └────────────────────────────────────┘
+                                                     │
+                                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                               REVISION LAYER                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  revise-plan                                                                │
+│  inputs: original training plan + eval_report.json                          │
+│  outputs: revised-plan.json / revised-plan.txt                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           RE-EVALUATION / ITERATION                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  eval-coach --input revised-plan.json --soft-eval                          │
+│  compare revised artifact against original                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+The key point is that generation is no longer the endpoint. The system now supports an explicit critique-and-revision loop.
 
 ## Data sources
 
-The current pipeline is built around two types of input:
+The pipeline currently works with two main categories of input.
 
 ### Activity data
-Activity history comes from Strava and provides the core training record used for recent-load calculations and context building.
 
-### Recovery / wellness data
-Recovery information comes from either:
+Activity history comes from Strava and acts as the core recent-load record.
 
-- GarminDB, or
+This is the main source for:
+
+- activity counts
+- moving time
+- distance
+- elevation
+- training-load rollups
+
+### Recovery and wellness data
+
+Recovery information can come from either:
+
+- GarminDB
 - Intervals.icu
 
-These sources are used to enrich the local context with recovery-related signals such as resting-heart-rate trends and related recent telemetry.
+These sources enrich the local context with recovery-related features such as resting-heart-rate trends, sleep coverage, and related telemetry.
 
-## Local artifacts
+The pipeline is intentionally tolerant of missing data. It can run in activity-only mode and becomes more informative when recent wellness data are available.
 
-A core design choice in `trailtraining` is to write intermediate outputs locally rather than hide the entire pipeline behind a single opaque command.
+## Local artifact model
 
-This has a few benefits:
+A core architectural decision in `trailtraining` is to persist intermediate state as local artifacts.
 
-- easier debugging,
-- easier inspection of intermediate state,
-- simpler iteration on forecasting and prompting,
-- clearer separation between ingestion, forecasting, and generation.
+That choice creates several benefits:
 
-Representative outputs are included in the `demo/` directory.
+- easier debugging and inspection
+- easier experimentation with forecasting and prompting
+- explicit boundaries between pipeline stages
+- straightforward re-use of artifacts in later steps
 
-## Training-load metric
+Typical artifacts include:
 
-The forecasting layer is built around a simple derived training-load metric.
+```text
+processing/
+prompting/
+├── combined_summary.json
+├── combined_rollups.json
+├── readiness_and_risk_forecast.json
+├── coach_brief_training-plan.json
+├── coach_brief_training-plan.txt
+├── eval_report.json
+├── revised-plan.json
+└── revised-plan.txt
+```
 
-The current implementation computes daily training load in **training-load hours**, using activity duration and a lightweight intensity adjustment.
+This artifact model is what makes evaluation and revision practical. The reviser does not need to regenerate the entire context from scratch; it can operate on saved plan and eval artifacts.
+
+## Deterministic forecasting
+
+Before any plan is generated, the system computes recent-load and recovery-aware signals.
+
+The forecasting layer is deliberately lightweight and transparent.
+
+### Training-load metric
+
+The current implementation computes a simple training-load signal in training-load hours.
 
 Conceptually:
 
@@ -96,174 +240,174 @@ training_load_hours = moving_time_hours × load_factor
 
 Where:
 
-* `moving_time_hours` is the activity duration in hours,
-* `load_factor` increases or decreases the load estimate based on relative effort.
+- `moving_time_hours` is duration in hours
+- `load_factor` adjusts for relative effort when that information is available
 
-When heart-rate information is available, the load factor is derived from intensity information such as average HR relative to max HR. When that is not available, the calculation falls back to a neutral default rather than pretending to know more than the data supports.
+This metric is intentionally simple. The goal is not physiological perfection. The goal is a practical, inspectable signal that is good enough to support planning and guardrails.
 
-This is intentionally simple. The point is not to claim lab-grade physiological modeling. The point is to create a practical recent-load signal that is good enough to support planning and guardrail logic.
+### Forecast outputs
 
-## Forecasting logic
+The forecast layer compares recent windows to longer baselines and emits practical outputs such as:
 
-The forecast layer combines recent training load and recent recovery signals.
+- readiness status / score
+- overreach-risk level / score
+- notes about missing telemetry or uncertainty
 
-The main ideas are:
+These are operational signals used to shape prompting and later evaluation.
 
-### 1. Recent load
+## Generation layer
 
-The system computes a recent 7-day training-load total and compares it to a rolling baseline from prior windows.
+Once local context exists, the generation layer assembles a structured prompt and produces coaching outputs.
 
-This creates a simple notion of:
+Examples include:
 
-* acute recent load,
-* historical baseline load,
-* whether the athlete is currently above or near their usual level.
+- weekly training plans
+- recovery summaries
+- meal-planning support
 
-### 2. Resting-heart-rate context
+The important engineering decision is that the model is asked to operate on a structured local context rather than freeform user prose alone.
 
-The system also compares short-window and longer-window resting-heart-rate behavior.
+For training plans, the generated artifact is a schema-constrained JSON document with a sibling human-readable `.txt` rendering.
 
-Conceptually, it looks at:
+## Deterministic evaluation layer
 
-* recent 7-day resting HR,
-* longer 28-day resting HR baseline,
-* variability in the longer baseline.
+Generation is not treated as success.
 
-This helps detect when recent recovery-related signals look elevated relative to normal.
+`eval-coach` checks the generated plan against explicit deterministic constraints and produces `eval_report.json`.
 
-### 3. Readiness and overreach context
+Examples of what this layer is designed to catch:
 
-Those inputs are then combined into two practical outputs:
+- excessive ramp versus recent load
+- poor spacing of hard sessions
+- insufficient rest structure
+- inconsistency between day details and weekly totals
+- weak grounding or citation problems
 
-* a readiness-oriented score / status,
-* an overreach-risk-oriented score / level.
+This is the first review gate.
 
-These are not intended as medical judgments or precise physiological truths. They are operational signals used to shape the generated plan.
+## Soft evaluation layer
 
-In practice, this means:
+The newer soft-eval path adds a second model as a qualitative judge.
 
-* elevated recent load can reduce readiness and increase risk,
-* elevated recent resting HR versus baseline can also reduce readiness and increase risk,
-* missing telemetry should reduce confidence and encourage more conservative interpretation.
+This model is not generating a new plan. It is evaluating the generated plan against explicit rubrics and markers.
 
-## Why use a simple training-load metric?
+The soft assessment can include:
 
-The training-load logic is deliberately lightweight.
+- summary
+- confidence
+- rubric scores
+- marker-level evidence
+- strengths
+- concerns
+- suggested improvements
 
-That is a design choice, not an omission.
+### Why a second model?
 
-There are three reasons for this:
+Deterministic checks are good at catching structural issues.
 
-### Practicality
+They are less suited for questions like:
 
-The project is meant to work with real consumer fitness data, which is often incomplete or inconsistent.
+- does the plan actually feel coherent as a week?
+- are the explanations specific or generic?
+- does the week clearly support the athlete goal?
+- is the caution tone proportionate?
+- is the plan genuinely actionable?
 
-### Transparency
+That is where the soft judge helps.
 
-A simpler metric is easier to inspect, explain, and debug than a more complex black-box score.
+### Why the judge/reviser uses a different model
 
-### Extensibility
+The revision loop intentionally uses a different model family from the initial generator when possible. In this setup, GPT is used to generate the first-pass training plan, while Claude is used as the second-stage judge/reviser.
 
-The current metric provides a clean baseline that can later be extended with more nuanced intensity handling, sport-specific adjustments, or richer physiology-informed scoring.
+The goal is not to claim that one model is universally better. The goal is to reduce same-model anchoring and self-grading bias. A separate model is less likely to simply mirror the generator’s original reasoning, which makes critique, scoring, and revision more independent.
 
-## Coaching generation
+This does not guarantee correctness, but it is a stronger evaluation pattern than having the same model both produce and judge the plan.
 
-Once the pipeline has:
+### Robustness against malformed judge output
 
-* combined activity and recovery data,
-* computed recent load context,
-* derived forecast outputs,
+The latest version hardens this stage significantly.
 
-that context is used to assemble a structured coaching prompt.
+The judge model does not always return a perfectly complete first-pass payload. The implementation now recovers by:
 
-The generated outputs are intended to be more useful than generic “AI insights.” They may include:
+- running a marker-only repair pass if marker results are missing
+- accepting incomplete top-level feedback lists and backfilling them locally
+- deriving rubric scores from marker scores when rubric-level outputs are malformed
+- detecting internally inconsistent outputs, such as narrative-only responses with all-zero scores
 
-* weekly training plans,
-* recovery summaries,
-* meal-planning support,
-* risk / caution notes,
-* rationale tied to recent load and recovery state.
+This is an important design improvement because it turns judge-model brittleness into a recoverable systems problem instead of a pipeline-breaking failure.
 
-The important design point is that the model is not asked to invent advice from nowhere. It is asked to operate on a structured local context that already includes computed signals.
+## Revision layer
 
-## Rule-based evaluation
+The new `revise-plan` command is the other major addition.
 
-One of the most important parts of the project is that generation is not the end of the pipeline.
+It introduces a formal post-evaluation revision step.
 
-Generated plans can be checked against explicit rules and constraints.
+### Inputs
 
-This matters because LLM-generated plans can sound plausible while still being poor in practice. A plan should be reviewable not only by reading the prose, but also by checking whether it violates obvious guardrails.
+`revise-plan` consumes:
 
-Examples of the kinds of concerns this layer is meant to catch include:
+- `coach_brief_training-plan.json`
+- `eval_report.json`
 
-* too much intensity in a risky week,
-* poor spacing of hard sessions,
-* excessive load ramp,
-* insufficient regard for uncertain recovery state.
+### Outputs
 
-This makes the system more useful as a decision-support tool rather than just a text generator.
+It writes:
 
-## Why local-first matters
+- `revised-plan.json`
+- `revised-plan.txt`
 
-A lot of current “AI fitness” features are shallow because they skip most of the actual systems work.
+### Design intent
 
-They often:
+The reviser is not meant to do arbitrary freeform rewriting.
 
-* do not expose the data context clearly,
-* do not explain why the recommendation was made,
-* do not distinguish between strong and weak signal quality,
-* do not apply meaningful constraints.
+It is prompted to:
 
-`trailtraining` takes the opposite approach:
+- preserve strong parts of the original plan
+- address deterministic violations and qualitative concerns
+- keep the revised artifact grounded in the original signals and citations
+- maintain schema compatibility
+- keep weekly totals and day-level structure internally coherent
 
-* keep data and artifacts local,
-* derive explicit context first,
-* generate second,
-* evaluate third.
+This addition changes the pipeline from one-shot generation into an iterative improvement loop.
 
-That ordering is important.
+## Why the revision loop matters
+
+Without revision, evaluation is only advisory.
+
+With revision, the system can do something more useful:
+
+1. generate a first-pass plan
+2. score and critique that plan
+3. rewrite it using the critique as explicit input
+4. check whether the revised plan improved
+
+That closes the loop between generation and evaluation.
+
+From an engineering perspective, this makes the project much stronger because critique is now actionable rather than decorative.
 
 ## Reliability and limitations
 
-The project is intentionally practical, but it has real limitations.
+The system is practical, but it has important limitations.
 
 ### Data quality
 
-Everything downstream depends on the quality and completeness of upstream activity and recovery data.
+Everything downstream depends on the quality and completeness of upstream activity and wellness data.
 
 ### Missing telemetry
 
-If recent recovery metrics are sparse or missing, confidence should be lower. The system should be interpreted more conservatively in those cases.
+If recent recovery metrics are sparse, confidence should be lower and interpretations should be more conservative.
 
 ### Simplified load modeling
 
-The current training-load metric is intentionally simple. It is useful as an operational signal, but it is not a complete model of fatigue, fitness, or injury risk.
+The training-load metric is deliberately lightweight. It is useful for planning and guardrails, but it is not a complete model of fatigue, fitness, or injury risk.
 
-### Generated plans remain assistive
+### Judge output can still be messy
 
-The outputs are meant to support decision-making, not replace judgment.
+The soft-eval path is more robust now, but first-pass judge outputs can still be incomplete. That is partly why the repair and derivation logic exists.
 
-## Why this project exists
+### Generated and revised plans remain assistive
 
-The motivation behind `trailtraining` is simple:
-
-* people already collect large amounts of training and wearable data,
-* most platforms do very little with it that is genuinely useful,
-* the first wave of LLM integrations in fitness products has often been generic and weak.
-
-This project is an attempt to build something better for real training use: a system that turns collected data into structured, inspectable, and more actionable guidance.
-
-## Future directions
-
-There are several obvious directions for extension:
-
-* better sport-specific load modeling,
-* richer recovery features,
-* more formal evaluation of generated plans,
-* clearer confidence handling when telemetry is incomplete,
-* stronger benchmarking between generated outputs and hand-written planning heuristics.
-
-But even in its current form, the core idea is already useful: unify the data, derive recent-load context, generate a plan from that context, and evaluate the result.
+Outputs are decision-support artifacts, not medical advice or guaranteed coaching truth.
 
 ## Repository layout
 
@@ -276,22 +420,53 @@ A simplified view of the repo:
 │   ├── engineering.md
 │   └── images/
 ├── src/trailtraining/
+│   ├── llm/
+│   │   ├── coach.py
+│   │   ├── eval.py
+│   │   ├── soft_eval.py
+│   │   └── revise.py
+│   └── cli.py
 ├── tests/
 ├── README.md
 └── pyproject.toml
 ```
 
+## Why local-first still matters
+
+A lot of current AI fitness tooling stays shallow because it skips the systems work.
+
+It often:
+
+- hides context
+- skips explicit evaluation
+- ignores missing-data uncertainty
+- produces polished text with weak operational value
+
+`trailtraining` takes the opposite approach:
+
+- derive context first
+- generate second
+- evaluate third
+- revise fourth
+- re-check fifth
+
+That ordering is the architecture.
+
+## Future directions
+
+The current pipeline is useful, but there are clear next steps:
+
+- richer sport-specific load modeling
+- better confidence handling under sparse telemetry
+- clearer comparison between original and revised plan quality
+- better benchmarking of soft-eval behavior across models
+- more polished demo artifacts showing the full revision loop
+- additional tooling around artifact diffs and revision summaries
+
 ## Closing note
 
-The project should be read as an engineering system, not just a prompt wrapper.
+The key contribution of `trailtraining` is not just that it uses an LLM.
 
-The key contribution is the pipeline:
+It is that it treats training guidance as a structured, inspectable pipeline with local artifacts, deterministic signals, explicit evaluation, and now an iterative revision loop.
 
-* local ingestion,
-* unified artifacts,
-* recent-load modeling,
-* recovery-aware forecasting,
-* structured generation,
-* rule-based evaluation.
-
-That is what makes `trailtraining` more than a generic “AI coaching” demo.
+That is what makes it more than a generic AI coaching demo.

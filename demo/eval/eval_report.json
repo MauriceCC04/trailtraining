@@ -1,0 +1,226 @@
+{
+  "grade": "A",
+  "score": 100,
+  "soft_assessment": {
+    "concerns": [
+      "The aerobic cycling session could more explicitly subordinate its purpose to running goals rather than just maintaining aerobic fitness"
+    ],
+    "confidence": "medium",
+    "grade": "A",
+    "marker_results": [
+      {
+        "evidence": "Plan explicitly targets becoming a faster trail runner with trail hill strength-tempo intervals, short intervals for VO2/speed, and trail-specific strength work including single-leg exercises for climbing/descending economy.",
+        "improvement_hint": "None needed - plan clearly addresses trail running speed development.",
+        "marker": "Goal specificity",
+        "marker_id": "goal_specificity",
+        "rubric": "goal_alignment",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Sessions include uphill power intervals on trail climbs, trail-specific strength (split squats, step-downs, single-leg calf raises), long trail run with climbing practice, and mobility work for ankle/hip stability on uneven terrain.",
+        "improvement_hint": "None needed - excellent trail-specific adaptations throughout.",
+        "marker": "Trail specificity",
+        "marker_id": "trail_specificity",
+        "rubric": "goal_alignment",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Week increases run frequency from cycling-heavy baseline (6 rides, 1 trail run last week) while adding controlled quality sessions and capping duration to manage transition risk.",
+        "improvement_hint": "Could specify more clearly how this week sets up subsequent progression phases.",
+        "marker": "Progression fit",
+        "marker_id": "progression_fit",
+        "rubric": "goal_alignment",
+        "score": 4.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Aerobic bike session supports aerobic base with low mechanical stress, and strength work targets trail-specific durability rather than general fitness.",
+        "improvement_hint": "Could reduce bike volume slightly more to emphasize run-specific adaptations.",
+        "marker": "Non-competing focus",
+        "marker_id": "non_competing_focus",
+        "rubric": "goal_alignment",
+        "score": 4.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Two hard days (trail hills Wednesday, intervals Friday) separated by easy run+strength Thursday, with rest day Monday and easy days surrounding the quality sessions.",
+        "improvement_hint": "None needed - excellent hard/easy distribution.",
+        "marker": "Hard/easy spacing",
+        "marker_id": "hard_easy_spacing",
+        "rubric": "plan_coherence",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Weekly totals match detailed math: 490 minutes = 8.17 hours planned vs 8.2 hours stated. Session durations and intensities align with moderate overreach risk management.",
+        "improvement_hint": "None needed - totals and sessions are internally consistent.",
+        "marker": "Internal consistency",
+        "marker_id": "weekly_internal_consistency",
+        "rubric": "plan_coherence",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Hill intervals purpose matches uphill power development, short intervals target VO2/speed for trail pace, long run builds endurance with capped duration for transition week.",
+        "improvement_hint": "None needed - workout descriptions perfectly match stated purposes.",
+        "marker": "Workout-purpose fit",
+        "marker_id": "workout_purpose_fit",
+        "rubric": "plan_coherence",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Reduces total volume (8.2 vs 11.3 hours last week) while shifting from cycling-dominant to run-specific training, with 2 quality days respecting moderate overreach risk.",
+        "improvement_hint": "Could explain more explicitly how this load pattern prepares for subsequent weeks.",
+        "marker": "Load progression logic",
+        "marker_id": "load_progression_logic",
+        "rubric": "plan_coherence",
+        "score": 4.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Uses specific context like '6 rides, 1 trail run last week', '25.394 training load hours vs baseline', 'capped at 2:30 long run', and '4 x 6 min uphill intervals'.",
+        "improvement_hint": "None needed - highly specific to athlete's actual data.",
+        "marker": "Specificity",
+        "marker_id": "specificity",
+        "rubric": "explanation_quality",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Explains why sessions are structured this way: 'build uphill power specific to faster trail running', 'capped duration during bike-to-run transition', 'two quality sessions within moderate overreach context'.",
+        "improvement_hint": "None needed - clear cause-and-effect reasoning throughout.",
+        "marker": "Actionable reasoning",
+        "marker_id": "actionable_reasoning",
+        "rubric": "explanation_quality",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Uses specific trail running language like 'climbing economy', 'single-leg strength for uneven trails', 'lactate management specific to trail pace' rather than generic fitness terms.",
+        "improvement_hint": "Minor: some phrases like 'quality stimulus' could be more specific to trail demands.",
+        "marker": "Non-generic language",
+        "marker_id": "non_generic_language",
+        "rubric": "explanation_quality",
+        "score": 4.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Each day has clear purpose: 'absorb elevated load', 'neuromuscular speed for faster trails', 'build uphill power + lactate management', 'reinforce trail-specific durability'.",
+        "improvement_hint": "None needed - purposes are clear and specific to trail running goals.",
+        "marker": "Useful day purposes",
+        "marker_id": "useful_day_purposes",
+        "rubric": "explanation_quality",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Moderate overreach risk appropriately addressed with 2 quality sessions max, capped long run duration, and intensity limits. Elevated training load (25.4 vs baseline) handled with volume reduction.",
+        "improvement_hint": "None needed - risk responses are well-calibrated to context.",
+        "marker": "Risk-context match",
+        "marker_id": "risk_context_match",
+        "rubric": "caution_proportionality",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Acknowledges 0 sleep days data explicitly, provides subjective monitoring cues ('if you wake up feeling unusually sore'), and adjusts confidence appropriately without overreacting.",
+        "improvement_hint": "None needed - handles missing sleep data transparently and practically.",
+        "marker": "Missing-data handling",
+        "marker_id": "missing_data_handling",
+        "rubric": "caution_proportionality",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Tone is measured and practical: 'keep intensity controlled', 'if you're straining early, slow down', 'downgrade quality sessions if needed' without being alarmist.",
+        "improvement_hint": "Could be slightly more confident given steady readiness status.",
+        "marker": "Caution tone",
+        "marker_id": "caution_tone",
+        "rubric": "caution_proportionality",
+        "score": 4.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Sessions include specific durations, intensities, rep schemes: '4 x 6 min uphill', '10 x 1 min fast / 1 min easy', '2-3 x 6-10 reps' for strength exercises.",
+        "improvement_hint": "None needed - sessions are completely executable.",
+        "marker": "Session clarity",
+        "marker_id": "session_clarity",
+        "rubric": "actionability",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Week flows logically day-to-day with clear progression, terrain recommendations, and practical execution notes like 'jog/walk back down for recovery' and fueling timing.",
+        "improvement_hint": "None needed - week is highly practical to follow.",
+        "marker": "Followability",
+        "marker_id": "followability",
+        "rubric": "actionability",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Recovery includes sleep prioritization, subjective monitoring cues, fueling strategies for quality days, and daily mobility work specific to trail demands.",
+        "improvement_hint": "Could add more specific recovery strategies between the two quality sessions.",
+        "marker": "Recovery integration",
+        "marker_id": "recovery_integration",
+        "rubric": "actionability",
+        "score": 4.0,
+        "verdict": "pass"
+      }
+    ],
+    "model": "anthropic/claude-sonnet-4",
+    "overall_score": 93.1,
+    "primary_goal": "to become a faster trail runner",
+    "rubric_scores": {
+      "actionability": {
+        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
+        "score": 93.3
+      },
+      "caution_proportionality": {
+        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
+        "score": 93.3
+      },
+      "explanation_quality": {
+        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
+        "score": 95.0
+      },
+      "goal_alignment": {
+        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
+        "score": 90.0
+      },
+      "plan_coherence": {
+        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
+        "score": 95.0
+      }
+    },
+    "strengths": [
+      "Highly trail-specific programming with hill intervals for uphill power, trail durability strength work, and climbing economy focus that directly supports the goal of becoming a faster trail runner",
+      "Excellent load management that reduces weekly hours from 11.3 to 8.2 while strategically adding quality sessions during transition from cycling-heavy training",
+      "Exceptional detail and specificity in session descriptions with concrete RPE targets, terrain guidance, and specific exercises that make the plan highly actionable",
+      "Thoughtful risk management that acknowledges moderate overreach risk and missing sleep data with appropriate adaptations and clear monitoring guidance"
+    ],
+    "style": "trailrunning",
+    "suggested_improvements": [
+      "Frame the cycling session more explicitly as supporting trail running goals, such as 'maintain aerobic base to support trail running intervals later this week'",
+      "Add specific bail-out protocols for quality sessions beyond general RPE guidance, such as 'if you can't complete rep 3 at target effort, reduce remaining reps to 4 min each'",
+      "Provide more specific terrain guidance for the long trail run regarding technical difficulty and grade steepness to optimize the climbing economy benefits",
+      "Consider adding approximate pace or power targets for the interval session to complement the RPE guidance for more precise execution"
+    ],
+    "summary": "Excellent trail running plan that effectively transitions from recent cycling-heavy training to running-focused work while managing moderate overreach risk. Strong trail-specific elements and detailed execution guidance."
+  },
+  "stats": {
+    "days": 7,
+    "effective_max_consecutive_hard": 2,
+    "effective_max_hard_per_7d": 3,
+    "effective_max_ramp_pct": 10.0,
+    "hard_days": 2,
+    "overreach_risk_level": "moderate",
+    "readiness_status": "steady",
+    "rest_days": 1
+  },
+  "subscores": {},
+  "violations": []
+}

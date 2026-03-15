@@ -1,28 +1,95 @@
 # Demo artifacts
 
-This folder contains example outputs from `trailtraining` and is meant to show what the pipeline produces after local data is ingested, combined, forecasted, and passed through the coaching layer.
+This folder contains representative outputs from `trailtraining` and is meant to make the full pipeline easy to inspect without needing your own API keys, wearable accounts, or local setup.
 
-These artifacts are examples, not ground truth. Their purpose is to make the pipeline inspectable: you can see the merged context, the generated plan, and the advisory outputs that were produced from that context.
+The demo now reflects the full artifact loop:
+
+**roll up data → generate plan → evaluate plan → revise plan → render human-readable outputs**
+
+These files are examples, not prescriptions or ground truth. Their purpose is to show what the system produces at each stage and how later artifacts build on earlier ones.
+
+1. `trailtraining` works from **local structured context**, not a freeform chatbot prompt.
+2. generated plans are **evaluated instead of trusted blindly**.
+3. evaluation can include both **deterministic checks** and an optional **second-model soft assessment**.
+4. plans can be **revised from evaluator feedback** and rendered again in a human-readable format.
+
+## Artifact flow
+
+```text
+combined_rollups.json
+        │
+        ▼
+coach_brief_training-plan.json
+        │
+        ├──► coach_brief_training-plan.txt
+        │
+        ▼
+eval_report.json
+        │
+        ▼
+revised-plan.json
+        │
+        └──► revised-plan.txt
+````
+
+The first-pass plan is generated from local context.
+The evaluation report critiques that plan.
+The revised plan incorporates that feedback while preserving the useful parts of the original.
+The `.txt` files are human-readable renderings of the structured JSON artifacts.
 
 ## Files
 
-- `rollups/combined_rollups.json`
-  Example merged rollup combining recent activity data with any available recovery telemetry. This is the main local context used by downstream forecasting and coaching steps.
+### `rollups/combined_rollups.json`
 
-- `plans/training-plan.json`
-  Example structured weekly training plan generated from the available local context.
+Example merged rollup combining recent activity data with any available recovery telemetry.
 
-- `plans/training-plan.txt`
-  Human-readable rendering of the structured weekly training plan.
+This is the main local context used by downstream forecasting, training-plan generation, and plan revision. It contains the recent windows and summary values that later stages cite and reason from.
 
-- `status/recovery-status.md`
-  Example lightweight recovery summary based on the available recent context.
+### `plans/coach_brief_training-plan.json`
 
-- `status/meal-plan.md`
-  Example meal-planning output based primarily on recent activity level and training context.
+Example first-pass structured weekly training plan generated from the available local context.
 
-## Notes
+This is the primary machine-readable training-plan artifact. It includes:
 
-`trailtraining` is designed to work with incomplete recovery data. Some demo artifacts may reflect richer recovery context than others, depending on what signals were available at generation time.
+* metadata
+* recent snapshot context
+* readiness
+* weekly totals
+* day-by-day sessions
+* recovery actions
+* risks
+* data notes
+* citations
 
-The structured training plan is the most constrained output. Advisory outputs like recovery status and meal planning are intentionally lighter-weight and should be interpreted as supportive guidance rather than strict prescriptions.
+### `plans/coach_brief_training-plan.txt`
+
+Human-readable rendering of the first-pass structured training plan.
+
+### `eval/eval_report.json`
+
+Example evaluation report for the first-pass training plan.
+
+This artifact shows how `trailtraining` critiques generated plans. Depending on configuration, it can include:
+
+* deterministic scoring and violations
+* per-category scoring
+* an optional soft assessment from a second LLM judge
+* qualitative strengths, concerns, and suggested improvements
+
+This file is the direct input to the revision step.
+
+### `plans/revised-plan.json`
+
+Example revised version of the original training plan.
+
+### `plans/revised-plan.txt`
+
+Human-readable rendering of the revised training plan.
+
+### `status/coach_brief_recovery-status.md`
+
+This is a lighter advisory artifact than the training plan and is meant to provide quick interpretive guidance rather than a full structured plan.
+
+### `status/coach_brief_meal-plan.md`
+
+Example meal-planning output generated from recent activity and training context.
