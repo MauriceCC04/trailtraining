@@ -1,5 +1,3 @@
-# src/trailtraining/llm/coach.py
-
 from __future__ import annotations
 
 import contextlib
@@ -16,6 +14,7 @@ from openai import OpenAI
 from trailtraining import config
 from trailtraining.llm.guardrails import apply_eval_coach_guardrails, build_eval_constraints_block
 from trailtraining.llm.presets import get_system_prompt, get_task_prompt
+from trailtraining.llm.rubrics import default_primary_goal_for_style
 from trailtraining.llm.schemas import (
     TRAINING_PLAN_SCHEMA,
     ensure_training_plan_shape,
@@ -65,10 +64,6 @@ def _make_openrouter_client() -> OpenAI:
 
 
 def _responses_create_compat(client: OpenAI, kwargs: dict[str, Any]) -> Any:
-    """
-    Retry a Responses API call with progressively simpler payloads when a
-    model/provider rejects optional fields.
-    """
     attempts: list[dict[str, Any]] = [dict(kwargs)]
     text_cfg = dict(kwargs.get("text") or {})
 
@@ -165,11 +160,6 @@ def _resolve_input_paths(
     personal_path: Optional[str],
     summary_path: Optional[str],
 ) -> tuple[Path, Path, Optional[Path]]:
-    """
-    Mirrors your CLI behavior:
-      - if --personal/--summary provided, use them
-      - else use --input (dir) or prompting directory
-    """
     base: Path
     if input_path:
         base = Path(input_path).expanduser().resolve()
@@ -216,7 +206,6 @@ def _filter_last_days(combined: list[dict[str, Any]], days: int) -> list[dict[st
     if not combined:
         return combined
 
-    # assume combined sorted by date asc (as produced by combine.py)
     last = _as_date(combined[-1].get("date", ""))
     if not last:
         return combined
@@ -263,7 +252,6 @@ def _summarize_day(day: dict[str, Any]) -> str:
 
     sleep = day.get("sleep")
     if isinstance(sleep, dict):
-        # keep it lightweight: only include a few small fields if present
         keys = [
             "sleep_score",
             "score",
@@ -278,7 +266,6 @@ def _summarize_day(day: dict[str, Any]) -> str:
         if picked:
             lines.append(f"Sleep: {picked}")
         else:
-            # fallback: avoid dumping huge dicts
             lines.append("Sleep: (data present)")
     elif sleep is None:
         lines.append("Sleep: (none)")
@@ -286,7 +273,7 @@ def _summarize_day(day: dict[str, Any]) -> str:
     acts = day.get("activities") or []
     if isinstance(acts, list) and acts:
         lines.append(f"Activities ({len(acts)}):")
-        for a in acts[:50]:  # hard cap per day
+        for a in acts[:50]:
             if isinstance(a, dict):
                 lines.append(_summarize_activity(a))
     else:
@@ -306,10 +293,6 @@ def _safe_json_snippet(obj: Any, *, max_chars: int) -> str:
 
 
 def _extract_json_object(text: str) -> str:
-    """
-    Robust parsing helper when the model accidentally adds extra text.
-    Grabs the outermost {...} region.
-    """
     if not isinstance(text, str):
         return str(text)
     start = text.find("{")
@@ -323,18 +306,11 @@ def _load_or_compute_deterministic_forecast(
     base_dir: Path,
     combined: list[dict[str, Any]],
 ) -> Optional[dict[str, Any]]:
-    """
-    Best-effort:
-      1) Load base_dir/readiness_and_risk_forecast.json if it exists
-      2) Else, try to compute via trailtraining.forecast.forecast.compute_readiness_and_risk(combined)
-         and (best-effort) write it back to the same path for next time.
-    """
     forecast_p = base_dir / "readiness_and_risk_forecast.json"
     if forecast_p.exists():
         obj = load_json(forecast_p, default=None)
         return obj if isinstance(obj, dict) else None
 
-    # Best-effort compute (won't crash coach if module isn't installed yet)
     try:
         from trailtraining.forecast.forecast import compute_readiness_and_risk
     except Exception:
@@ -366,9 +342,6 @@ def _load_or_compute_deterministic_forecast(
 
 
 def _forecast_signal_rows(det_forecast: dict[str, Any]) -> list[dict[str, Any]]:
-    """
-    Converts readiness_and_risk_forecast.json into signal_registry rows so the model can cite them.
-    """
     out: list[dict[str, Any]] = []
     if not isinstance(det_forecast, dict):
         return out
@@ -390,6 +363,17 @@ def _forecast_signal_rows(det_forecast: dict[str, Any]) -> list[dict[str, Any]]:
                     "value": cap_label,
                     "unit": "",
                     "source": "readiness_and_risk_forecast.json:result.inputs.recovery_capability_label",
+                    "date_range": date_range,
+                }
+            )
+        cap_key = inputs.get("recovery_capability_key")
+        if isinstance(cap_key, str) and cap_key.strip():
+            out.append(
+                {
+                    "signal_id": "forecast.recovery_capability.key",
+                    "value": cap_key,
+                    "unit": "",
+                    "source": "readiness_and_risk_forecast.json:result.inputs.recovery_capability_key",
                     "date_range": date_range,
                 }
             )
@@ -499,6 +483,19 @@ def _apply_deterministic_readiness_to_plan(
     plan_obj["data_notes"] = data_notes
 
 
+def _apply_primary_goal_to_plan(plan_obj: dict[str, Any], primary_goal: Optional[str]) -> None:
+    goal = str(primary_goal or "").strip()
+    if not goal:
+        return
+
+    meta = _as_dict(plan_obj.get("meta"))
+    if not meta:
+        return
+
+    meta["primary_goal"] = goal
+    plan_obj["meta"] = meta
+
+
 def training_plan_to_text(obj: dict[str, Any]) -> str:
     meta = _as_dict(obj.get("meta"))
     readiness = _as_dict(obj.get("readiness"))
@@ -525,6 +522,7 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
     plan_days = meta.get("plan_days")
     style = _as_str(meta.get("style"))
     today = _as_str(meta.get("today"))
+    primary_goal = _as_str(meta.get("primary_goal"))
 
     if today:
         lines.append(f"Generated: {today}")
@@ -534,6 +532,8 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
         )
     if style:
         lines.append(f"Style: {style}")
+    if primary_goal:
+        lines.append(f"Primary goal: {primary_goal}")
 
     status = _as_str(readiness.get("status"))
     rationale = _as_str(readiness.get("rationale"))
@@ -627,11 +627,6 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
 def _call_responses_best_effort_schema(
     client: OpenAI, kwargs: dict[str, Any], schema: dict[str, Any]
 ) -> Any:
-    """
-    Best-effort structured-output call for OpenRouter's Responses API.
-    Try Responses-style text.format first, then OpenRouter's response_format
-    json_schema shape, then fall back to a plain call.
-    """
     schema_name = schema.get("name")
     schema_body = schema.get("schema")
 
@@ -667,16 +662,9 @@ def _call_responses_best_effort_schema(
 
 
 def _prompt_instruction(prompt_name: str, *, style: str) -> str:
-    """
-    Only style-switches:
-      - system instructions (handled elsewhere)
-      - training-plan task prompt (handled here via presets)
-    Other prompts remain unchanged from prompts.py.
-    """
     try:
         return get_task_prompt(prompt_name, style=style)
     except Exception:
-        # Fallbacks (should rarely hit)
         if prompt_name == "training-plan":
             return "Generate a trail-running training plan for the next 7-14 days based on fatigue, recent volume, and sleep."
         if prompt_name == "recovery-status":
@@ -694,17 +682,20 @@ def _build_prompt_text(
     deterministic_forecast: Optional[dict[str, Any]],
     *,
     style: str,
+    primary_goal: str,
     max_chars: int,
     detail_days: int,
 ) -> str:
-    """
-    Budgeted assembly.
-    We build from newest → oldest until we hit max_chars, then stop.
-    """
     retrieval_weeks = int(os.getenv("TRAILTRAINING_COACH_RETRIEVAL_WEEKS", "8"))
 
     header = [
         f"# TrailTraining Coach Brief: {prompt_name}",
+        "",
+        "## Evaluation context",
+        f"Style: {style}",
+        f"Primary goal (authoritative): {primary_goal}",
+        "",
+        "The output plan MUST target the primary goal above and copy it exactly into meta.primary_goal.",
         "",
         "## Personal profile (raw JSON)",
         _safe_json_snippet(personal, max_chars=50_000),
@@ -733,7 +724,6 @@ def _build_prompt_text(
             "",
         ]
 
-    # Retrieval: last N weeks + citeable signal registry
     ctx = build_retrieval_context(
         combined,
         rollups if isinstance(rollups, dict) else None,
@@ -743,7 +733,6 @@ def _build_prompt_text(
     weekly_history = ctx.get("weekly_history")
     signal_registry = ctx.get("signal_registry")
 
-    # Append forecast into signal registry so the model can cite it (forecast.*)
     if isinstance(signal_registry, list) and isinstance(deterministic_forecast, dict):
         signal_registry = list(signal_registry) + _forecast_signal_rows(deterministic_forecast)
 
@@ -756,7 +745,6 @@ def _build_prompt_text(
         "",
     ]
 
-    # Limit daily detail further even if combined is large
     if detail_days > 0 and len(combined) > detail_days:
         combined_detail = combined[-detail_days:]
         combined_older = combined[:-detail_days]
@@ -764,7 +752,6 @@ def _build_prompt_text(
         combined_detail = combined
         combined_older = []
 
-    # We include only minimal reference to older days (optional)
     if combined_older:
         header += [
             f"## Older days included in window: {len(combined_older)} (details omitted; rely on rollups + recent detail)",
@@ -774,11 +761,9 @@ def _build_prompt_text(
     base = "\n".join(header)
     budget = max_chars if max_chars > 0 else 200_000
 
-    # Start with base; then add day blocks newest→oldest until budget is exhausted
     text_parts: list[str] = [base]
     used = len(base)
 
-    # Add detailed days newest→oldest
     for day in reversed(combined_detail):
         block = _summarize_day(day)
         if used + len(block) > budget:
@@ -786,13 +771,11 @@ def _build_prompt_text(
         text_parts.append(block)
         used += len(block)
 
-    # Add tail task instruction
     tail = "\n## Task\n" + _prompt_instruction(prompt_name, style=style) + "\n"
     if used + len(tail) <= budget:
         text_parts.append(tail)
         used += len(tail)
 
-    # For training-plan, append strict output contract (works even without schema-mode)
     if prompt_name == "training-plan":
         contract = "\n## Output Contract (STRICT)\n" + training_plan_output_contract_text() + "\n"
         if used + len(contract) <= budget:
@@ -803,14 +786,14 @@ def _build_prompt_text(
 
 @dataclass(frozen=True)
 class CoachConfig:
-    # Safe constants as dataclass defaults (no function calls)
     model: str = "openai/gpt-5.2"
-    reasoning_effort: str = "medium"  # none|low|medium|high|xhigh
-    verbosity: str = "medium"  # low|medium|high
+    reasoning_effort: str = "medium"
+    verbosity: str = "medium"
     days: int = 60
     max_chars: int = 200_000
     temperature: Optional[float] = None
     style: str = "trailrunning"
+    primary_goal: str = ""
 
     @classmethod
     def from_env(cls) -> CoachConfig:
@@ -823,21 +806,23 @@ class CoachConfig:
             except ValueError:
                 return default
 
+        style = os.getenv("TRAILTRAINING_COACH_STYLE", cls.style)
+        primary_goal = os.getenv("TRAILTRAINING_PRIMARY_GOAL")
+        if not primary_goal or not primary_goal.strip():
+            primary_goal = default_primary_goal_for_style(style)
+
         return cls(
             model=os.getenv("TRAILTRAINING_LLM_MODEL", cls.model),
             reasoning_effort=os.getenv("TRAILTRAINING_REASONING_EFFORT", cls.reasoning_effort),
             verbosity=os.getenv("TRAILTRAINING_VERBOSITY", cls.verbosity),
             days=_env_int("TRAILTRAINING_COACH_DAYS", cls.days),
             max_chars=_env_int("TRAILTRAINING_COACH_MAX_CHARS", cls.max_chars),
-            style=os.getenv("TRAILTRAINING_COACH_STYLE", cls.style),
+            style=style,
+            primary_goal=primary_goal,
         )
 
 
 def _recompute_planned_hours_from_days(obj: dict[str, Any]) -> None:
-    """
-    Make weekly_totals.planned_moving_time_hours consistent with sum(plan.days[].duration_minutes).
-    This prevents false MAX_RAMP_PCT violations caused by rounding / inconsistent totals.
-    """
     plan = obj.get("plan")
     if not isinstance(plan, dict):
         return
@@ -880,7 +865,6 @@ def run_coach_brief(
     if not isinstance(combined, list):
         raise RuntimeError("combined_summary.json must be a list of day objects")
 
-    # early pruning
     _dedup_activities_in_place(combined)
     combined = _filter_last_days(combined, cfg.days)
 
@@ -890,6 +874,10 @@ def run_coach_brief(
     detail_days = int(os.getenv("TRAILTRAINING_COACH_DETAIL_DAYS", "14"))
     detail_days = max(1, min(detail_days, len(combined))) if combined else 0
 
+    resolved_primary_goal = (cfg.primary_goal or "").strip() or default_primary_goal_for_style(
+        cfg.style
+    )
+
     prompt_text = _build_prompt_text(
         prompt_name=prompt,
         personal=personal,
@@ -897,13 +885,13 @@ def run_coach_brief(
         combined=combined,
         deterministic_forecast=deterministic_forecast,
         style=cfg.style,
+        primary_goal=resolved_primary_goal,
         max_chars=cfg.max_chars,
         detail_days=detail_days,
     )
 
     client = _make_openrouter_client()
 
-    # Use style-specific system instructions
     system_instructions = get_system_prompt(cfg.style)
 
     kwargs: dict[str, Any] = {
@@ -913,11 +901,9 @@ def run_coach_brief(
         "reasoning": {"effort": cfg.reasoning_effort},
         "text": {"verbosity": cfg.verbosity},
     }
-    # API restriction: temperature typically only allowed when reasoning.effort == "none"
     if cfg.reasoning_effort == "none" and cfg.temperature is not None:
         kwargs["temperature"] = cfg.temperature
 
-    # Training-plan: request structured JSON output (best-effort)
     if prompt == "training-plan":
         resp = _call_responses_best_effort_schema(client, kwargs, TRAINING_PLAN_SCHEMA)
     else:
@@ -925,7 +911,6 @@ def run_coach_brief(
 
     out_text = getattr(resp, "output_text", None) or str(resp)
 
-    # If training-plan: parse + validate + save pretty JSON
     if prompt == "training-plan":
         raw = _extract_json_object(out_text)
         try:
@@ -953,11 +938,10 @@ def run_coach_brief(
             obj = ensure_training_plan_shape(json.loads(raw2))
             _recompute_planned_hours_from_days(obj)
 
-        # Force deterministic readiness into the final plan object
+        _apply_primary_goal_to_plan(obj, resolved_primary_goal)
         _apply_deterministic_readiness_to_plan(obj, deterministic_forecast)
         apply_eval_coach_guardrails(obj, rollups if isinstance(rollups, dict) else None)
 
-        # Save JSON output
         if output_path:
             out_p = Path(output_path).expanduser().resolve()
         else:
@@ -966,7 +950,6 @@ def run_coach_brief(
         out_p.parent.mkdir(parents=True, exist_ok=True)
         save_json(out_p, obj, compact=False)
 
-        # Also write a human-readable interpretation (.txt) next to the JSON
         try:
             txt_p = out_p.parent / f"{out_p.stem}.txt"
             txt_p.write_text(training_plan_to_text(obj), encoding="utf-8")
@@ -976,7 +959,6 @@ def run_coach_brief(
         pretty = json.dumps(obj, indent=2, ensure_ascii=False)
         return pretty, str(out_p)
 
-    # Non-training-plan: save markdown text
     if output_path:
         out_p = Path(output_path).expanduser().resolve()
     else:

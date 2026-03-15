@@ -27,6 +27,7 @@ class TrainingMeta(StrictModel):
     plan_start: str
     plan_days: int = Field(ge=1, le=21)
     style: str
+    primary_goal: str = "to become a faster endurance athlete"
 
 
 class Readiness(StrictModel):
@@ -117,12 +118,43 @@ class Violation(StrictModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class RubricScoreArtifact(StrictModel):
+    score: Union[int, float]
+    reasoning: str
+
+
+class MarkerAssessmentArtifact(StrictModel):
+    rubric: str
+    marker_id: str
+    marker: str
+    verdict: Literal["pass", "partial", "fail"]
+    score: Union[int, float]
+    evidence: str
+    improvement_hint: str
+
+
+class SoftAssessmentArtifact(StrictModel):
+    model: str
+    style: Optional[str] = None
+    primary_goal: str
+    summary: str
+    overall_score: Union[int, float]
+    grade: str
+    confidence: Literal["low", "medium", "high"]
+    rubric_scores: dict[str, RubricScoreArtifact] = Field(default_factory=dict)
+    marker_results: list[MarkerAssessmentArtifact] = Field(default_factory=list)
+    strengths: list[str] = Field(default_factory=list)
+    concerns: list[str] = Field(default_factory=list)
+    suggested_improvements: list[str] = Field(default_factory=list)
+
+
 class EvaluationReportArtifact(StrictModel):
     score: Union[int, float]
     grade: str
     subscores: dict[str, Union[int, float]] = Field(default_factory=dict)
     stats: dict[str, Any] = Field(default_factory=dict)
     violations: list[Violation] = Field(default_factory=list)
+    soft_assessment: Optional[SoftAssessmentArtifact] = None
 
 
 # ---------- forecast artifact ----------
@@ -141,7 +173,6 @@ class ForecastInputs(StrictModel):
     training_load_delta_hours: Optional[float] = None
     training_load_z: Optional[float] = None
 
-    # NEW
     sleep_7d_mean_hours: Optional[float] = None
     hrv_7d_mean_ms: Optional[float] = None
 

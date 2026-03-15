@@ -1,6 +1,7 @@
 # src/trailtraining/llm/constraints.py
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Optional
@@ -8,31 +9,104 @@ from typing import Any, Optional
 
 @dataclass(frozen=True)
 class ConstraintConfig:
-    # existing
     max_ramp_pct: float = 10.0
     max_consecutive_hard: int = 2
 
-    # existing quality knobs
     max_hard_per_7d: int = 3
     min_rest_per_7d: int = 1
     min_signal_ids_per_day: int = 1
 
-    # Compare weekly_totals.planned_moving_time_hours to sum(day.duration_minutes)/60
-    weekly_time_tolerance_pct: float = 30.0  # allow mismatch (plans often round)
+    weekly_time_tolerance_pct: float = 30.0
 
-    # Rest-day expectations
     rest_day_max_minutes: int = 30
     require_rest_session_type: bool = True
 
-    # --- new forecast-aware conservative overlays ---
     fatigued_max_hard_per_7d: int = 1
     high_risk_max_hard_per_7d: int = 1
     high_risk_max_consecutive_hard: int = 1
     high_risk_max_ramp_pct: float = 0.0
 
-    # When telemetry is sparse, be somewhat more conservative
     sparse_data_max_hard_per_7d: int = 2
     sparse_data_max_ramp_pct: float = 5.0
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def constraint_config_from_env(
+    *,
+    max_ramp_pct: float | None = None,
+    max_consecutive_hard: int | None = None,
+) -> ConstraintConfig:
+    base = ConstraintConfig()
+    return ConstraintConfig(
+        max_ramp_pct=(
+            float(max_ramp_pct)
+            if max_ramp_pct is not None
+            else _env_float("TRAILTRAINING_MAX_RAMP_PCT", base.max_ramp_pct)
+        ),
+        max_consecutive_hard=(
+            int(max_consecutive_hard)
+            if max_consecutive_hard is not None
+            else _env_int("TRAILTRAINING_MAX_CONSEC_HARD", base.max_consecutive_hard)
+        ),
+        max_hard_per_7d=_env_int("TRAILTRAINING_MAX_HARD_PER_7D", base.max_hard_per_7d),
+        min_rest_per_7d=_env_int("TRAILTRAINING_MIN_REST_PER_7D", base.min_rest_per_7d),
+        min_signal_ids_per_day=_env_int(
+            "TRAILTRAINING_MIN_SIGNAL_IDS_PER_DAY", base.min_signal_ids_per_day
+        ),
+        weekly_time_tolerance_pct=_env_float(
+            "TRAILTRAINING_WEEKLY_TIME_TOLERANCE_PCT", base.weekly_time_tolerance_pct
+        ),
+        rest_day_max_minutes=_env_int(
+            "TRAILTRAINING_REST_DAY_MAX_MINUTES", base.rest_day_max_minutes
+        ),
+        require_rest_session_type=_env_bool(
+            "TRAILTRAINING_REQUIRE_REST_SESSION_TYPE", base.require_rest_session_type
+        ),
+        fatigued_max_hard_per_7d=_env_int(
+            "TRAILTRAINING_FATIGUED_MAX_HARD_PER_7D", base.fatigued_max_hard_per_7d
+        ),
+        high_risk_max_hard_per_7d=_env_int(
+            "TRAILTRAINING_HIGH_RISK_MAX_HARD_PER_7D", base.high_risk_max_hard_per_7d
+        ),
+        high_risk_max_consecutive_hard=_env_int(
+            "TRAILTRAINING_HIGH_RISK_MAX_CONSEC_HARD", base.high_risk_max_consecutive_hard
+        ),
+        high_risk_max_ramp_pct=_env_float(
+            "TRAILTRAINING_HIGH_RISK_MAX_RAMP_PCT", base.high_risk_max_ramp_pct
+        ),
+        sparse_data_max_hard_per_7d=_env_int(
+            "TRAILTRAINING_SPARSE_DATA_MAX_HARD_PER_7D", base.sparse_data_max_hard_per_7d
+        ),
+        sparse_data_max_ramp_pct=_env_float(
+            "TRAILTRAINING_SPARSE_DATA_MAX_RAMP_PCT", base.sparse_data_max_ramp_pct
+        ),
+    )
 
 
 def _pct_increase(new: float, old: Optional[float]) -> Optional[float]:
@@ -129,7 +203,6 @@ def _is_sparse_capability(ctx: dict[str, Optional[str]]) -> bool:
     if key in {"load_only", "load_sleep", "load_resting_hr", "load_hrv"}:
         return True
 
-    # fallback for older artifacts that only carry the label
     if "only have training data" in label:
         return True
 
@@ -158,7 +231,6 @@ def _normalize_days(plan_obj: dict[str, Any]) -> list[dict[str, Any]]:
         return []
     days: list[dict[str, Any]] = [d for d in raw if isinstance(d, dict)]
 
-    # Sort by date if possible; otherwise keep stable-ish order
     def key(d: dict[str, Any]) -> tuple[int, str]:
         dd = _as_date(d.get("date"))
         return (0, dd.isoformat()) if dd else (1, str(d.get("date") or ""))
@@ -187,9 +259,6 @@ def _pct_diff(a: float, b: float) -> Optional[float]:
     return abs(a - b) / b * 100.0
 
 
-# -----------------------------
-# Existing constraint function
-# -----------------------------
 def validate_training_plan(
     plan_obj: dict[str, Any],
     rollups: Optional[dict[str, Any]],
@@ -198,7 +267,6 @@ def validate_training_plan(
     violations: list[dict[str, Any]] = []
     days = _normalize_days(plan_obj)
 
-    # --- Ramp rate: use actual first-7 planned durations, not weekly_totals ---
     declared_planned_hours = _planned_week_hours(plan_obj)
     actual_first7_hours = _sum_hours(days[: min(7, len(days))]) if days else None
 
@@ -232,7 +300,6 @@ def validate_training_plan(
                 )
             )
 
-    # --- Too many hard days in a row ---
     consec = 0
     for d in days:
         hard = bool(d.get("is_hard_day"))
@@ -254,40 +321,24 @@ def validate_training_plan(
     return violations
 
 
-# -----------------------------
-# New: quality scoring
-# -----------------------------
 def evaluate_training_plan_quality(
     plan_obj: dict[str, Any],
     rollups: Optional[dict[str, Any]],
     cfg: ConstraintConfig,
 ) -> dict[str, Any]:
-    """
-    Returns a report dict:
-      {
-        "score": int,
-        "grade": str,
-        "subscores": {category: int},
-        "stats": {...},
-        "violations": [ ... ]
-      }
-    """
-    # Start with existing safety constraints
     violations: list[dict[str, Any]] = []
     for v0 in validate_training_plan(plan_obj, rollups, cfg):
         if isinstance(v0, dict):
-            # already normalized via _v(), but keep robust
             v0.setdefault("category", "safety")
             v0.setdefault("penalty", _default_penalty(str(v0.get("severity", "medium"))))
             violations.append(v0)
 
     days = _normalize_days(plan_obj)
 
-    # ---- Stats ----
     hard_days = sum(1 for d in days if bool(d.get("is_hard_day")))
     rest_days = sum(1 for d in days if bool(d.get("is_rest_day")))
     stats: dict[str, Any] = {"days": len(days), "hard_days": hard_days, "rest_days": rest_days}
-    # ---- Forecast-aware context ----
+
     fx = _extract_forecast_context(plan_obj)
     for k, v in fx.items():
         if v is not None:
@@ -314,7 +365,7 @@ def evaluate_training_plan_quality(
     stats["effective_max_hard_per_7d"] = effective_max_hard_per_7d
     stats["effective_max_consecutive_hard"] = effective_max_consecutive_hard
     stats["effective_max_ramp_pct"] = effective_max_ramp_pct
-    # ---- Structure checks ----
+
     seen = set()
     prev: Optional[date] = None
     for d in days:
@@ -376,7 +427,7 @@ def evaluate_training_plan_quality(
                     },
                 )
             )
-    # ---- Forecast-aware ramp overlay ----
+
     last7_hours = None
     try:
         w7 = (rollups or {}).get("windows", {}).get("7", {})
@@ -413,8 +464,7 @@ def evaluate_training_plan_quality(
                     penalty=35 if sev == "high" else 15,
                 )
             )
-    # ---- Safety/consistency checks (new) ----
-    # ---- Safety/consistency checks (rolling 7-day windows) ----
+
     for i, wk in enumerate(_rolling7(days)):
         h = sum(1 for d in wk if bool(d.get("is_hard_day")))
         if h > cfg.max_hard_per_7d:
@@ -453,7 +503,6 @@ def evaluate_training_plan_quality(
                 )
             )
 
-    # ---- Forecast-aware hard-day overlay ----
     if effective_max_hard_per_7d < cfg.max_hard_per_7d:
         reason_text = _forecast_reason_text(fx)
         sev = "high" if fx.get("overreach_risk_level") == "high" else "medium"
@@ -480,7 +529,6 @@ def evaluate_training_plan_quality(
                     )
                 )
 
-    # ---- Forecast-aware consecutive-hard overlay ----
     if effective_max_consecutive_hard < cfg.max_consecutive_hard:
         reason_text = _forecast_reason_text(fx)
         consec = 0
@@ -512,6 +560,7 @@ def evaluate_training_plan_quality(
             else:
                 consec = 0
                 streak_start = None
+
     for d in days:
         if not bool(d.get("is_rest_day")):
             continue
@@ -539,7 +588,6 @@ def evaluate_training_plan_quality(
                     )
                 )
 
-    # ---- Justification checks (new) ----
     for idx, d in enumerate(days):
         sig = d.get("signal_ids")
         n = len(sig) if isinstance(sig, list) else 0
@@ -614,7 +662,6 @@ def score_from_violations(
         by_cat[cat] = by_cat.get(cat, 0) + pen
 
     score = max(0, 100 - total_pen)
-
     subscores = {cat: max(0, 100 - pen) for cat, pen in by_cat.items()}
 
     if score >= 90:

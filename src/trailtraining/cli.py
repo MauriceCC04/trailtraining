@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 
+from trailtraining.llm.rubrics import default_primary_goal_for_style
 from trailtraining.util.logging_config import configure_logging
 
 
@@ -18,13 +19,14 @@ def _run(func):
         sys.exit(1)
 
 
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 def _load_env_file(path: Path) -> None:
-    """
-    Load KEY=VALUE lines from a .env-style file into os.environ.
-    - Ignores blank lines and comments (# ...)
-    - Does NOT override already-set environment variables
-    - Supports simple quoted values
-    """
     if not path.exists():
         return
 
@@ -40,20 +42,12 @@ def _load_env_file(path: Path) -> None:
 
 
 def apply_profile(profile: str) -> str:
-    """
-    Applies a profile by:
-      1) Setting TRAILTRAINING_PROFILE
-      2) Loading ~/.trailtraining/profiles/<profile>.env (unless vars already set)
-      3) Setting a default per-profile TRAILTRAINING_BASE_DIR (unless already set)
-    """
     profile = (profile or "default").strip() or "default"
     os.environ["TRAILTRAINING_PROFILE"] = profile
 
-    # Load per-profile secrets/config if present
     env_path = Path.home() / ".trailtraining" / "profiles" / f"{profile}.env"
     _load_env_file(env_path)
 
-    # If still not set, isolate data by profile
     os.environ.setdefault(
         "TRAILTRAINING_BASE_DIR", str(Path.home() / "trailtraining-data" / profile)
     )
@@ -120,7 +114,6 @@ def cmd_run_all_intervals(args):
         )
     )
 
-    # auto-detect
     from trailtraining import config
 
     if (config.INTERVALS_API_KEY or "").strip():
@@ -136,17 +129,34 @@ def cmd_doctor(_args):
     _run(doctor.main)
 
 
+def cmd_forecast(args):
+    from trailtraining.forecast.forecast import run_forecasts
+
+    r = run_forecasts(input_dir=args.input, output_path=args.output)
+    print(f"[Saved] {r['saved']}")
+    print(r["result"])
+
+
 def cmd_coach(args):
     from trailtraining.llm.coach import CoachConfig, run_coach_brief
 
+    base_cfg = CoachConfig.from_env()
+    style = args.style or base_cfg.style or "trailrunning"
+    primary_goal = (
+        args.goal
+        or os.getenv("TRAILTRAINING_PRIMARY_GOAL")
+        or default_primary_goal_for_style(style)
+    )
+
     cfg = CoachConfig(
-        model=args.model,
-        reasoning_effort=args.reasoning_effort,
-        verbosity=args.verbosity,
-        days=args.days,
-        max_chars=args.max_chars,
+        model=args.model or base_cfg.model,
+        reasoning_effort=args.reasoning_effort or base_cfg.reasoning_effort,
+        verbosity=args.verbosity or base_cfg.verbosity,
+        days=args.days if args.days is not None else base_cfg.days,
+        max_chars=args.max_chars if args.max_chars is not None else base_cfg.max_chars,
         temperature=args.temperature,
-        style=args.style,
+        style=style,
+        primary_goal=primary_goal,
     )
     text, out_path = run_coach_brief(
         prompt=args.prompt,
@@ -167,46 +177,75 @@ def cmd_coach(args):
 
 
 def cmd_eval_coach(args):
-    """
-    Evaluate a coach training-plan JSON output against constraints + quality scoring.
-    """
-    from trailtraining.llm.constraints import ConstraintConfig
+    from trailtraining import config
+    from trailtraining.llm.constraints import constraint_config_from_env
     from trailtraining.llm.eval import evaluate_training_plan_quality_file
+    from trailtraining.llm.soft_eval import SoftEvalConfig
     from trailtraining.util.state import save_json
 
-    cfg = ConstraintConfig(
+    input_path = args.input or str(
+        Path(config.PROMPTING_DIRECTORY) / "coach_brief_training-plan.json"
+    )
+    report_path = args.report or str(Path(config.PROMPTING_DIRECTORY) / "eval_report.json")
+
+    cfg = constraint_config_from_env(
         max_ramp_pct=float(args.max_ramp_pct),
         max_consecutive_hard=int(args.max_consecutive_hard),
     )
 
+    soft_cfg = None
+    if getattr(args, "soft_eval", False):
+        default_soft = SoftEvalConfig.from_env()
+        soft_cfg = SoftEvalConfig(
+            enabled=True,
+            model=args.soft_eval_model or default_soft.model,
+            reasoning_effort=(
+                getattr(args, "soft_eval_reasoning_effort", None) or default_soft.reasoning_effort
+            ),
+            verbosity=(getattr(args, "soft_eval_verbosity", None) or default_soft.verbosity),
+            primary_goal=args.goal or default_soft.primary_goal,
+        )
+
     report, _obj = evaluate_training_plan_quality_file(
-        args.input,
+        input_path,
         rollups_path=args.rollups,
         cfg=cfg,
+        soft_eval_cfg=soft_cfg,
+        primary_goal=args.goal,
     )
     violations = report.get("violations", [])
 
-    # Save outputs (keep --output behavior = violations JSON)
     if args.output:
         outp = Path(args.output).expanduser().resolve()
         save_json(outp, violations, compact=False)
         print(f"[Saved] {outp}")
 
-    # New: save full report
-    if getattr(args, "report", None):
-        outp = Path(args.report).expanduser().resolve()
-        save_json(outp, report, compact=False)
-        print(f"[Saved] {outp}")
+    outp = Path(report_path).expanduser().resolve()
+    save_json(outp, report, compact=False)
+    print(f"[Saved] {outp}")
 
     score = report.get("score", 0)
     grade = report.get("grade", "?")
-    print(f"Score: {score}/100 ({grade})")
+    print(f"Deterministic score: {score}/100 ({grade})")
 
     subs = report.get("subscores", {}) or {}
     if subs:
-        # stable ordering for readability
         parts = [f"{k}={subs[k]}" for k in sorted(subs.keys())]
-        print("Subscores:", ", ".join(parts))
+        print("Deterministic subscores:", ", ".join(parts))
+
+    soft = report.get("soft_assessment") or {}
+    if isinstance(soft, dict) and soft:
+        soft_score = soft.get("overall_score", 0)
+        soft_grade = soft.get("grade", "?")
+        print(f"Soft quality score: {soft_score}/100 ({soft_grade})")
+
+        rubric_scores = soft.get("rubric_scores", {}) or {}
+        if rubric_scores:
+            parts = []
+            for key in sorted(rubric_scores.keys()):
+                item = rubric_scores.get(key) or {}
+                parts.append(f"{key}={item.get('score', 0)}")
+            print("Rubric scores:", ", ".join(parts))
 
     if not violations:
         print("✅ eval-coach: no violations")
@@ -219,24 +258,14 @@ def cmd_eval_coach(args):
         msg = v.get("message", "")
         print(f"- [{sev}] {code}: {msg}")
 
-    # Fail on any high severity (same behavior as before)
     if any(v.get("severity") == "high" for v in violations):
         raise SystemExit(1)
     raise SystemExit(0)
 
 
-def cmd_forecast(args):
-    from trailtraining.forecast.forecast import run_forecasts
-
-    r = run_forecasts(input_dir=args.input, output_path=args.output)
-    print(f"[Saved] {r['saved']}")
-    print(r["result"])
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="trailtraining", description="TrailTraining CLI")
 
-    # Global profile support
     parser.add_argument(
         "--profile",
         default=os.getenv("TRAILTRAINING_PROFILE", "default"),
@@ -295,7 +324,6 @@ def main(argv=None):
     )
     run_all_p.set_defaults(func=cmd_run_all)
 
-    # coach
     coach_p = sub.add_parser(
         "coach", help="LLM coach analysis on combined_summary.json + formatted_personal_data.json"
     )
@@ -304,15 +332,15 @@ def main(argv=None):
         default="training-plan",
         choices=["training-plan", "recovery-status", "meal-plan"],
     )
-    coach_p.add_argument("--model", default=os.getenv("TRAILTRAINING_LLM_MODEL", "gpt-5.2"))
+    coach_p.add_argument("--model", default=None)
     coach_p.add_argument(
         "--reasoning-effort",
-        default=os.getenv("TRAILTRAINING_REASONING_EFFORT", "medium"),
+        default=None,
         choices=["none", "low", "medium", "high", "xhigh"],
     )
     coach_p.add_argument(
         "--verbosity",
-        default=os.getenv("TRAILTRAINING_VERBOSITY", "medium"),
+        default=None,
         choices=["low", "medium", "high"],
     )
     coach_p.add_argument(
@@ -321,11 +349,12 @@ def main(argv=None):
         default=None,
         help="Only used if --reasoning-effort none (API restriction).",
     )
+    coach_p.add_argument("--days", type=int, default=None)
+    coach_p.add_argument("--max-chars", type=int, default=None)
     coach_p.add_argument(
-        "--days", type=int, default=int(os.getenv("TRAILTRAINING_COACH_DAYS", "60"))
-    )
-    coach_p.add_argument(
-        "--max-chars", type=int, default=int(os.getenv("TRAILTRAINING_COACH_MAX_CHARS", "200000"))
+        "--goal",
+        default=None,
+        help="Primary athlete goal used by generation and soft evaluation.",
     )
     coach_p.add_argument(
         "--output",
@@ -343,31 +372,30 @@ def main(argv=None):
         help="Explicit path to formatted_personal_data.json (overrides --input)",
     )
     coach_p.add_argument(
-        "--summary", default=None, help="Explicit path to combined_summary.json (overrides --input)"
+        "--summary",
+        default=None,
+        help="Explicit path to combined_summary.json (overrides --input)",
     )
-
-    # style preset
     coach_p.add_argument(
         "--style",
-        default=os.getenv("TRAILTRAINING_COACH_STYLE", "trailrunning"),
+        default=None,
         choices=["trailrunning", "triathlon"],
         help="Prompt preset: changes system instructions; training-plan prompt is sport-specific.",
     )
     coach_p.set_defaults(func=cmd_coach)
-
     # eval-coach
     eval_p = sub.add_parser(
         "eval-coach", help="Evaluate coach training-plan JSON output against constraints"
     )
     eval_p.add_argument(
         "--input",
-        required=True,
-        help="Path to coach_brief_training-plan.json (or any training-plan JSON)",
+        default=None,
+        help="Path to coach_brief_training-plan.json (default: <prompting_dir>/coach_brief_training-plan.json)",
     )
     eval_p.add_argument(
         "--rollups",
         default=None,
-        help="Optional path to combined_rollups.json (default: same dir as --input)",
+        help="Optional path to combined_rollups.json (default: same dir as resolved input)",
     )
     eval_p.add_argument(
         "--max-ramp-pct", type=float, default=float(os.getenv("TRAILTRAINING_MAX_RAMP_PCT", "10"))
@@ -381,9 +409,28 @@ def main(argv=None):
     eval_p.add_argument(
         "--report", default=None, help="Optional path to write full scoring report JSON"
     )
+    eval_p.add_argument("--soft-eval", action="store_true", help="Run rubric-based soft evaluation")
+    eval_p.add_argument(
+        "--soft-eval-model",
+        default=None,
+        help="OpenRouter model for soft evaluation",
+    )
+    eval_p.add_argument(
+        "--goal",
+        default=None,
+        help="Primary athlete goal used for soft evaluation",
+    )
+    eval_p.add_argument(
+        "--soft-eval-reasoning-effort",
+        default=None,
+        choices=["none", "low", "medium", "high", "xhigh"],
+    )
+    eval_p.add_argument(
+        "--soft-eval-verbosity",
+        default=None,
+        choices=["low", "medium", "high"],
+    )
     eval_p.set_defaults(func=cmd_eval_coach)
-
-    # intervals
     intervals_p = sub.add_parser(
         "fetch-intervals", help="Fetch sleep + resting HR from Intervals.icu"
     )
@@ -426,10 +473,7 @@ def main(argv=None):
 
     args = parser.parse_args(argv)
 
-    # Apply profile BEFORE running command imports
     apply_profile(args.profile)
-
-    # Configure logging AFTER profile loads (so env-based defaults are present)
     configure_logging(args.log_level)
 
     args.func(args)

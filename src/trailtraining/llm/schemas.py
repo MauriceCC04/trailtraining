@@ -21,10 +21,6 @@ def ensure_training_plan_shape(obj: Any) -> dict[str, Any]:
 
 
 def _snapshot_obj_schema() -> dict[str, Any]:
-    # OpenAI strict schema requires:
-    # - additionalProperties: false on every object
-    # - required must include EVERY key in properties
-    # We use string values so missing data can be represented as "" (empty string).
     return {
         "type": "object",
         "additionalProperties": False,
@@ -42,7 +38,7 @@ def _snapshot_obj_schema() -> dict[str, Any]:
 
 
 TRAINING_PLAN_SCHEMA: dict[str, Any] = {
-    "name": "trailtraining_training_plan_v1",
+    "name": "trailtraining_training_plan_v2",
     "schema": {
         "type": "object",
         "additionalProperties": False,
@@ -60,12 +56,13 @@ TRAINING_PLAN_SCHEMA: dict[str, Any] = {
             "meta": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["today", "plan_start", "plan_days", "style"],
+                "required": ["today", "plan_start", "plan_days", "style", "primary_goal"],
                 "properties": {
                     "today": {"type": "string", "description": "YYYY-MM-DD"},
                     "plan_start": {"type": "string", "description": "YYYY-MM-DD"},
                     "plan_days": {"type": "integer", "minimum": 1, "maximum": 21},
                     "style": {"type": "string"},
+                    "primary_goal": {"type": "string"},
                 },
             },
             "snapshot": {
@@ -194,7 +191,6 @@ TRAINING_PLAN_SCHEMA: dict[str, Any] = {
                         "signal_id": {"type": "string"},
                         "source": {"type": "string"},
                         "date_range": {"type": "string"},
-                        # keep as string to avoid strict union-type issues
                         "value": {"type": "string"},
                     },
                 },
@@ -208,6 +204,7 @@ def training_plan_output_contract_text() -> str:
     return (
         "Output MUST be a single JSON object (no Markdown, no backticks) matching the training-plan schema.\n"
         "Rules:\n"
+        "- meta.primary_goal MUST match the authoritative primary goal provided in the prompt.\n"
         "- Use only signal_ids that appear in the provided Signal registry.\n"
         "- Every plan day MUST include signal_ids justifying that day.\n"
         "- readiness.signal_ids MUST justify readiness.\n"
