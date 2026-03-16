@@ -10,6 +10,11 @@ from typing import Any, Optional
 import requests
 
 from trailtraining import config
+from trailtraining.util.errors import (
+    ConfigError,
+    DataValidationError,
+    ExternalServiceError,
+)
 
 BASE_URL = os.getenv("INTERVALS_BASE_URL", "https://intervals.icu/api/v1")
 _SESSION = requests.Session()
@@ -46,7 +51,10 @@ def _auth_headers() -> dict[str, str]:
     api_key = _env_str("INTERVALS_API_KEY") or config_api_key_str
 
     if not api_key:
-        raise RuntimeError("Missing INTERVALS_API_KEY (or INTERVALS_ACCESS_TOKEN).")
+        raise ConfigError(
+            message="Missing INTERVALS_API_KEY (or INTERVALS_ACCESS_TOKEN).",
+            hint="Set INTERVALS_API_KEY in your profile env, or run `trailtraining doctor`.",
+        )
 
     import base64
 
@@ -68,8 +76,8 @@ def _request_with_retry(
     for attempt in range(0, 6):
         try:
             resp = session.request(method, url, timeout=30, **kwargs)
-        except (requests.Timeout, requests.ConnectionError) as e:
-            last_err = e
+        except (requests.Timeout, requests.ConnectionError) as err:
+            last_err = err
             time.sleep(min(30, 2**attempt))
             continue
 
@@ -80,13 +88,30 @@ def _request_with_retry(
             continue
 
         if 500 <= resp.status_code <= 599:
+            last_err = ExternalServiceError(
+                message=f"Intervals server error ({resp.status_code}) for {method} {url}",
+                hint=resp.text[:300]
+                if resp.text
+                else "The service may be temporarily unavailable.",
+            )
             time.sleep(min(30, 2**attempt))
             continue
 
-        resp.raise_for_status()
+        if 400 <= resp.status_code <= 499:
+            raise ExternalServiceError(
+                message=f"Intervals request failed with HTTP {resp.status_code}",
+                hint=resp.text[:300] if resp.text else f"{method} {url}",
+            )
+
         return resp
 
-    raise RuntimeError(f"HTTP request failed after retries: {method} {url} ({last_err})")
+    if isinstance(last_err, ExternalServiceError):
+        raise last_err
+
+    raise ExternalServiceError(
+        message=f"Intervals request failed after retries: {method} {url}",
+        hint=str(last_err) if last_err else "Check network access and Intervals availability.",
+    )
 
 
 def fetch_wellness(oldest: str, newest: str) -> list[dict[str, Any]]:
@@ -111,13 +136,15 @@ def fetch_wellness(oldest: str, newest: str) -> list[dict[str, Any]]:
     try:
         data = resp.json()
     except Exception as err:
-        raise RuntimeError(
-            f"Intervals wellness JSON parse failed: {err}. HTTP {resp.status_code}: {resp.text[:500]}"
+        raise ExternalServiceError(
+            message="Intervals wellness JSON parse failed.",
+            hint=f"HTTP {resp.status_code}: {resp.text[:300]}",
         ) from err
 
     if not isinstance(data, list):
-        raise ValueError(
-            f"Unexpected Intervals wellness response (expected list). Got: {type(data)}"
+        raise DataValidationError(
+            message="Unexpected Intervals wellness response.",
+            hint=f"Expected a list, got {type(data).__name__}.",
         )
     return data
 
@@ -126,7 +153,10 @@ def normalize_to_filtered_sleep(entry: dict[str, Any]) -> dict[str, Any]:
     # Date key: Intervals often uses `id` for the day (YYYY-MM-DD)
     day = str(_pick(entry, "id", "day", "date", "calendarDate", default=""))[:10]
     if not day:
-        raise ValueError(f"Wellness entry missing date/id: {entry}")
+        raise DataValidationError(
+            message="Wellness entry missing date/id.",
+            hint=str(entry)[:300],
+        )
 
     sleep_secs = _to_int(_pick(entry, "sleepSecs", "sleep_seconds", "sleepTimeSeconds"))
     resting_hr = _to_int(_pick(entry, "restingHR", "restingHr", "restingHeartRate"))
@@ -161,7 +191,10 @@ def _validate_ymd(s: str, name: str) -> str:
     try:
         date.fromisoformat(s)
     except ValueError as err:
-        raise RuntimeError(f"{name} must be YYYY-MM-DD. Got: {s!r}") from err
+        raise DataValidationError(
+            message=f"{name} must be YYYY-MM-DD.",
+            hint=f"Got {s!r}.",
+        ) from err
     return s
 
 
@@ -193,7 +226,10 @@ def main(*, oldest: Optional[str] = None, newest: Optional[str] = None) -> None:
     oldest_v = _validate_ymd(oldest_raw, "oldest")
 
     if date.fromisoformat(oldest_v) > date.fromisoformat(newest_v):
-        raise RuntimeError(f"oldest must be <= newest (got {oldest_v} > {newest_v})")
+        raise DataValidationError(
+            message="oldest must be <= newest.",
+            hint=f"Got {oldest_v} > {newest_v}.",
+        )
 
     print(f"Fetching Intervals wellness {oldest_v} → {newest_v} ...")
     raw = fetch_wellness(oldest=oldest_v, newest=newest_v)

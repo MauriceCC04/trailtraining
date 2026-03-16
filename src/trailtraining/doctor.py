@@ -4,10 +4,10 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
 
 from trailtraining import config
 from trailtraining.data.strava import default_token_path
+from trailtraining.providers import resolve_wellness_provider
 
 
 def _ok(label: str, msg: str = "") -> None:
@@ -22,48 +22,35 @@ def _bad(label: str, msg: str = "") -> None:
     print(f"❌ {label}" + (f" - {msg}" if msg else ""))
 
 
-def _detect_provider(explicit: Optional[str] = None) -> str:
-    # Normalize
-    v = (explicit or config.WELLNESS_PROVIDER or "auto").strip().lower()
-    if v in {"garmin", "intervals"}:
-        return v
-
-    # auto: prefer Intervals when configured, else Garmin when configured
-    if (os.getenv("INTERVALS_API_KEY") or config.INTERVALS_API_KEY).strip():
-        return "intervals"
-    if config.GARMIN_EMAIL.strip() and config.GARMIN_PASSWORD.strip():
-        return "garmin"
-
-    # fallback (least setup friction)
-    return "intervals"
-
-
 def main() -> None:
     print("TrailTraining doctor\n")
     config.ensure_directories()
 
     profile = os.getenv("TRAILTRAINING_PROFILE", "default")
-    base_dir = Path(config.BASE_DIR)
+    base_dir = Path(config.base_dir())
     _ok("Profile", profile)
     _ok("Base dir", str(base_dir))
 
     issues = 0
 
     # ---- Strava ----
-    if config.STRAVA_ID and config.STRAVA_ID != 0:
+    if config.strava_id() and config.strava_id() != 0:
         _ok("STRAVA_CLIENT_ID set")
     else:
         _bad("STRAVA_CLIENT_ID missing", "Set STRAVA_CLIENT_ID in your profile env.")
         issues += 1
 
-    if config.STRAVA_SECRET.strip():
+    if config.strava_secret():
         _ok("STRAVA_CLIENT_SECRET set")
     else:
-        _bad("STRAVA_CLIENT_SECRET missing", "Set STRAVA_CLIENT_SECRET in your profile env.")
+        _bad(
+            "STRAVA_CLIENT_SECRET missing",
+            "Set STRAVA_CLIENT_SECRET in your profile env.",
+        )
         issues += 1
 
-    if config.STRAVA_REDIRECT_URI.strip():
-        _ok("STRAVA_REDIRECT_URI set", config.STRAVA_REDIRECT_URI)
+    if config.strava_redirect_uri():
+        _ok("STRAVA_REDIRECT_URI set", config.strava_redirect_uri())
     else:
         _warn(
             "STRAVA_REDIRECT_URI missing",
@@ -74,35 +61,46 @@ def main() -> None:
     if token_path.exists():
         _ok("Strava token", str(token_path))
     else:
-        _warn("Strava token not found", f"Run: trailtraining --profile {profile} auth-strava")
+        _warn(
+            "Strava token not found",
+            f"Run: trailtraining --profile {profile} auth-strava",
+        )
 
     # ---- Wellness provider ----
-    provider = _detect_provider()
-    _ok("Wellness provider", provider)
+    resolution = resolve_wellness_provider()
+    provider = resolution.provider
+    _ok(
+        "Wellness provider",
+        f"{provider} (requested={resolution.requested}, source={resolution.source})",
+    )
 
     if provider == "intervals":
-        if (os.getenv("INTERVALS_API_KEY") or config.INTERVALS_API_KEY).strip():
+        if config.intervals_api_key():
             _ok("INTERVALS_API_KEY set")
         else:
-            _bad("INTERVALS_API_KEY missing", "Set INTERVALS_API_KEY (or set provider to garmin).")
+            _bad(
+                "INTERVALS_API_KEY missing",
+                "Set INTERVALS_API_KEY (or set provider to garmin).",
+            )
             issues += 1
 
-        athlete_id = (
-            os.getenv("INTERVALS_ATHLETE_ID") or config.INTERVALS_ATHLETE_ID or ""
-        ).strip()
+        athlete_id = config.intervals_athlete_id()
         if athlete_id:
             _ok("INTERVALS_ATHLETE_ID", athlete_id)
         else:
-            _warn("INTERVALS_ATHLETE_ID not set", "Default '0' may still work (current athlete).")
+            _warn(
+                "INTERVALS_ATHLETE_ID not set",
+                "Default '0' may still work (current athlete).",
+            )
 
     if provider == "garmin":
-        if config.GARMIN_EMAIL.strip():
+        if config.garmin_email():
             _ok("GARMIN_EMAIL set")
         else:
             _bad("GARMIN_EMAIL missing")
             issues += 1
 
-        if config.GARMIN_PASSWORD.strip():
+        if config.garmin_password():
             _ok("GARMIN_PASSWORD set")
         else:
             _bad("GARMIN_PASSWORD missing")
@@ -118,7 +116,7 @@ def main() -> None:
         else:
             _bad(
                 "GarminDb CLI missing",
-                "Install GarminDb and ensure garmindb_cli is on PATH (or set GARMINGDB_CLI).",
+                "Install GarminDb and ensure garmindb_cli is on PATH " "(or set GARMINGDB_CLI).",
             )
             issues += 1
 

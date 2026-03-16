@@ -1,6 +1,7 @@
 # src/trailtraining/forecast/forecast.py
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -17,10 +18,18 @@ from trailtraining.contracts import (
     ForecastRisk,
 )
 from trailtraining.metrics.training_load import day_training_load_hours
+from trailtraining.providers import resolve_wellness_provider
+from trailtraining.util.errors import ArtifactError, DataValidationError
 from trailtraining.util.state import load_json, save_json
+
+log = logging.getLogger(__name__)
 
 ReadinessStatus = Literal["primed", "steady", "fatigued"]
 RiskLevel = Literal["low", "moderate", "high"]
+
+
+def _detect_provider(explicit: Optional[str] = None) -> str:
+    return resolve_wellness_provider(explicit).provider
 
 
 def _sleep_hours(day_obj: dict[str, Any]) -> Optional[float]:
@@ -192,11 +201,17 @@ def compute_readiness_and_risk(
     rollups: Optional[dict[str, Any]] = None,
 ) -> ForecastResult:
     if not combined:
-        raise ValueError("combined_summary.json is empty")
+        raise DataValidationError(
+            message="combined_summary.json is empty",
+            hint="Run the earlier pipeline steps first, or verify combine output.",
+        )
 
     last_d = _as_date(combined[-1].get("date", ""))
     if not last_d:
-        raise ValueError("Could not parse last date from combined_summary.json")
+        raise DataValidationError(
+            message="Could not parse last date from combined_summary.json",
+            hint="Expected the last item to contain a valid ISO date string in 'date'.",
+        )
 
     w7 = _window_days(combined, last_d, 7)
     w28 = _window_days(combined, last_d, 28)
@@ -223,29 +238,51 @@ def compute_readiness_and_risk(
 
     last7_load = roll7[-1] if roll7 else None
 
-    # NEW: prefer rollups for the last-7 load if present and aligned (avoids stale rollups)
     used_rollups_last7 = False
-    if isinstance(rollups, dict):
-        try:
-            windows = rollups.get("windows") or {}
-            w7r = windows.get("7")
-            if isinstance(w7r, dict):
-                end_date = w7r.get("end_date")
-                if isinstance(end_date, str):
-                    end_date_s = end_date[:10]
-                else:
-                    end_date_s = str(end_date)[:10] if end_date is not None else ""
+    rollups_warning: str | None = None
 
-                if end_date_s == last_d.isoformat():
+    if isinstance(rollups, dict):
+        windows = rollups.get("windows")
+        if not isinstance(windows, dict):
+            rollups_warning = (
+                "combined_rollups.json is present but missing a valid 'windows' object"
+            )
+        else:
+            w7r = windows.get("7")
+            if w7r is None:
+                rollups_warning = "combined_rollups.json is present but missing windows['7']"
+            elif not isinstance(w7r, dict):
+                rollups_warning = "combined_rollups.json windows['7'] is not an object"
+            else:
+                end_date = w7r.get("end_date")
+                end_date_s = end_date[:10] if isinstance(end_date, str) else ""
+                if end_date_s != last_d.isoformat():
+                    rollups_warning = (
+                        "combined_rollups.json windows['7'].end_date does not match "
+                        f"combined_summary.json last date ({end_date_s!r} != {last_d.isoformat()!r})"
+                    )
+                else:
                     acts = w7r.get("activities")
-                    if isinstance(acts, dict):
+                    if not isinstance(acts, dict):
+                        rollups_warning = (
+                            "combined_rollups.json windows['7'].activities is missing or invalid"
+                        )
+                    else:
                         v = acts.get("total_training_load_hours")
-                        if isinstance(v, (int, float)):
+                        if not isinstance(v, (int, float)):
+                            rollups_warning = (
+                                "combined_rollups.json windows['7'].activities."
+                                "total_training_load_hours is missing or invalid"
+                            )
+                        else:
                             last7_load = float(v)
                             used_rollups_last7 = True
-        except Exception:
-            # If rollups shape is unexpected, silently fall back to computed rolling sum.
-            pass
+
+    if rollups_warning:
+        log.warning(
+            "%s. Falling back to rolling sum computed from combined_summary.json.",
+            rollups_warning,
+        )
 
     # Baseline load distribution: prior rolling windows (exclude the most recent window)
     prior_roll7 = [x for x in roll7[:-1] if x is not None]
@@ -405,14 +442,27 @@ def run_forecasts(
 
     combined = load_json(summary_p, default=[])
     if not isinstance(combined, list):
-        raise ValueError("combined_summary.json must be a list")
+        raise ArtifactError(
+            message="combined_summary.json must be a list",
+            hint=f"Got {type(combined).__name__} instead.",
+        )
 
     # NEW: load rollups if present and pass into compute_readiness_and_risk
     rollups_p = base / "combined_rollups.json"
     rollups: Optional[dict[str, Any]] = None
     if rollups_p.exists():
         r = load_json(rollups_p, default=None)
-        rollups = r if isinstance(r, dict) else None
+        if r is None:
+            rollups = None
+        elif isinstance(r, dict):
+            rollups = r
+        else:
+            log.warning(
+                "combined_rollups.json exists but is a %s, not an object. "
+                "Falling back to rolling sums from combined_summary.json.",
+                type(r).__name__,
+            )
+            rollups = None
 
     fr = compute_readiness_and_risk(combined, rollups=rollups)
 

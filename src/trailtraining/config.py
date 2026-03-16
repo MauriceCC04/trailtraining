@@ -11,53 +11,122 @@ def _env(name: str, default: str = "") -> str:
     return (os.getenv(name, default) or "").strip()
 
 
-# Prefer TRAILTRAINING_BASE_DIR (documented in README), but keep compatibility with TRAILTRAINING_DATA_DIR.
-_base = _env("TRAILTRAINING_BASE_DIR") or _env("TRAILTRAINING_DATA_DIR", "~/trailtraining-data")
-BASE_DIR_PATH = Path(_base).expanduser().resolve()
+# ---- Runtime getters -----------------------------------------------------
 
-# Legacy string variables used across the repo
-BASE_DIR = str(BASE_DIR_PATH)
 
-RHR_DIRECTORY = os.path.join(BASE_DIR, "RHR")
-SLEEP_DIRECTORY = os.path.join(BASE_DIR, "Sleep")
-FIT_DIRECTORY = os.path.join(BASE_DIR, "FitFiles")
+def base_dir_path() -> Path:
+    base = _env("TRAILTRAINING_BASE_DIR") or _env("TRAILTRAINING_DATA_DIR", "~/trailtraining-data")
+    return Path(base).expanduser().resolve()
 
-PROCESSING_DIRECTORY = os.path.join(BASE_DIR, "processing")
-PROMPTING_DIRECTORY = os.path.join(BASE_DIR, "prompting")
 
-# Credentials (read from environment)
-STRAVA_ID = int(_env("STRAVA_CLIENT_ID", "0") or "0")
-STRAVA_SECRET = _env("STRAVA_CLIENT_SECRET", "")
-STRAVA_REDIRECT_URI = _env("STRAVA_REDIRECT_URI", "http://127.0.0.1:5000/authorization")
+def base_dir() -> str:
+    return str(base_dir_path())
 
-GARMIN_EMAIL = _env("GARMIN_EMAIL", "")
-GARMIN_PASSWORD = _env("GARMIN_PASSWORD", "")
 
-# intervals:
-# ---- Intervals.icu (wellness: sleep + HR) ----
-# Personal/single-user integration (Intervals Settings → API Access)
-INTERVALS_API_KEY = os.environ.get("INTERVALS_API_KEY", "")
-INTERVALS_ATHLETE_ID = os.environ.get("INTERVALS_ATHLETE_ID", "0")  # "0" = current athlete
+def rhr_directory() -> str:
+    return os.path.join(base_dir(), "RHR")
 
-# Optional: if you later switch to OAuth (multi-user/public app)
-INTERVALS_CLIENT_ID = os.environ.get("INTERVALS_CLIENT_ID", "")
-INTERVALS_CLIENT_SECRET = os.environ.get("INTERVALS_CLIENT_SECRET", "")
-INTERVALS_REDIRECT_URI = os.environ.get("INTERVALS_REDIRECT_URI", "")
 
-# Optional: let your app choose the wellness provider
-WELLNESS_PROVIDER = _env("TRAILTRAINING_WELLNESS_PROVIDER") or _env(
-    "WELLNESS_PROVIDER", "intervals"
-)
+def sleep_directory() -> str:
+    return os.path.join(base_dir(), "Sleep")
+
+
+def fit_directory() -> str:
+    return os.path.join(base_dir(), "FitFiles")
+
+
+def processing_directory() -> str:
+    return os.path.join(base_dir(), "processing")
+
+
+def prompting_directory() -> str:
+    return os.path.join(base_dir(), "prompting")
+
+
+def strava_id() -> int:
+    return int(_env("STRAVA_CLIENT_ID", "0") or "0")
+
+
+def strava_secret() -> str:
+    return _env("STRAVA_CLIENT_SECRET", "")
+
+
+def strava_redirect_uri() -> str:
+    return _env("STRAVA_REDIRECT_URI", "http://127.0.0.1:5000/authorization")
+
+
+def garmin_email() -> str:
+    return _env("GARMIN_EMAIL", "")
+
+
+def garmin_password() -> str:
+    return _env("GARMIN_PASSWORD", "")
+
+
+def intervals_api_key() -> str:
+    return _env("INTERVALS_API_KEY", "")
+
+
+def intervals_athlete_id() -> str:
+    return _env("INTERVALS_ATHLETE_ID", "0")  # "0" = current athlete
+
+
+def intervals_client_id() -> str:
+    return _env("INTERVALS_CLIENT_ID", "")
+
+
+def intervals_client_secret() -> str:
+    return _env("INTERVALS_CLIENT_SECRET", "")
+
+
+def intervals_redirect_uri() -> str:
+    return _env("INTERVALS_REDIRECT_URI", "")
+
+
+def wellness_provider_setting() -> str:
+    # Prefer the namespaced env var, but keep compatibility with WELLNESS_PROVIDER.
+    # Default to "auto" so provider resolution can inspect the configured credentials.
+    return _env("TRAILTRAINING_WELLNESS_PROVIDER") or _env("WELLNESS_PROVIDER", "auto")
 
 
 def ensure_directories() -> None:
-    """Create all expected directories."""
+    """Create all expected directories using runtime configuration."""
     for d in [
-        BASE_DIR,
-        RHR_DIRECTORY,
-        SLEEP_DIRECTORY,
-        FIT_DIRECTORY,
-        PROCESSING_DIRECTORY,
-        PROMPTING_DIRECTORY,
+        base_dir(),
+        rhr_directory(),
+        sleep_directory(),
+        fit_directory(),
+        processing_directory(),
+        prompting_directory(),
     ]:
         os.makedirs(d, exist_ok=True)
+
+
+# ---- Legacy snapshot constants -------------------------------------------
+# Keep these for backward compatibility with the rest of the repo.
+# Runtime-sensitive paths/credentials should use the getter functions above.
+
+BASE_DIR_PATH = base_dir_path()
+BASE_DIR = base_dir()
+
+RHR_DIRECTORY = rhr_directory()
+SLEEP_DIRECTORY = sleep_directory()
+FIT_DIRECTORY = fit_directory()
+
+PROCESSING_DIRECTORY = processing_directory()
+PROMPTING_DIRECTORY = prompting_directory()
+
+STRAVA_ID = strava_id()
+STRAVA_SECRET = strava_secret()
+STRAVA_REDIRECT_URI = strava_redirect_uri()
+
+GARMIN_EMAIL = garmin_email()
+GARMIN_PASSWORD = garmin_password()
+
+INTERVALS_API_KEY = intervals_api_key()
+INTERVALS_ATHLETE_ID = intervals_athlete_id()
+INTERVALS_CLIENT_ID = intervals_client_id()
+INTERVALS_CLIENT_SECRET = intervals_client_secret()
+INTERVALS_REDIRECT_URI = intervals_redirect_uri()
+
+WELLNESS_PROVIDER = wellness_provider_setting()

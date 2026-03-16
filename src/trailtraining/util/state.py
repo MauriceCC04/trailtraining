@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Union
 
+from trailtraining.util.errors import ArtifactError
+
 PathLike = Union[str, Path]
 
 
@@ -15,7 +17,18 @@ def load_json(path: PathLike, default: Any = None) -> Any:
     p = Path(path)
     if not p.exists():
         return default
-    return json.loads(p.read_text(encoding="utf-8"))
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as err:
+        raise ArtifactError(
+            message=f"Invalid JSON in {p}",
+            hint=f"Parse error at line {err.lineno}, column {err.colno}: {err.msg}",
+        ) from err
+    except OSError as err:
+        raise ArtifactError(
+            message=f"Could not read {p}",
+            hint=str(err),
+        ) from err
 
 
 def atomic_write_text(path: PathLike, text: str) -> None:
