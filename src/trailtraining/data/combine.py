@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Optional
 
 from trailtraining import config
+from trailtraining.data.personal_profile import build_formatted_personal_profile
 from trailtraining.metrics.training_load import activity_training_load_hours
 from trailtraining.util.state import load_json, save_json
 
@@ -225,6 +226,8 @@ def main() -> None:
     out_summary = os.path.join(config.PROMPTING_DIRECTORY, "combined_summary.json")
     save_json(out_summary, combined, compact=True)
 
+    out_rollups = os.path.join(config.PROMPTING_DIRECTORY, "combined_rollups.json")
+
     # Rollups (7d + 28d) ending at the most recent date we have
     if combined:
         last_date = _as_date(combined[-1]["date"])
@@ -236,11 +239,18 @@ def main() -> None:
                     "28": _compute_rollup(combined, end_date=last_date, window_days=28),
                 },
             }
-            out_rollups = os.path.join(config.PROMPTING_DIRECTORY, "combined_rollups.json")
             save_json(out_rollups, rollups, compact=True)
 
+    personal_path = os.path.join(config.PROMPTING_DIRECTORY, "formatted_personal_data.json")
+    build_formatted_personal_profile(
+        combined_summary_path=out_summary,
+        output_path=personal_path,
+        base_personal_path=personal_path,
+    )
+
     print(f"Wrote: {out_summary}")
-    print(f"Wrote: {os.path.join(config.PROMPTING_DIRECTORY, 'combined_rollups.json')}")
+    print(f"Wrote: {out_rollups}")
+    print(f"Wrote: {personal_path}")
 
 
 if __name__ == "__main__":

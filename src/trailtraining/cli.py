@@ -366,7 +366,7 @@ def main(argv=None):
     coach_p.add_argument(
         "--prompt",
         default="training-plan",
-        choices=["training-plan", "recovery-status", "meal-plan"],
+        choices=["training-plan", "recovery-status", "meal-plan", "session-review"],
     )
     coach_p.add_argument("--model", default=None)
     coach_p.add_argument(
