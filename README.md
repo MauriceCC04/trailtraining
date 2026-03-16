@@ -141,6 +141,7 @@ Intervals.icu ────────┘                                 ├─
                                                                     ├──► coach_brief_training-plan.json/.txt
                                                                     └──► coach_brief_<prompt>.md
 
+```
 ## What the project does
 
 `trailtraining` can:
