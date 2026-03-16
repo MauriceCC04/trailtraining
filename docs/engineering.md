@@ -5,12 +5,13 @@ This document explains the architecture and design choices behind `trailtraining
 The current system is no longer just a data-to-plan generator. It is now a local artifact pipeline that can:
 
 1. ingest activity and optional recovery data
-2. compute deterministic training context
-3. generate structured coaching artifacts
-4. evaluate those artifacts deterministically
-5. optionally evaluate them qualitatively with a second model
-6. revise the original plan from the evaluation report
-7. re-evaluate the revised artifact
+2. synthesize a durable athlete profile from merged local artifacts
+3. compute deterministic training context
+4. generate structured coaching artifacts
+5. evaluate those artifacts deterministically
+6. optionally evaluate them qualitatively with a second model
+7. revise the original plan from the evaluation report
+8. re-evaluate the revised artifact
 
 The project should be read as an engineering system, not just a prompt wrapper.
 
@@ -96,7 +97,7 @@ The current pipeline is:
 │                                INPUT LAYER                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  Strava activity history                                                   │
-│  GarminDB wellness data (optional)                                         │
+│  GarminDB wellness + biometrics (optional)                                 │
 │  Intervals.icu wellness data (optional)                                    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
@@ -106,7 +107,10 @@ The current pipeline is:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  fetch-strava / fetch-garmin / fetch-intervals                             │
 │  combine                                                                    │
-│  outputs: combined_summary.json, combined_rollups.json                     │
+│  outputs:                                                                   │
+│    - combined_summary.json                                                  │
+│    - combined_rollups.json                                                  │
+│    - formatted_personal_data.json                                           │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
@@ -123,45 +127,10 @@ The current pipeline is:
 │                              GENERATION LAYER                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  coach --prompt training-plan                                              │
-│  output: coach_brief_training-plan.json / .txt                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         DETERMINISTIC EVALUATION LAYER                     │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  eval-coach                                                                 │
-│  constraint checks, scoring, violation reporting                            │
-│  output: eval_report.json                                                   │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                           ┌──────────┴──────────┐
-                           │                     │
-                           ▼                     ▼
-┌────────────────────────────────────┐  ┌────────────────────────────────────┐
-│  score / grade / violations         │  │     SOFT EVALUATION LAYER         │
-│  deterministic quality signals      │  ├────────────────────────────────────┤
-│                                      │  │  eval-coach --soft-eval           │
-│                                      │  │  second-model judge               │
-│                                      │  │  rubric scores + markers          │
-└────────────────────────────────────┘  │  strengths / concerns / fixes      │
-                                        └────────────────────────────────────┘
-                                                     │
-                                                     ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                               REVISION LAYER                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  revise-plan                                                                │
-│  inputs: original training plan + eval_report.json                          │
-│  outputs: revised-plan.json / revised-plan.txt                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           RE-EVALUATION / ITERATION                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  eval-coach --input revised-plan.json --soft-eval                          │
-│  compare revised artifact against original                                  │
+│  coach --prompt recovery-status                                            │
+│  coach --prompt meal-plan                                                  │
+│  coach --prompt session-review                                             │
+│  outputs: structured plan JSON/TXT or markdown coach briefs                │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -182,6 +151,22 @@ This is the main source for:
 - distance
 - elevation
 - training-load rollups
+
+### Athlete profile data
+
+`formatted_personal_data.json` is now built from multiple sources:
+
+- Garmin biometrics when available
+- merged activity history from the combined artifact set
+
+This lets the system derive stable context such as:
+
+- claimed years in sport based on first observed activity
+- top sports and primary sport family
+- historical peak 7d / 28d capacities
+- running-family versus all-sport background
+
+This is intentionally deterministic and inspectable rather than freeform LLM inference.
 
 ### Recovery and wellness data
 
@@ -212,9 +197,13 @@ processing/
 prompting/
 ├── combined_summary.json
 ├── combined_rollups.json
+├── formatted_personal_data.json
 ├── readiness_and_risk_forecast.json
 ├── coach_brief_training-plan.json
 ├── coach_brief_training-plan.txt
+├── coach_brief_recovery-status.md
+├── coach_brief_meal-plan.md
+├── coach_brief_session-review.md
 ├── eval_report.json
 ├── revised-plan.json
 └── revised-plan.txt
@@ -255,6 +244,43 @@ The forecast layer compares recent windows to longer baselines and emits practic
 
 These are operational signals used to shape prompting and later evaluation.
 
+## Athlete profile synthesis
+
+A newer architectural decision is to treat `formatted_personal_data.json` as a merged athlete-profile artifact rather than a Garmin-only byproduct.
+
+### Why this changed
+
+Previously, Garmin users could get useful biometric profile data while Intervals-only users often ended up with a near-empty personal profile.
+
+That was a bad fit for prompting because athlete background materially affects interpretation:
+
+- low recent load can mean novice
+- low recent load can also mean experienced but detrained
+- multisport background changes how distance, elevation, and load should be interpreted
+
+### Current design
+
+`combine` now rebuilds `formatted_personal_data.json` from merged local artifacts.
+
+That profile can include:
+
+- provider biometrics when available
+- activity-derived sport participation history
+- top sports over recent and longer windows
+- historical capacities over 90d and 365d windows
+- peak 7d and 28d metrics for load, distance, and elevation
+- all-sport and running-family capacity context
+
+### Important constraint
+
+The athlete profile is contextual, not prescriptive.
+
+The generation layer should use it to understand background and progression potential, but near-term recommendations should still be anchored to:
+
+- recent 7d / 28d load
+- current recovery
+- deterministic forecast outputs
+
 ## Generation layer
 
 Once local context exists, the generation layer assembles a structured prompt and produces coaching outputs.
@@ -264,10 +290,21 @@ Examples include:
 - weekly training plans
 - recovery summaries
 - meal-planning support
+- most-recent-session reviews
 
-The important engineering decision is that the model is asked to operate on a structured local context rather than freeform user prose alone.
+A key engineering decision is that the model does not need years of raw history in the prompt.
 
-For training plans, the generated artifact is a schema-constrained JSON document with a sibling human-readable `.txt` rendering.
+Instead, it receives:
+
+- recent detailed daily context
+- recent rollups
+- deterministic readiness / risk outputs
+- a durable athlete-profile artifact
+
+This keeps prompts smaller while preserving the difference between:
+- novice athletes with low recent load
+- experienced athletes who are rebuilding
+- multisport athletes whose current running load may not match total training load
 
 ## Deterministic evaluation layer
 

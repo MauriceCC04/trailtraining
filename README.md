@@ -20,14 +20,28 @@ This is not a chatbot wrapper around Strava. It is an auditable training-plannin
 
 ## What changed recently
 
-The current version now supports a full revision loop:
+The current version now supports a richer athlete-profile and review flow:
 
-1. generate `coach_brief_training-plan.json`
-2. evaluate it with `eval-coach`
-3. optionally add a second-model qualitative assessment via `--soft-eval`
-4. revise the original plan into `revised-plan.json`
-5. render `revised-plan.txt`
-6. re-evaluate the revised plan
+1. `combine` now rebuilds `formatted_personal_data.json` from merged local artifacts
+2. that profile can include:
+   - Garmin biometrics when available
+   - deterministic activity-derived sport history
+   - top sports over recent and longer windows
+   - historical capacity peaks (7d / 28d, including distance, elevation, and load)
+3. Intervals-only users no longer get an almost-empty personal profile by default
+4. the coach now supports a new `session-review` prompt for reviewing the most recent completed session in recent context
+5. the revision loop remains:
+   - generate `coach_brief_training-plan.json`
+   - evaluate it with `eval-coach`
+   - optionally add a second-model qualitative assessment via `--soft-eval`
+   - revise the original plan into `revised-plan.json`
+   - render `revised-plan.txt`
+   - re-evaluate the revised plan
+
+This makes the system better at distinguishing:
+- currently low-load athletes who are genuinely new
+- currently low-load athletes who are experienced but rebuilding
+- running-focused versus multisport backgrounds
 
 It also hardens soft evaluation so imperfect judge-model outputs can still produce useful reports by repairing missing marker results, deriving rubric scores from markers when needed, and backfilling qualitative feedback lists.
 - **Independent critique is better than self-grading.** The revision loop is designed so that, when possible, a different model family critiques and revises the original plan. In practice, that means GPT can generate the first-pass plan while Claude evaluates and revises it.
@@ -114,37 +128,18 @@ If you add revision-loop demo assets, this list should also include:
 Strava ───────────────┐
                       │
 GarminDB /            ├──► local ingestion ───► combine ───► combined_summary.json
-Intervals.icu ────────┘                                 │
-                                                        ▼
-                                            deterministic forecast
-                                     (readiness + overreach context)
-                                                        │
-                                                        ▼
-                                           coach --prompt training-plan
-                                                        │
-                                                        ▼
-                                   coach_brief_training-plan.json/.txt
-                                                        │
-                                                        ▼
-                                     eval-coach (deterministic checks)
-                                                        │
-                                  ┌─────────────────────┴─────────────────────┐
-                                  │                                           │
-                                  ▼                                           ▼
-                      eval_report.json                            eval-coach --soft-eval
-                 (score / grade / violations)                  (second-model qualitative judge)
-                                  │                                           │
-                                  └─────────────────────┬─────────────────────┘
-                                                        ▼
-                                              revise-plan command
-                           (original plan + eval_report.json -> revised artifact)
-                                                        │
-                                                        ▼
-                                         revised-plan.json / revised-plan.txt
-                                                        │
-                                                        ▼
-                                     eval-coach --input revised-plan.json
-```
+Intervals.icu ────────┘                                 ├──► combined_rollups.json
+                                                        └──► formatted_personal_data.json
+                                                                    │
+                                                                    ▼
+                                                        deterministic forecast
+                                                 (readiness + overreach context)
+                                                                    │
+                                                                    ▼
+                                  coach --prompt training-plan | recovery-status | meal-plan | session-review
+                                                                    │
+                                                                    ├──► coach_brief_training-plan.json/.txt
+                                                                    └──► coach_brief_<prompt>.md
 
 ## What the project does
 
@@ -160,6 +155,10 @@ Intervals.icu ────────┘                                 │
 - revise a generated training plan from its evaluation report
 - render machine-readable and human-readable plan artifacts
 - support isolated multi-profile setups with `--profile`
+- derive a deterministic athlete profile from merged activity history
+- merge Garmin biometrics into that profile when available
+- support activity-derived context even for Intervals-only users
+- review the latest completed session with `coach --prompt session-review`
 
 ## Why this project exists
 
@@ -187,6 +186,8 @@ That makes it closer to a decision-support system than a generic AI wrapper.
 The pipeline is designed to degrade gracefully when recent recovery telemetry is sparse.
 
 It can run on activity-only data and improves when recent sleep, resting HR, or HRV data are available. When recovery data are missing, forecasts and generated plans should be interpreted more conservatively.
+
+If Garmin biometrics are available, they are merged into `formatted_personal_data.json`. If they are not, the system still derives useful athlete context from activity history, including sport mix, claimed years in sport (based on first observed activity), and historical capacity peaks. This is especially useful for Intervals-only setups, where the personal profile is no longer just an empty stub.
 
 ## Plan evaluation and soft evaluation
 
@@ -350,8 +351,11 @@ trailtraining --profile alice run-all
 # 4. Forecast deterministic readiness / risk
 trailtraining --profile alice forecast
 
-# 5. Generate first-pass training plan
+# 5a. Generate first-pass training plan
 trailtraining --profile alice coach --prompt training-plan
+
+# 5b. Review the most recent completed session
+trailtraining --profile alice coach --prompt session-review
 
 # 6. Evaluate it with deterministic + soft checks
 trailtraining --profile alice eval-coach --soft-eval
@@ -381,13 +385,36 @@ Common prompting artifacts:
 prompting/
 ├── combined_summary.json
 ├── combined_rollups.json
+├── formatted_personal_data.json
 ├── readiness_and_risk_forecast.json
 ├── coach_brief_training-plan.json
 ├── coach_brief_training-plan.txt
+├── coach_brief_recovery-status.md
+├── coach_brief_meal-plan.md
+├── coach_brief_session-review.md
 ├── eval_report.json
 ├── revised-plan.json
 └── revised-plan.txt
 ```
+## Athlete profile artifact
+
+`formatted_personal_data.json` is the durable athlete-profile artifact used by the coach.
+
+It can combine:
+
+- Garmin-derived biometrics when available
+- deterministic activity-derived sport history
+- top sports over recent and longer windows
+- historical 7d / 28d peak capacities
+- running-family and all-sport capacity context
+
+This artifact is designed to give the LLM background context without forcing it to read years of raw day-by-day history.
+
+Important design rule:
+
+- recent 7d / 28d load and current recovery drive near-term recommendations
+- historical profile informs interpretation and progression potential
+- historical peaks are context, not permission to prescribe aggressively
 
 These artifacts are intended to answer questions like:
 
@@ -432,6 +459,9 @@ trailtraining --profile alice run-all
 trailtraining --profile alice run-all-intervals
 trailtraining --profile alice forecast
 trailtraining --profile alice coach --prompt training-plan
+trailtraining --profile alice coach --prompt recovery-status
+trailtraining --profile alice coach --prompt meal-plan
+trailtraining --profile alice coach --prompt session-review
 trailtraining --profile alice eval-coach --input <path>
 trailtraining --profile alice eval-coach --soft-eval
 trailtraining --profile alice revise-plan
