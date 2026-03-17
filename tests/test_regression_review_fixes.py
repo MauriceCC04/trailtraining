@@ -126,9 +126,17 @@ def test_combine_main_reports_skipped_rollups_when_no_combined_data(
     prompting.mkdir()
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(combine_mod.config, "ensure_directories", lambda: None)
-        mp.setattr(combine_mod.config, "PROCESSING_DIRECTORY", str(processing))
-        mp.setattr(combine_mod.config, "PROMPTING_DIRECTORY", str(prompting))
+        mp.setattr(combine_mod.config, "ensure_directories", lambda runtime=None: None)
+        mp.setattr(
+            combine_mod.config,
+            "current",
+            lambda: types.SimpleNamespace(
+                paths=types.SimpleNamespace(
+                    processing_directory=processing,
+                    prompting_directory=prompting,
+                )
+            ),
+        )
         mp.setattr(combine_mod, "build_formatted_personal_profile", lambda **kwargs: None)
 
         combine_mod.main()

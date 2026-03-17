@@ -192,6 +192,8 @@ class SoftAssessmentArtifact(StrictModel):
     strengths: list[str] = Field(default_factory=list)
     concerns: list[str] = Field(default_factory=list)
     suggested_improvements: list[str] = Field(default_factory=list)
+    repaired: bool = False
+    derived_fields: list[str] = Field(default_factory=list)
 
 
 class EvaluationReportArtifact(StrictModel):

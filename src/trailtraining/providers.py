@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from trailtraining import config
+from trailtraining.util.errors import ConfigError
 
 ProviderName = Literal["garmin", "intervals"]
 RequestedProvider = Literal["auto", "garmin", "intervals"]
@@ -56,7 +57,14 @@ def resolve_wellness_provider(explicit: str | None = None) -> ProviderResolution
     elif g_ready:
         provider = "garmin"
     else:
-        provider = "intervals"
+        raise ConfigError(
+            message="No wellness provider is configured.",
+            hint=(
+                "Configure Intervals via INTERVALS_API_KEY, or Garmin via "
+                "GARMIN_EMAIL and GARMIN_PASSWORD, or set "
+                "TRAILTRAINING_WELLNESS_PROVIDER explicitly."
+            ),
+        )
 
     return ProviderResolution(
         provider=provider,

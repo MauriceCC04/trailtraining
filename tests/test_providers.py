@@ -1,5 +1,6 @@
 # tests/test_providers.py
 
+import pytest
 from trailtraining.providers import resolve_wellness_provider
 
 
@@ -49,8 +50,9 @@ def test_auto_uses_garmin_when_intervals_missing(monkeypatch):
     assert res.requested == "auto"
 
 
-def test_auto_falls_back_to_intervals_when_nothing_configured(monkeypatch):
+def test_auto_raises_when_nothing_configured(monkeypatch):
+    from trailtraining.util.errors import ConfigError
+
     clear_env(monkeypatch)
-    res = resolve_wellness_provider()
-    assert res.provider == "intervals"
-    assert res.requested == "auto"
+    with pytest.raises(ConfigError, match="No wellness provider is configured"):
+        resolve_wellness_provider()

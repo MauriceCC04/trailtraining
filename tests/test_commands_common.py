@@ -21,6 +21,22 @@ def test_run_logs_and_exits_on_unhandled_exception(caplog):
     assert "Unhandled error" in caplog.text
 
 
+def test_run_formats_trailtraining_errors(capfd):
+    from trailtraining.util.errors import ConfigError
+
+    with pytest.raises(SystemExit) as exc:
+        common._run(
+            lambda: (_ for _ in ()).throw(
+                ConfigError(message="bad config", hint="set ENV", exit_code=2)
+            )
+        )
+
+    assert exc.value.code == 2
+    err = capfd.readouterr().err
+    assert "Error: bad config" in err
+    assert "Hint: set ENV" in err
+
+
 def test_env_truthy_and_load_env_file(monkeypatch, tmp_path):
     monkeypatch.delenv("TT_FLAG", raising=False)
     assert common._env_truthy("TT_FLAG", default=True) is True

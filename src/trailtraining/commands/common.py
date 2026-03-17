@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+from trailtraining.util.errors import TrailTrainingError
+
 log = logging.getLogger(__name__)
 
 
@@ -14,9 +16,15 @@ def _run(func: Callable[[], None]) -> None:
         func()
     except SystemExit:
         raise
-    except Exception:
+    except TrailTrainingError as err:
+        log.error("%s", err.message)
+        print(f"Error: {err.message}", file=sys.stderr)
+        if err.hint:
+            print(f"Hint: {err.hint}", file=sys.stderr)
+        raise SystemExit(err.exit_code) from err
+    except Exception as err:
         log.exception("Unhandled error")
-        sys.exit(1)
+        raise SystemExit(1) from err
 
 
 def _env_truthy(name: str, default: bool = False) -> bool:

@@ -1,4 +1,3 @@
-# src/trailtraining/pipelines/intervals.py
 from __future__ import annotations
 
 import json
@@ -46,9 +45,8 @@ def _auth_headers() -> dict[str, str]:
     if bearer:
         return {"Authorization": f"Bearer {bearer}"}
 
-    config_api_key = getattr(config, "INTERVALS_API_KEY", "")
-    config_api_key_str = config_api_key.strip() if isinstance(config_api_key, str) else ""
-    api_key = _env_str("INTERVALS_API_KEY") or config_api_key_str
+    runtime = config.current()
+    api_key = _env_str("INTERVALS_API_KEY") or runtime.intervals_api_key
 
     if not api_key:
         raise ConfigError(
@@ -65,17 +63,13 @@ def _auth_headers() -> dict[str, str]:
 def _request_with_retry(
     session: requests.Session, method: str, url: str, **kwargs: Any
 ) -> requests.Response:
-    """Delegate to shared retry utility with Intervals-specific service name."""
     return request_with_retry(session, method, url, service_name="Intervals.icu", **kwargs)
 
 
 def fetch_wellness(oldest: str, newest: str) -> list[dict[str, Any]]:
     athlete_id_env = _env_str("INTERVALS_ATHLETE_ID")
-    athlete_id_cfg = getattr(config, "INTERVALS_ATHLETE_ID", "0")
-    athlete_id_cfg_str = (
-        athlete_id_cfg.strip() if isinstance(athlete_id_cfg, str) else str(athlete_id_cfg)
-    )
-    athlete_id = athlete_id_env or athlete_id_cfg_str or "0"
+    runtime = config.current()
+    athlete_id = athlete_id_env or runtime.intervals_athlete_id or "0"
 
     url = f"{BASE_URL}/athlete/{athlete_id}/wellness"
     params = {"oldest": oldest, "newest": newest}
@@ -124,9 +118,10 @@ def normalize_to_filtered_sleep(entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def ensure_personal_stub() -> None:
-    out_path = os.path.join(config.PROMPTING_DIRECTORY, "formatted_personal_data.json")
-    if os.path.exists(out_path):
+def ensure_personal_stub(runtime: Optional[config.RuntimeConfig] = None) -> None:
+    runtime = runtime or config.current()
+    out_path = runtime.paths.prompting_directory / "formatted_personal_data.json"
+    if out_path.exists():
         return
 
     stub: dict[str, dict[str, Any]] = {
@@ -151,7 +146,9 @@ def _validate_ymd(s: str, name: str) -> str:
 
 
 def main(*, oldest: Optional[str] = None, newest: Optional[str] = None) -> None:
-    config.ensure_directories()
+    runtime = config.current()
+    config.ensure_directories(runtime)
+    paths = runtime.paths
 
     newest_raw = (
         newest
@@ -178,14 +175,14 @@ def main(*, oldest: Optional[str] = None, newest: Optional[str] = None) -> None:
             hint=f"Got {oldest_v} > {newest_v}.",
         )
 
-    print(f"Fetching Intervals wellness {oldest_v} → {newest_v} ...")
+    print(f"Fetching Intervals wellness {oldest_v} -> {newest_v} ...")
     raw = fetch_wellness(oldest=oldest_v, newest=newest_v)
     normalized = [normalize_to_filtered_sleep(x) for x in raw]
     normalized.sort(key=lambda r: r["calendarDate"])
 
-    out = os.path.join(config.PROCESSING_DIRECTORY, "filtered_sleep.json")
+    out = paths.processing_directory / "filtered_sleep.json"
     with open(out, "w", encoding="utf-8") as f:
         json.dump(normalized, f, indent=4)
 
-    ensure_personal_stub()
+    ensure_personal_stub(runtime)
     print(f"Intervals wellness saved: {out}")

@@ -1,8 +1,5 @@
-# src/trailtraining/data/combine.py
-
 from __future__ import annotations
 
-import os
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
@@ -34,7 +31,6 @@ def _extract_sleep_date(entry: dict[str, Any]) -> Optional[str]:
 
 
 def _date_key_from_activity(a: dict[str, Any]) -> Optional[str]:
-    # Prefer local date for grouping
     s = a.get("start_date_local") or a.get("start_date")
     if not isinstance(s, str) or len(s) < 10:
         return None
@@ -101,7 +97,6 @@ def _compute_rollup(
     sports: Counter[str] = Counter()
     sleep_days_with_data = 0
 
-    # Per-sport aggregation (distance/time/elev + training load)
     by_sport: dict[str, dict[str, float]] = defaultdict(
         lambda: {
             "count": 0.0,
@@ -151,8 +146,6 @@ def _compute_rollup(
                 total_moving_s += float(mv)
                 by_sport[sport]["moving_s"] += float(mv)
 
-            # Training load: moving_time_hours * load_factor
-            # Distance can be 0: as long as moving_time > 0, this counts as load.
             tl_h = float(activity_training_load_hours(a))
             if tl_h > 0:
                 total_training_load_h += tl_h
@@ -194,13 +187,15 @@ def _compute_rollup(
 
 
 def main() -> None:
-    config.ensure_directories()
+    runtime = config.current()
+    config.ensure_directories(runtime)
+    paths = runtime.paths
 
-    sleep_path = os.path.join(config.PROCESSING_DIRECTORY, "filtered_sleep.json")
-    activities_path = os.path.join(config.PROCESSING_DIRECTORY, "strava_activities.json")
+    sleep_path = paths.processing_directory / "filtered_sleep.json"
+    activities_path = paths.processing_directory / "strava_activities.json"
 
-    sleep_by_date = _load_sleep_by_date(sleep_path)
-    activities_by_date = _load_activities_by_date(activities_path)
+    sleep_by_date = _load_sleep_by_date(str(sleep_path))
+    activities_by_date = _load_activities_by_date(str(activities_path))
 
     print(f"Loaded sleep days: {len(sleep_by_date)} from {sleep_path}")
     print(f"Loaded activity days: {len(activities_by_date)} from {activities_path}")
@@ -217,10 +212,10 @@ def main() -> None:
             }
         )
 
-    out_summary = os.path.join(config.PROMPTING_DIRECTORY, "combined_summary.json")
+    out_summary = paths.prompting_directory / "combined_summary.json"
     save_json(out_summary, combined, compact=True)
 
-    out_rollups = os.path.join(config.PROMPTING_DIRECTORY, "combined_rollups.json")
+    out_rollups = paths.prompting_directory / "combined_rollups.json"
     rollups_written = False
 
     if combined:
@@ -236,11 +231,11 @@ def main() -> None:
             save_json(out_rollups, rollups, compact=True)
             rollups_written = True
 
-    personal_path = os.path.join(config.PROMPTING_DIRECTORY, "formatted_personal_data.json")
+    personal_path = paths.prompting_directory / "formatted_personal_data.json"
     build_formatted_personal_profile(
-        combined_summary_path=out_summary,
-        output_path=personal_path,
-        base_personal_path=personal_path,
+        combined_summary_path=str(out_summary),
+        output_path=str(personal_path),
+        base_personal_path=str(personal_path),
     )
 
     print(f"Wrote: {out_summary}")

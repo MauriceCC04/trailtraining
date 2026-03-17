@@ -151,3 +151,33 @@ def test_quality_eval_can_attach_soft_assessment(tmp_path: Path, monkeypatch) ->
     assert artifact.soft_assessment is not None
     assert artifact.soft_assessment.grade == "B"
     assert artifact.soft_assessment.model == "anthropic/claude-opus-4.6"
+
+
+def test_soft_assessment_accepts_provenance_fields() -> None:
+    artifact = EvaluationReportArtifact.model_validate(
+        {
+            "score": 80,
+            "grade": "B",
+            "subscores": {},
+            "stats": {},
+            "violations": [],
+            "soft_assessment": {
+                "model": "x",
+                "primary_goal": "goal",
+                "summary": "usable",
+                "overall_score": 80,
+                "grade": "B",
+                "confidence": "medium",
+                "rubric_scores": {},
+                "marker_results": [],
+                "strengths": [],
+                "concerns": [],
+                "suggested_improvements": [],
+                "repaired": True,
+                "derived_fields": ["rubric_scores"],
+            },
+        }
+    )
+    assert artifact.soft_assessment is not None
+    assert artifact.soft_assessment.repaired is True
+    assert artifact.soft_assessment.derived_fields == ["rubric_scores"]

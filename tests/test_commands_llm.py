@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import types
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,6 +62,12 @@ class FakeRevisePlanConfig:
     primary_goal: str | None = None
 
 
+def _runtime_with_prompting_dir(path: Path):
+    return types.SimpleNamespace(
+        paths=types.SimpleNamespace(prompting_directory=path),
+    )
+
+
 def test_cmd_coach_builds_config_and_prints_saved_files(monkeypatch, tmp_path, capsys):
     captured = {}
 
@@ -116,7 +123,9 @@ def test_cmd_eval_coach_prints_report_and_exits_zero(monkeypatch, tmp_path, caps
     saved = []
 
     monkeypatch.setattr(lc, "_run", lambda func: func())
-    monkeypatch.setattr("trailtraining.config.PROMPTING_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(
+        "trailtraining.config.current", lambda: _runtime_with_prompting_dir(tmp_path)
+    )
     monkeypatch.setattr(
         "trailtraining.llm.constraints.constraint_config_from_env",
         lambda **kwargs: kwargs,
@@ -185,7 +194,9 @@ def test_cmd_eval_coach_prints_report_and_exits_zero(monkeypatch, tmp_path, caps
 
 def test_cmd_eval_coach_exits_one_for_high_severity_violation(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(lc, "_run", lambda func: func())
-    monkeypatch.setattr("trailtraining.config.PROMPTING_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(
+        "trailtraining.config.current", lambda: _runtime_with_prompting_dir(tmp_path)
+    )
     monkeypatch.setattr(
         "trailtraining.llm.constraints.constraint_config_from_env",
         lambda **kwargs: kwargs,
@@ -248,7 +259,9 @@ def test_cmd_eval_coach_exits_one_for_high_severity_violation(monkeypatch, tmp_p
 
 def test_cmd_revise_plan_prints_saved_artifacts(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(lc, "_run", lambda func: func())
-    monkeypatch.setattr("trailtraining.config.PROMPTING_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(
+        "trailtraining.config.current", lambda: _runtime_with_prompting_dir(tmp_path)
+    )
     install_module(
         monkeypatch,
         llm_pkg,

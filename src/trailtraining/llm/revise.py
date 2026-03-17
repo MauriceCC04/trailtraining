@@ -9,20 +9,20 @@ from typing import Any, Optional
 
 from trailtraining import config
 from trailtraining.contracts import EvaluationReportArtifact, TrainingPlanArtifact
-from trailtraining.llm.coach import (
-    _apply_primary_goal,
-    _call_with_schema,
-    _extract_json_object,
-    _make_openrouter_client,
-    _race_context_section,
-    _recompute_planned_hours,
-    training_plan_to_text,
-)
 from trailtraining.llm.eval import _load_rollups_near
 from trailtraining.llm.guardrails import apply_eval_coach_guardrails
 from trailtraining.llm.presets import _multiweek_addendum
 from trailtraining.llm.rubrics import _normalize_style, default_primary_goal_for_style
 from trailtraining.llm.schemas import TRAINING_PLAN_SCHEMA, ensure_training_plan_shape
+from trailtraining.llm.shared import (
+    apply_primary_goal,
+    call_with_schema,
+    extract_json_object,
+    make_openrouter_client,
+    race_context_section,
+    recompute_planned_hours,
+    training_plan_to_text,
+)
 from trailtraining.util.state import load_json, save_json
 from trailtraining.util.text import _safe_json_snippet
 
@@ -41,14 +41,8 @@ class RevisePlanConfig:
     def from_env(cls) -> RevisePlanConfig:
         return cls(
             model=os.getenv("TRAILTRAINING_LLM_MODEL", cls.model),
-            reasoning_effort=os.getenv(
-                "TRAILTRAINING_REASONING_EFFORT",
-                cls.reasoning_effort,
-            ),
-            verbosity=os.getenv(
-                "TRAILTRAINING_VERBOSITY",
-                cls.verbosity,
-            ),
+            reasoning_effort=os.getenv("TRAILTRAINING_REASONING_EFFORT", cls.reasoning_effort),
+            verbosity=os.getenv("TRAILTRAINING_VERBOSITY", cls.verbosity),
             primary_goal=os.getenv("TRAILTRAINING_PRIMARY_GOAL") or None,
         )
 
@@ -61,13 +55,13 @@ def _summarize_eval_targets(report_obj: dict[str, Any]) -> list[str]:
 
     if isinstance(violations, list) and violations:
         lines.append("## Deterministic issues to fix")
-        for v in violations:
-            if not isinstance(v, dict):
+        for violation in violations:
+            if not isinstance(violation, dict):
                 continue
-            sev = str(v.get("severity", "") or "").strip() or "unknown"
-            code = str(v.get("code", "") or "").strip() or "UNKNOWN"
-            msg = str(v.get("message", "") or "").strip()
-            lines.append(f"- [{sev}] {code}: {msg}")
+            severity = str(violation.get("severity", "") or "").strip() or "unknown"
+            code = str(violation.get("code", "") or "").strip() or "UNKNOWN"
+            msg = str(violation.get("message", "") or "").strip()
+            lines.append(f"- [{severity}] {code}: {msg}")
         lines.append("")
 
     if isinstance(soft, dict) and soft:
@@ -131,12 +125,12 @@ def _build_revise_prompt(
         multiweek_note = [
             "## Multi-week plan rules (plan_days > 7)",
             f"- The revised plan MUST contain exactly {plan_days} days in plan.days.",
-            "- Preserve the phased structure (build → build → peak → recovery) across the weeks.",
+            "- Preserve the phased structure (build -> build -> peak -> recovery) across the weeks.",
             "- weekly_totals MUST reflect WEEK 1 values only, not the full-period total.",
             *_multiweek_addendum(plan_days).strip().splitlines(),
             "",
         ]
-        multiweek_note += _race_context_section(primary_goal)
+        multiweek_note += race_context_section(primary_goal)
 
     return "\n".join(
         [
@@ -180,8 +174,11 @@ def run_revise_plan(
     eval_report_path: str,
     output_path: Optional[str] = None,
     rollups_path: Optional[str] = None,
+    runtime: Optional[config.RuntimeConfig] = None,
 ) -> tuple[str, str]:
-    config.ensure_directories()
+    runtime = runtime or config.current()
+    config.ensure_directories(runtime)
+    paths = runtime.paths
 
     plan_p = Path(input_plan_path).expanduser().resolve()
     report_p = Path(eval_report_path).expanduser().resolve()
@@ -199,7 +196,7 @@ def run_revise_plan(
         or default_primary_goal_for_style(style)
     )
 
-    client = _make_openrouter_client()
+    client = make_openrouter_client()
     prompt_text = _build_revise_prompt(
         plan_obj,
         report_obj,
@@ -220,12 +217,12 @@ def run_revise_plan(
     if cfg.reasoning_effort == "none" and cfg.temperature is not None:
         kwargs["temperature"] = cfg.temperature
 
-    resp = _call_with_schema(client, kwargs, TRAINING_PLAN_SCHEMA)
+    resp = call_with_schema(client, kwargs, TRAINING_PLAN_SCHEMA)
     out_text = getattr(resp, "output_text", None) or str(resp)
 
     try:
-        obj = ensure_training_plan_shape(json.loads(_extract_json_object(out_text)))
-        _recompute_planned_hours(obj)
+        obj = ensure_training_plan_shape(json.loads(extract_json_object(out_text)))
+        recompute_planned_hours(obj)
     except Exception as exc:
         log.warning("Revised-plan JSON parse/shape failed; attempting one repair pass: %s", exc)
         repair_prompt = (
@@ -241,25 +238,24 @@ def run_revise_plan(
             "reasoning": {"effort": "none"},
             "text": {"verbosity": "low"},
         }
-        repair_resp = _call_with_schema(client, repair_kwargs, TRAINING_PLAN_SCHEMA)
+        repair_resp = call_with_schema(client, repair_kwargs, TRAINING_PLAN_SCHEMA)
         repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
-        obj = ensure_training_plan_shape(json.loads(_extract_json_object(repaired)))
-        _recompute_planned_hours(obj)
+        obj = ensure_training_plan_shape(json.loads(extract_json_object(repaired)))
+        recompute_planned_hours(obj)
 
-    _apply_primary_goal(obj, primary_goal)
+    apply_primary_goal(obj, primary_goal)
 
     rollups = _load_rollups_near(plan_p, rollups_path)
     if isinstance(rollups, dict):
         apply_eval_coach_guardrails(obj, rollups)
 
-    # Final validation
     final_obj = TrainingPlanArtifact.model_validate(obj).model_dump(mode="json")
 
-    if output_path:
-        out_p = Path(output_path).expanduser().resolve()
-    else:
-        out_p = Path(config.PROMPTING_DIRECTORY) / "revised-plan.json"
-
+    out_p = (
+        Path(output_path).expanduser().resolve()
+        if output_path
+        else paths.prompting_directory / "revised-plan.json"
+    )
     out_p.parent.mkdir(parents=True, exist_ok=True)
     save_json(out_p, final_obj, compact=False)
 

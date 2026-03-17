@@ -7,11 +7,6 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from trailtraining.contracts import SoftAssessmentArtifact
-from trailtraining.llm.coach import (
-    _call_with_schema,
-    _extract_json_object,
-    _make_openrouter_client,
-)
 from trailtraining.llm.rubrics import (
     DEFAULT_PRIMARY_GOAL,
     _normalize_style,
@@ -21,6 +16,7 @@ from trailtraining.llm.rubrics import (
     render_rubrics_for_prompt,
     weighted_score_from_rubric_scores,
 )
+from trailtraining.llm.shared import call_with_schema, extract_json_object, make_openrouter_client
 from trailtraining.util.text import _safe_json_snippet
 
 log = logging.getLogger(__name__)
@@ -118,18 +114,9 @@ SOFT_EVAL_SCHEMA: dict[str, Any] = {
                     },
                 },
             },
-            "strengths": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-            "concerns": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-            "suggested_improvements": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
+            "strengths": {"type": "array", "items": {"type": "string"}},
+            "concerns": {"type": "array", "items": {"type": "string"}},
+            "suggested_improvements": {"type": "array", "items": {"type": "string"}},
         },
     },
 }
@@ -215,18 +202,20 @@ def _build_feedback_lists(
     raw: dict[str, Any],
     rubric_scores: dict[str, dict[str, Any]],
     marker_results: list[dict[str, Any]],
-) -> tuple[list[str], list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str], list[str]]:
     strengths = _clean_string_list(raw.get("strengths"))
     concerns = _clean_string_list(raw.get("concerns"))
     improvements = _clean_string_list(raw.get("suggested_improvements"))
+    derived_fields: list[str] = []
 
     if len(strengths) < 2:
-        for _rid, item in sorted(
+        derived_fields.append("strengths")
+        for _, rubric_score in sorted(
             rubric_scores.items(),
             key=lambda kv: float((kv[1] or {}).get("score", 0)),
             reverse=True,
         ):
-            reasoning = str((item or {}).get("reasoning", "")).strip()
+            reasoning = str((rubric_score or {}).get("reasoning", "")).strip()
             if reasoning and reasoning not in strengths:
                 strengths.append(reasoning)
             if len(strengths) >= 3:
@@ -234,36 +223,37 @@ def _build_feedback_lists(
 
     weaker_markers = sorted(
         marker_results,
-        key=lambda m: float(m.get("score", 0)),
+        key=lambda marker: float(marker.get("score", 0)),
     )
 
     if len(concerns) < 1:
-        for m in weaker_markers:
-            evidence = str(m.get("evidence", "")).strip()
-            marker = str(m.get("marker", "")).strip()
+        derived_fields.append("concerns")
+        for marker in weaker_markers:
+            evidence = str(marker.get("evidence", "")).strip()
+            label = str(marker.get("marker", "")).strip()
             if evidence:
-                text = f"{marker}: {evidence}" if marker else evidence
+                text = f"{label}: {evidence}" if label else evidence
                 if text not in concerns:
                     concerns.append(text)
             if len(concerns) >= 2:
                 break
 
     if len(improvements) < 2:
-        for m in weaker_markers:
-            hint = str(m.get("improvement_hint", "")).strip()
+        derived_fields.append("suggested_improvements")
+        for marker in weaker_markers:
+            hint = str(marker.get("improvement_hint", "")).strip()
             if hint and hint not in improvements:
                 improvements.append(hint)
             if len(improvements) >= 3:
                 break
 
     if len(strengths) < 2:
-        fallback_strengths = [
+        for fallback_strength in [
             "The plan contains concrete and executable session structure.",
             "The week shows a clear training purpose across sessions.",
-        ]
-        for s in fallback_strengths:
-            if s not in strengths:
-                strengths.append(s)
+        ]:
+            if fallback_strength not in strengths:
+                strengths.append(fallback_strength)
             if len(strengths) >= 2:
                 break
 
@@ -271,17 +261,16 @@ def _build_feedback_lists(
         concerns = ["Some parts of the plan could be more specific or better justified."]
 
     if len(improvements) < 2:
-        fallback_improvements = [
+        for fallback_improvement in [
             "Add more specific execution guidance for key sessions.",
             "Clarify progression and recovery logic where useful.",
-        ]
-        for s in fallback_improvements:
-            if s not in improvements:
-                improvements.append(s)
+        ]:
+            if fallback_improvement not in improvements:
+                improvements.append(fallback_improvement)
             if len(improvements) >= 2:
                 break
 
-    return strengths[:4], concerns[:3], improvements[:4]
+    return strengths[:4], concerns[:3], improvements[:4], sorted(set(derived_fields))
 
 
 def _expected_markers(style: str) -> list[dict[str, str]]:
@@ -487,7 +476,7 @@ def _looks_internally_broken_soft_eval(
 
 
 def _parse_soft_eval_json(out_text: str) -> dict[str, Any]:
-    raw = json.loads(_extract_json_object(out_text))
+    raw = json.loads(extract_json_object(out_text))
     if not isinstance(raw, dict):
         raise ValueError("Soft evaluator did not return a JSON object.")
     return raw
@@ -539,7 +528,7 @@ def _derive_rubric_scores_from_markers(
     style: str,
 ) -> dict[str, dict[str, Any]]:
     rubrics = get_default_rubrics(style)
-    by_rubric: dict[str, list[float]] = {r.rubric_id: [] for r in rubrics}
+    by_rubric: dict[str, list[float]] = {rubric.rubric_id: [] for rubric in rubrics}
 
     for item in marker_results:
         rubric_id = str(item.get("rubric", "") or "").strip()
@@ -563,10 +552,7 @@ def _derive_rubric_scores_from_markers(
         else:
             rubric_score = 0.0
             reasoning = "No marker evidence available to derive a rubric score."
-        out[rubric.rubric_id] = {
-            "score": rubric_score,
-            "reasoning": reasoning,
-        }
+        out[rubric.rubric_id] = {"score": rubric_score, "reasoning": reasoning}
 
     return out
 
@@ -599,7 +585,7 @@ def _repair_soft_eval_output(
         "text": {"verbosity": "low"},
         "max_output_tokens": int(os.getenv("TRAILTRAINING_SOFT_EVAL_MAX_OUTPUT_TOKENS", "6000")),
     }
-    repair_resp = _call_with_schema(client, repair_kwargs, SOFT_EVAL_SCHEMA)
+    repair_resp = call_with_schema(client, repair_kwargs, SOFT_EVAL_SCHEMA)
     repair_text = getattr(repair_resp, "output_text", None) or str(repair_resp)
     return _parse_and_validate_soft_eval_output(repair_text)
 
@@ -628,13 +614,23 @@ def _generate_marker_results_only(
         "text": {"verbosity": "low"},
         "max_output_tokens": int(os.getenv("TRAILTRAINING_SOFT_EVAL_MAX_OUTPUT_TOKENS", "6000")),
     }
-    resp = _call_with_schema(client, kwargs, _marker_only_schema())
+    resp = call_with_schema(client, kwargs, _marker_only_schema())
     out_text = getattr(resp, "output_text", None) or str(resp)
     raw = _parse_soft_eval_json(out_text)
     marker_results = raw.get("marker_results")
     if not isinstance(marker_results, list) or not marker_results:
         raise ValueError("Marker-only repair returned missing or empty marker_results.")
     return marker_results
+
+
+def _too_much_output_was_locally_derived(derived_fields: list[str]) -> bool:
+    derived = set(derived_fields)
+    return {
+        "rubric_scores",
+        "strengths",
+        "concerns",
+        "suggested_improvements",
+    }.issubset(derived)
 
 
 def evaluate_training_plan_soft(
@@ -648,7 +644,7 @@ def evaluate_training_plan_soft(
 
     style, primary_goal = _resolve_style_and_goal(plan_obj, cfg)
 
-    client = _make_openrouter_client()
+    client = make_openrouter_client()
     kwargs: dict[str, Any] = {
         "model": cfg.model,
         "instructions": (
@@ -669,7 +665,10 @@ def evaluate_training_plan_soft(
     if cfg.reasoning_effort == "none" and cfg.temperature is not None:
         kwargs["temperature"] = cfg.temperature
 
-    resp = _call_with_schema(client, kwargs, SOFT_EVAL_SCHEMA)
+    repaired = False
+    derived_fields: list[str] = []
+
+    resp = call_with_schema(client, kwargs, SOFT_EVAL_SCHEMA)
     out_text = getattr(resp, "output_text", None) or str(resp)
 
     try:
@@ -677,6 +676,7 @@ def evaluate_training_plan_soft(
     except Exception as exc:
         log.warning("Soft eval primary response invalid or incomplete: %s", exc)
         raw = _repair_soft_eval_output(client, cfg, out_text)
+        repaired = True
 
     marker_results_raw = raw.get("marker_results")
     if not isinstance(marker_results_raw, list) or not marker_results_raw:
@@ -690,6 +690,7 @@ def evaluate_training_plan_soft(
             style=style,
             primary_goal=primary_goal,
         )
+        repaired = True
 
     marker_results = _normalize_marker_results(marker_results_raw, style=style)
 
@@ -699,10 +700,8 @@ def evaluate_training_plan_soft(
         log.warning(
             "Soft eval returned missing or malformed rubric_scores; deriving rubric scores from marker_results."
         )
-        rubric_scores = _derive_rubric_scores_from_markers(
-            marker_results,
-            style=style,
-        )
+        rubric_scores = _derive_rubric_scores_from_markers(marker_results, style=style)
+        derived_fields.append("rubric_scores")
 
     overall_score = weighted_score_from_rubric_scores(rubric_scores, style=style)
 
@@ -716,11 +715,17 @@ def evaluate_training_plan_soft(
             "(non-empty narrative with all-zero scores)."
         )
 
-    strengths, concerns, suggested_improvements = _build_feedback_lists(
+    strengths, concerns, suggested_improvements, feedback_derived = _build_feedback_lists(
         raw,
         rubric_scores,
         marker_results,
     )
+    derived_fields.extend(feedback_derived)
+    derived_fields = sorted(set(derived_fields))
+    repaired = repaired or bool(derived_fields)
+
+    if _too_much_output_was_locally_derived(derived_fields):
+        raise ValueError("Soft evaluator output required too much local synthesis after repair.")
 
     payload = {
         "model": cfg.model,
@@ -735,6 +740,8 @@ def evaluate_training_plan_soft(
         "strengths": strengths,
         "concerns": concerns,
         "suggested_improvements": suggested_improvements,
+        "repaired": repaired,
+        "derived_fields": derived_fields,
     }
 
     return SoftAssessmentArtifact.model_validate(payload).model_dump(mode="json")

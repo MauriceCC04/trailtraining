@@ -422,12 +422,11 @@ def run_forecasts(
     CLI entrypoint used by: trailtraining forecast
     Writes readiness_and_risk_forecast.json by default.
     """
-    config.ensure_directories()
+    runtime = config.current()
+    config.ensure_directories(runtime)
 
     base = (
-        Path(input_dir).expanduser().resolve()
-        if input_dir
-        else Path(config.PROMPTING_DIRECTORY).expanduser().resolve()
+        Path(input_dir).expanduser().resolve() if input_dir else runtime.paths.prompting_directory
     )
     summary_p = base / "combined_summary.json"
     if not summary_p.exists():

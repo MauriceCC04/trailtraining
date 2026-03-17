@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import calendar
-import contextlib
 import json
 import logging
 import os
-import re
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
@@ -22,150 +19,37 @@ from trailtraining.llm.schemas import (
     ensure_training_plan_shape,
     training_plan_output_contract_text,
 )
+from trailtraining.llm.shared import (
+    apply_primary_goal as _apply_primary_goal,
+)
+from trailtraining.llm.shared import (
+    call_with_param_fallback as _call_with_param_fallback,
+)
+from trailtraining.llm.shared import (
+    call_with_schema as _call_with_schema,
+)
+from trailtraining.llm.shared import (
+    extract_json_object as _extract_json_object,
+)
+from trailtraining.llm.shared import (
+    make_openrouter_client as _make_openrouter_client,
+)
+from trailtraining.llm.shared import (
+    race_context_section as _race_context_section,
+)
+from trailtraining.llm.shared import (
+    recompute_planned_hours as _recompute_planned_hours,
+)
+from trailtraining.llm.shared import (
+    training_plan_to_text,
+)
 from trailtraining.llm.signals import build_retrieval_context
 from trailtraining.util.dates import _as_date
-from trailtraining.util.errors import LLMUnsupportedParameterError
-from trailtraining.util.llm_helpers import _classify_and_raise
+from trailtraining.util.errors import ArtifactError, MissingArtifactError
 from trailtraining.util.state import load_json, save_json
 from trailtraining.util.text import _safe_json_snippet
 
 log = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Race-goal parsing
-# ---------------------------------------------------------------------------
-
-_MONTH_MAP: dict[str, int] = {
-    "january": 1,
-    "jan": 1,
-    "february": 2,
-    "feb": 2,
-    "march": 3,
-    "mar": 3,
-    "april": 4,
-    "apr": 4,
-    "may": 5,
-    "june": 6,
-    "jun": 6,
-    "july": 7,
-    "jul": 7,
-    "august": 8,
-    "aug": 8,
-    "september": 9,
-    "sep": 9,
-    "sept": 9,
-    "october": 10,
-    "oct": 10,
-    "november": 11,
-    "nov": 11,
-    "december": 12,
-    "dec": 12,
-}
-
-_MONTH_PATTERN = (
-    r"january|february|march|april|may|june|july|august|september|october|november|december"
-    r"|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec"
-)
-
-
-def _parse_race_context(goal_text: str, today: Optional[date] = None) -> dict[str, Any]:
-    """Extract race date from a goal string and return planning context.
-
-    Supports:
-    - ISO dates:              "2026-07-30"
-    - Full dates:             "July 30 2026", "July 30, 2026"
-    - Month + year:           "July 2026"  (approximate -> last day of month)
-    - Month only:             "in April"  (next occurrence, approximate)
-
-    Returns an empty dict if no recognisable date is found or the date has passed.
-    """
-    today = today or date.today()
-    low = goal_text.strip().lower()
-    race_date: Optional[date] = None
-    is_approximate = False
-
-    m = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", goal_text)
-    if m:
-        with contextlib.suppress(ValueError):
-            race_date = date.fromisoformat(m.group(1))
-
-    if not race_date:
-        m = re.search(
-            rf"\b({_MONTH_PATTERN})\s+(\d{{1,2}}),?\s+(\d{{4}})\b",
-            low,
-        )
-        if m:
-            month = _MONTH_MAP.get(m.group(1))
-            if month:
-                with contextlib.suppress(ValueError):
-                    race_date = date(int(m.group(3)), month, int(m.group(2)))
-
-    if not race_date:
-        m = re.search(rf"\b({_MONTH_PATTERN})\s+(\d{{4}})\b", low)
-        if m:
-            month = _MONTH_MAP.get(m.group(1))
-            if month:
-                with contextlib.suppress(ValueError):
-                    year = int(m.group(2))
-                    last_day = calendar.monthrange(year, month)[1]
-                    race_date = date(year, month, last_day)
-                    is_approximate = True
-
-    if not race_date:
-        m = re.search(rf"\b(?:in\s+)?({_MONTH_PATTERN})\b", low)
-        if m:
-            month = _MONTH_MAP.get(m.group(1))
-            if month:
-                with contextlib.suppress(ValueError):
-                    year = today.year if month >= today.month else today.year + 1
-                    last_day = calendar.monthrange(year, month)[1]
-                    race_date = date(year, month, last_day)
-                    is_approximate = True
-
-    if not race_date:
-        return {}
-
-    days_to_race = (race_date - today).days
-    if days_to_race < 0:
-        return {}
-
-    return {
-        "race_date": race_date.isoformat(),
-        "weeks_to_race": days_to_race // 7,
-        "days_to_race": days_to_race,
-        "is_approximate": is_approximate,
-    }
-
-
-def _race_context_section(primary_goal: str) -> list[str]:
-    """Build prompt lines describing the race goal, or empty list if no date found."""
-    ctx = _parse_race_context(primary_goal)
-    if not ctx:
-        return []
-    approx = " (approximate -> use last day of the stated month)" if ctx["is_approximate"] else ""
-    weeks = ctx["weeks_to_race"]
-    if weeks <= 2:
-        phase = "TAPER / RACE-READY -> reduce volume ~20-30 %, sharpen with short quality only."
-    elif weeks <= 6:
-        phase = "PEAK -> maintain quality, cap volume, practice race-specific efforts."
-    elif weeks <= 12:
-        phase = "BUILD -> progressive loading, race-specific workouts increasing in frequency."
-    else:
-        phase = "BASE / DEVELOPMENT -> aerobic foundation; race-specific intensity starts later."
-
-    return [
-        "## Race Goal Context (use to calibrate periodization)",
-        f"Race date: {ctx['race_date']}{approx}",
-        f"Days to race: {ctx['days_to_race']}  |  Weeks to race: {weeks}",
-        f"Recommended training phase: {phase}",
-        "Anchor the plan to this phase. If plan_days covers multiple phases, transition between them.",
-        "",
-    ]
-
-
-# ---------------------------------------------------------------------------
-# Type coercions
-# ---------------------------------------------------------------------------
 
 
 def _as_dict(v: Any) -> dict[str, Any]:
@@ -180,146 +64,14 @@ def _as_str(v: Any) -> str:
     return v.strip() if isinstance(v, str) else ""
 
 
-def _as_float(v: Any) -> Optional[float]:
-    return float(v) if isinstance(v, (int, float)) else None
-
-
-# ---------------------------------------------------------------------------
-# OpenRouter client
-# ---------------------------------------------------------------------------
-
-
-def _make_openrouter_client() -> OpenAI:
-    api_key = (
-        os.getenv("OPENROUTER_API_KEY") or os.getenv("TRAILTRAINING_OPENROUTER_API_KEY") or ""
-    ).strip()
-    if not api_key:
-        raise RuntimeError(
-            "Missing OpenRouter API key. Set OPENROUTER_API_KEY "
-            "(or TRAILTRAINING_OPENROUTER_API_KEY).\n"
-            "Example:\n"
-            "  export OPENROUTER_API_KEY='sk-or-v1-...'\n"
-            "Then rerun: trailtraining coach --prompt training-plan"
-        )
-    headers: dict[str, str] = {}
-    if site_url := (os.getenv("TRAILTRAINING_OPENROUTER_SITE_URL") or "").strip():
-        headers["HTTP-Referer"] = site_url
-    if app_name := (os.getenv("TRAILTRAINING_OPENROUTER_APP_NAME") or "trailtraining").strip():
-        headers["X-OpenRouter-Title"] = app_name
-    return OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, default_headers=headers)
-
-
-def _call_with_param_fallback(client: OpenAI, kwargs: dict[str, Any]) -> Any:
-    """Call the responses API, stripping unsupported params on failure.
-
-    Tries four progressively-stripped variants so the same call site works
-    across models that reject reasoning or verbosity parameters:
-
-    1. Full kwargs
-    2. Without ``text.verbosity`` only
-    3. Without ``reasoning`` only
-    4. Without either (bare minimum)
-    """
-
-    def _strip_verbosity(kw: dict[str, Any]) -> dict[str, Any]:
-        text = {k: v for k, v in kw.get("text", {}).items() if k != "verbosity"}
-        return {**kw, "text": text} if text else {k: v for k, v in kw.items() if k != "text"}
-
-    def _strip_reasoning(kw: dict[str, Any]) -> dict[str, Any]:
-        return {k: v for k, v in kw.items() if k != "reasoning"}
-
-    attempts = [
-        ("full", kwargs),
-        ("no_text_verbosity", _strip_verbosity(kwargs)),
-        ("no_reasoning", _strip_reasoning(kwargs)),
-        ("bare_minimum", _strip_reasoning(_strip_verbosity(kwargs))),
-    ]
-    last_exc: Optional[Exception] = None
-    for label, kw in attempts:
-        try:
-            return client.responses.create(**kw)
-        except Exception as exc:
-            try:
-                _classify_and_raise(exc)
-            except LLMUnsupportedParameterError as unsupported:
-                log.warning(
-                    "LLM call rejected %s attempt due to unsupported parameters: %s",
-                    label,
-                    unsupported,
-                )
-                last_exc = unsupported
-                continue
-            raise
-    assert last_exc is not None
-    raise last_exc
-
-
-def _call_with_schema(client: OpenAI, kwargs: dict[str, Any], schema: dict[str, Any]) -> Any:
-    """Try structured JSON output, fall back to plain call if the model doesn't support it."""
-    name, body = schema.get("name"), schema.get("schema")
-
-    structured_attempts = [
-        (
-            "text.format",
-            {
-                **kwargs,
-                "text": {
-                    **kwargs.get("text", {}),
-                    "format": {
-                        "type": "json_schema",
-                        "name": name,
-                        "schema": body,
-                        "strict": True,
-                    },
-                },
-            },
-        ),
-        (
-            "response_format",
-            {
-                **kwargs,
-                "response_format": {
-                    "type": "json_schema",
-                    "json_schema": {"name": name, "strict": True, "schema": body},
-                },
-            },
-        ),
-    ]
-
-    for label, kw in structured_attempts:
-        try:
-            return _call_with_param_fallback(client, kw)
-        except LLMUnsupportedParameterError as exc:
-            log.warning("Structured output mode %s unavailable; falling back: %s", label, exc)
-
-    return _call_with_param_fallback(client, kwargs)
-
-
-# ---------------------------------------------------------------------------
-# Small utilities
-# ---------------------------------------------------------------------------
-
-
-def _extract_json_object(text: str) -> str:
-    start, end = text.find("{"), text.rfind("}")
-    return text[start : end + 1] if start != -1 and end > start else text
-
-
-# ---------------------------------------------------------------------------
-# Input resolution
-# ---------------------------------------------------------------------------
-
-
 def _resolve_input_paths(
     input_path: Optional[str],
     personal_path: Optional[str],
     summary_path: Optional[str],
+    *,
+    prompting_dir: Path,
 ) -> tuple[Path, Path, Optional[Path]]:
-    base = (
-        Path(input_path).expanduser().resolve()
-        if input_path
-        else Path(config.PROMPTING_DIRECTORY).expanduser().resolve()
-    )
+    base = Path(input_path).expanduser().resolve() if input_path else prompting_dir
     personal = (
         Path(personal_path).expanduser().resolve()
         if personal_path
@@ -334,9 +86,44 @@ def _resolve_input_paths(
     return personal, summary, (rollups if rollups.exists() else None)
 
 
-# ---------------------------------------------------------------------------
-# Combined-summary helpers
-# ---------------------------------------------------------------------------
+def _load_required_object_artifact(path: Path, *, producer_hint: str) -> dict[str, Any]:
+    raw = load_json(path, default=None)
+    if raw is None:
+        raise MissingArtifactError(
+            message=f"Missing required artifact: {path}",
+            hint=producer_hint,
+        )
+    if not isinstance(raw, dict):
+        raise ArtifactError(
+            message=f"{path.name} must be a JSON object.",
+            hint=f"Got {type(raw).__name__} in {path}.",
+        )
+    if not raw:
+        raise MissingArtifactError(
+            message=f"Required artifact is empty: {path}",
+            hint=producer_hint,
+        )
+    return raw
+
+
+def _load_required_list_artifact(path: Path, *, producer_hint: str) -> list[dict[str, Any]]:
+    raw = load_json(path, default=None)
+    if raw is None:
+        raise MissingArtifactError(
+            message=f"Missing required artifact: {path}",
+            hint=producer_hint,
+        )
+    if not isinstance(raw, list):
+        raise ArtifactError(
+            message=f"{path.name} must be a list of day objects.",
+            hint=f"Got {type(raw).__name__} in {path}.",
+        )
+    if not raw:
+        raise MissingArtifactError(
+            message=f"Required artifact is empty: {path}",
+            hint=producer_hint,
+        )
+    return raw
 
 
 def _dedup_activities_in_place(combined: list[dict[str, Any]]) -> None:
@@ -347,15 +134,15 @@ def _dedup_activities_in_place(combined: list[dict[str, Any]]) -> None:
             day["activities"] = []
             continue
         unique = []
-        for a in acts:
-            if not isinstance(a, dict):
+        for activity in acts:
+            if not isinstance(activity, dict):
                 continue
-            aid = a.get("id")
+            aid = activity.get("id")
             if aid is None:
-                unique.append(a)
+                unique.append(activity)
             elif (key := str(aid)) not in seen:
                 seen.add(key)
-                unique.append(a)
+                unique.append(activity)
         day["activities"] = unique
 
 
@@ -366,20 +153,24 @@ def _filter_last_days(combined: list[dict[str, Any]], days: int) -> list[dict[st
     if not last:
         return combined
     cutoff = last - timedelta(days=days - 1)
-    return [d for d in combined if (dd := _as_date(d.get("date", ""))) and dd >= cutoff]
+    return [
+        day
+        for day in combined
+        if (day_date := _as_date(day.get("date", ""))) and day_date >= cutoff
+    ]
 
 
-def _summarize_activity(a: dict[str, Any]) -> str:
-    parts = [str(a.get("sport_type") or a.get("type") or "unknown")]
-    if isinstance(dist := a.get("distance"), (int, float)):
+def _summarize_activity(activity: dict[str, Any]) -> str:
+    parts = [str(activity.get("sport_type") or activity.get("type") or "unknown")]
+    if isinstance(dist := activity.get("distance"), (int, float)):
         parts.append(f"{dist / 1000:.2f} km")
-    if isinstance(elev := a.get("total_elevation_gain"), (int, float)):
+    if isinstance(elev := activity.get("total_elevation_gain"), (int, float)):
         parts.append(f"{elev:.0f} m+")
-    if isinstance(mv := a.get("moving_time"), (int, float)):
-        parts.append(f"{mv / 60:.0f} min")
-    if isinstance(hr := a.get("average_heartrate"), (int, float)):
+    if isinstance(moving_time := activity.get("moving_time"), (int, float)):
+        parts.append(f"{moving_time / 60:.0f} min")
+    if isinstance(hr := activity.get("average_heartrate"), (int, float)):
         parts.append(f"avgHR {hr:.0f}")
-    if isinstance(name := a.get("name"), str) and name.strip():
+    if isinstance(name := activity.get("name"), str) and name.strip():
         parts.append(f"({name.strip()})")
     return " • " + " | ".join(parts)
 
@@ -402,18 +193,19 @@ def _summarize_day(day: dict[str, Any]) -> str:
         lines.append(f"Sleep: {picked}" if picked else "Sleep: (data present)")
     else:
         lines.append("Sleep: (none)")
-    acts = day.get("activities") or []
-    if isinstance(acts, list) and acts:
-        lines.append(f"Activities ({len(acts)}):")
-        lines.extend(_summarize_activity(a) for a in acts[:50] if isinstance(a, dict))
+
+    activities = day.get("activities") or []
+    if isinstance(activities, list) and activities:
+        lines.append(f"Activities ({len(activities)}):")
+        lines.extend(
+            _summarize_activity(activity)
+            for activity in activities[:50]
+            if isinstance(activity, dict)
+        )
     else:
         lines.append("Activities: (none)")
+
     return "\n".join(lines) + "\n"
-
-
-# ---------------------------------------------------------------------------
-# Forecast helpers
-# ---------------------------------------------------------------------------
 
 
 def _load_or_compute_deterministic_forecast(
@@ -427,6 +219,7 @@ def _load_or_compute_deterministic_forecast(
             return obj
         log.warning("Ignoring malformed deterministic forecast artifact at %s", forecast_p)
         return None
+
     try:
         from trailtraining.forecast.forecast import compute_readiness_and_risk
 
@@ -473,8 +266,8 @@ def _forecast_capability_block(det_forecast: dict[str, Any]) -> list[str]:
 
 def _forecast_signal_rows(det_forecast: dict[str, Any]) -> list[dict[str, Any]]:
     res = _as_dict(det_forecast.get("result"))
-    d = res.get("date")
-    dr = f"{d}..{d}" if isinstance(d, str) and d else ""
+    day_value = res.get("date")
+    date_range = f"{day_value}..{day_value}" if isinstance(day_value, str) and day_value else ""
     inputs = _as_dict(res.get("inputs"))
     src = "readiness_and_risk_forecast.json:result"
 
@@ -484,7 +277,7 @@ def _forecast_signal_rows(det_forecast: dict[str, Any]) -> list[dict[str, Any]]:
             "value": value,
             "unit": unit,
             "source": f"{src}.{path}",
-            "date_range": dr,
+            "date_range": date_range,
         }
 
     rows: list[dict[str, Any]] = []
@@ -500,12 +293,13 @@ def _forecast_signal_rows(det_forecast: dict[str, Any]) -> list[dict[str, Any]]:
         _row("forecast.readiness.status", readiness.get("status"), "readiness.status"),
         _row("forecast.readiness.score", readiness.get("score"), "readiness.score"),
     ]
-    for key, sid in [
+
+    for key, signal_id in [
         ("sleep_days_7d", "forecast.recovery_capability.sleep_days_7d"),
         ("resting_hr_days_7d", "forecast.recovery_capability.resting_hr_days_7d"),
         ("hrv_days_7d", "forecast.recovery_capability.hrv_days_7d"),
     ]:
-        rows.append(_row(sid, inputs.get(key), f"inputs.{key}", "days"))
+        rows.append(_row(signal_id, inputs.get(key), f"inputs.{key}", "days"))
 
     risk = _as_dict(res.get("overreach_risk"))
     rows += [
@@ -515,20 +309,18 @@ def _forecast_signal_rows(det_forecast: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Plan mutation helpers
-# ---------------------------------------------------------------------------
-
-
 def _apply_deterministic_readiness(
-    plan_obj: dict[str, Any], det_forecast: Optional[dict[str, Any]]
+    plan_obj: dict[str, Any],
+    det_forecast: Optional[dict[str, Any]],
 ) -> None:
     if not isinstance(det_forecast, dict):
         return
+
     readiness = _as_dict(_as_dict(det_forecast.get("result")).get("readiness"))
     status = readiness.get("status")
     if status not in ("primed", "steady", "fatigued"):
         return
+
     plan_readiness = _as_dict(plan_obj.get("readiness"))
     if not plan_readiness:
         return
@@ -551,131 +343,6 @@ def _apply_deterministic_readiness(
     if note not in notes:
         notes.append(note)
     plan_obj["data_notes"] = notes
-
-
-def _apply_primary_goal(plan_obj: dict[str, Any], primary_goal: Optional[str]) -> None:
-    goal = _as_str(primary_goal)
-    meta = _as_dict(plan_obj.get("meta"))
-    if goal and meta:
-        meta["primary_goal"] = goal
-        plan_obj["meta"] = meta
-
-
-def _recompute_planned_hours(plan_obj: dict[str, Any]) -> None:
-    """Recompute weekly_totals.planned_moving_time_hours from week 1 only.
-
-    For multi-week plans, weekly_totals always reflects week 1 (days 1-7).
-    """
-    all_days = _as_list(_as_dict(plan_obj.get("plan")).get("days"))
-    week1 = all_days[: min(7, len(all_days))]
-    total_min = sum(
-        float(d["duration_minutes"])
-        for d in week1
-        if isinstance(d, dict) and isinstance(d.get("duration_minutes"), (int, float))
-    )
-    wt = _as_dict(_as_dict(plan_obj.get("plan")).get("weekly_totals"))
-    if wt:
-        wt["planned_moving_time_hours"] = round(total_min / 60.0, 1)
-
-
-# ---------------------------------------------------------------------------
-# Text rendering
-# ---------------------------------------------------------------------------
-
-
-def training_plan_to_text(obj: dict[str, Any]) -> str:
-    meta = _as_dict(obj.get("meta"))
-    readiness = _as_dict(obj.get("readiness"))
-    plan = _as_dict(obj.get("plan"))
-    weekly = _as_dict(plan.get("weekly_totals"))
-    day_objs = sorted(
-        [d for d in _as_list(plan.get("days")) if isinstance(d, dict)],
-        key=lambda d: d.get("date") or "9999-99-99",
-    )
-
-    lines: list[str] = ["TrailTraining - Training Plan", ""]
-
-    if today := _as_str(meta.get("today")):
-        lines.append(f"Generated: {today}")
-    plan_start, plan_days = _as_str(meta.get("plan_start")), meta.get("plan_days")
-    if plan_start or plan_days is not None:
-        lines.append(
-            f"Plan start: {plan_start or '(unknown)'}   Days: {plan_days if plan_days is not None else '(unknown)'}"
-        )
-    if style := _as_str(meta.get("style")):
-        lines.append(f"Style: {style}")
-    if goal := _as_str(meta.get("primary_goal")):
-        lines.append(f"Primary goal: {goal}")
-
-    status = _as_str(readiness.get("status"))
-    rationale = _as_str(readiness.get("rationale"))
-    if status or rationale:
-        lines.append("")
-        if status:
-            lines.append(f"Readiness: {status}")
-        if rationale:
-            lines.append(f"Why: {rationale}")
-
-    totals: list[str] = []
-    if (h := _as_float(weekly.get("planned_moving_time_hours"))) is not None:
-        totals.append(f"{h:.1f} h")
-    if (km := _as_float(weekly.get("planned_distance_km"))) and km > 0:
-        totals.append(f"{km:.0f} km")
-    if (elev := _as_float(weekly.get("planned_elevation_m"))) and elev > 0:
-        totals.append(f"{elev:.0f} m+")
-    if totals:
-        lines += ["", "Weekly totals: " + " • ".join(totals)]
-
-    lines += ["", "Day-by-day", "-" * 10]
-    for day_obj in day_objs:
-        ds = _as_str(day_obj.get("date"))
-        try:
-            wd = date.fromisoformat(ds).strftime("%a") if ds else ""
-        except Exception:
-            wd = ""
-        title = _as_str(day_obj.get("title")) or "(no title)"
-        st = _as_str(day_obj.get("session_type"))
-        is_rest = bool(day_obj.get("is_rest_day"))
-        is_hard = bool(day_obj.get("is_hard_day"))
-        mins = day_obj.get("duration_minutes")
-        dur = f"{mins} min" if isinstance(mins, (int, float)) else "?"
-        tags = (["REST"] if is_rest else ([st.upper()] if st else [])) + (
-            ["HARD"] if is_hard and not is_rest else []
-        )
-        date_label = f"{wd} {ds}".strip() if wd or ds else "(unknown date)"
-        lines.append(f"{date_label}: {title} ({', '.join(tags) or 'SESSION'}, {dur})")
-        for field, label in [
-            ("target_intensity", "Intensity"),
-            ("terrain", "Terrain"),
-            ("workout", "Workout"),
-            ("purpose", "Purpose"),
-        ]:
-            if val := _as_str(day_obj.get(field)):
-                lines.append(f"  {label}: {val}")
-        lines.append("")
-
-    recovery = _as_dict(obj.get("recovery"))
-    actions = [a for a in _as_list(recovery.get("actions")) if isinstance(a, str) and a.strip()]
-    if actions:
-        lines += ["Recovery focus", "-" * 14]
-        lines.extend(f"- {a.strip()}" for a in actions)
-        lines.append("")
-
-    risks = [r for r in _as_list(obj.get("risks")) if isinstance(r, dict)]
-    if risks:
-        lines += ["Risks / cautions", "-" * 15]
-        for risk in risks:
-            lines.append(
-                f"- [{_as_str(risk.get('severity')) or 'unknown'}] {_as_str(risk.get('message')) or '(no message)'}"
-            )
-        lines.append("")
-
-    return "\n".join(lines).rstrip() + "\n"
-
-
-# ---------------------------------------------------------------------------
-# Prompt construction
-# ---------------------------------------------------------------------------
 
 
 def _build_prompt_text(
@@ -734,7 +401,9 @@ def _build_prompt_text(
         ]
 
     ctx = build_retrieval_context(
-        combined, rollups if isinstance(rollups, dict) else None, retrieval_weeks=retrieval_weeks
+        combined,
+        rollups if isinstance(rollups, dict) else None,
+        retrieval_weeks=retrieval_weeks,
     )
     signal_registry = list(ctx.get("signal_registry") or [])
     if isinstance(deterministic_forecast, dict):
@@ -758,7 +427,10 @@ def _build_prompt_text(
         combined[-detail_days:] if detail_days > 0 and len(combined) > detail_days else combined
     )
     if older_count := len(combined) - len(combined_detail):
-        note = f"## Older days in window: {older_count} (details omitted; rely on rollups + recent detail)\n"
+        note = (
+            f"## Older days in window: {older_count} "
+            "(details omitted; rely on rollups + recent detail)\n"
+        )
         parts.append(note)
         used += len(note)
 
@@ -782,11 +454,6 @@ def _build_prompt_text(
     return "\n".join(parts)
 
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class CoachConfig:
     model: str = "openai/gpt-4o"
@@ -802,9 +469,9 @@ class CoachConfig:
     @classmethod
     def from_env(cls) -> CoachConfig:
         def _env_int(name: str, default: int) -> int:
-            v = os.getenv(name)
+            value = os.getenv(name)
             try:
-                return int(v) if v and v.strip() else default
+                return int(value) if value and value.strip() else default
             except ValueError:
                 return default
 
@@ -824,13 +491,11 @@ class CoachConfig:
         )
 
 
-# ---------------------------------------------------------------------------
-# Training-plan pipeline
-# ---------------------------------------------------------------------------
-
-
 def _parse_training_plan(
-    out_text: str, client: OpenAI, cfg: CoachConfig, system_instructions: str
+    out_text: str,
+    client: OpenAI,
+    cfg: CoachConfig,
+    system_instructions: str,
 ) -> dict[str, Any]:
     try:
         obj = ensure_training_plan_shape(json.loads(_extract_json_object(out_text)))
@@ -866,6 +531,8 @@ def _run_training_plan(
     deterministic_forecast: Optional[dict[str, Any]],
     rollups: Optional[Any],
     output_path: Optional[str],
+    *,
+    prompting_dir: Path,
 ) -> tuple[str, str]:
     system_instructions = api_kwargs.get("instructions", "")
     resp = _call_with_schema(client, api_kwargs, TRAINING_PLAN_SCHEMA)
@@ -879,7 +546,7 @@ def _run_training_plan(
     out_p = (
         Path(output_path).expanduser().resolve()
         if output_path
-        else Path(config.PROMPTING_DIRECTORY) / "coach_brief_training-plan.json"
+        else prompting_dir / "coach_brief_training-plan.json"
     )
     out_p.parent.mkdir(parents=True, exist_ok=True)
     save_json(out_p, obj, compact=False)
@@ -894,11 +561,6 @@ def _run_training_plan(
     return json.dumps(obj, indent=2, ensure_ascii=False), str(out_p)
 
 
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
-
-
 def run_coach_brief(
     *,
     prompt: str,
@@ -907,19 +569,35 @@ def run_coach_brief(
     personal_path: Optional[str] = None,
     summary_path: Optional[str] = None,
     output_path: Optional[str] = None,
+    runtime: Optional[config.RuntimeConfig] = None,
 ) -> tuple[str, Optional[str]]:
-    config.ensure_directories()
+    runtime = runtime or config.current()
+    config.ensure_directories(runtime)
+    paths = runtime.paths
 
-    personal_p, summary_p, rollups_p = _resolve_input_paths(input_path, personal_path, summary_path)
-    personal = load_json(personal_p, default={})
-    combined = load_json(summary_p, default=[])
+    personal_p, summary_p, rollups_p = _resolve_input_paths(
+        input_path,
+        personal_path,
+        summary_path,
+        prompting_dir=paths.prompting_directory,
+    )
+
+    producer_hint = (
+        "Run `trailtraining combine` (or `trailtraining run-all`) to generate the required inputs."
+    )
+    personal = _load_required_object_artifact(personal_p, producer_hint=producer_hint)
+    combined = _load_required_list_artifact(summary_p, producer_hint=producer_hint)
     rollups = load_json(rollups_p, default=None) if rollups_p else None
-
-    if not isinstance(combined, list):
-        raise RuntimeError("combined_summary.json must be a list of day objects")
 
     _dedup_activities_in_place(combined)
     combined = _filter_last_days(combined, cfg.days)
+    if not combined:
+        raise MissingArtifactError(
+            message=(
+                f"{summary_p.name} contains no usable day objects in the last {cfg.days} days."
+            ),
+            hint="Fetch fresh source data and rerun `trailtraining combine`.",
+        )
 
     deterministic_forecast = _load_or_compute_deterministic_forecast(summary_p.parent, combined)
     detail_days = (
@@ -955,7 +633,14 @@ def run_coach_brief(
 
     if prompt == "training-plan":
         return _run_training_plan(
-            client, api_kwargs, cfg, resolved_goal, deterministic_forecast, rollups, output_path
+            client,
+            api_kwargs,
+            cfg,
+            resolved_goal,
+            deterministic_forecast,
+            rollups,
+            output_path,
+            prompting_dir=paths.prompting_directory,
         )
 
     resp = _call_with_param_fallback(client, api_kwargs)
@@ -963,7 +648,7 @@ def run_coach_brief(
     out_p = (
         Path(output_path).expanduser().resolve()
         if output_path
-        else Path(config.PROMPTING_DIRECTORY) / f"coach_brief_{prompt}.md"
+        else paths.prompting_directory / f"coach_brief_{prompt}.md"
     )
     out_p.parent.mkdir(parents=True, exist_ok=True)
     out_p.write_text(out_text, encoding="utf-8")

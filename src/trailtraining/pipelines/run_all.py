@@ -36,16 +36,18 @@ def main(
     clean_prompting: bool = False,
     wellness_provider: Optional[str] = None,
 ) -> None:
-    config.ensure_directories()
+    runtime = config.current()
+    config.ensure_directories(runtime)
+    paths = runtime.paths
 
     if clean:
         clean_processing = True
         clean_prompting = True
 
     if clean_processing:
-        _clean_directory(config.PROCESSING_DIRECTORY)
+        _clean_directory(str(paths.processing_directory))
     if clean_prompting:
-        _clean_directory(config.PROMPTING_DIRECTORY)
+        _clean_directory(str(paths.prompting_directory))
 
     provider = _detect_provider(wellness_provider)
     log.info("Selected wellness provider: %s", provider)

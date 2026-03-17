@@ -178,27 +178,29 @@ def filter_sleep(input_path: str, output_path: str) -> None:
 
 
 def main() -> None:
-    combine_json_files(config.RHR_DIRECTORY, os.path.join(config.PROCESSING_DIRECTORY, "rhr.json"))
-    combine_json_files(
-        config.SLEEP_DIRECTORY, os.path.join(config.PROCESSING_DIRECTORY, "sleep.json")
-    )
+    runtime = config.current()
+    config.ensure_directories(runtime)
+    paths = runtime.paths
+
+    combine_json_files(str(paths.rhr_directory), str(paths.processing_directory / "rhr.json"))
+    combine_json_files(str(paths.sleep_directory), str(paths.processing_directory / "sleep.json"))
 
     format_personal_data(
-        os.path.join(config.FIT_DIRECTORY, "personal-information.json"),
-        os.path.join(config.PROMPTING_DIRECTORY, "formatted_personal_data.json"),
+        str(paths.fit_directory / "personal-information.json"),
+        str(paths.prompting_directory / "formatted_personal_data.json"),
     )
 
     shorten_rhr(
-        os.path.join(config.PROCESSING_DIRECTORY, "rhr.json"),
-        os.path.join(config.PROMPTING_DIRECTORY, "shortened_rhr.json"),
+        str(paths.processing_directory / "rhr.json"),
+        str(paths.prompting_directory / "shortened_rhr.json"),
     )
 
     filter_sleep(
-        os.path.join(config.PROCESSING_DIRECTORY, "sleep.json"),
-        os.path.join(config.PROCESSING_DIRECTORY, "filtered_sleep.json"),
+        str(paths.processing_directory / "sleep.json"),
+        str(paths.processing_directory / "filtered_sleep.json"),
     )
 
     shorten_sleep(
-        os.path.join(config.PROCESSING_DIRECTORY, "filtered_sleep.json"),
-        os.path.join(config.PROMPTING_DIRECTORY, "shortened_sleep.json"),
+        str(paths.processing_directory / "filtered_sleep.json"),
+        str(paths.prompting_directory / "shortened_sleep.json"),
     )

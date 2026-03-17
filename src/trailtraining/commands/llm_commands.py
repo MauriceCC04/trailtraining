@@ -59,10 +59,11 @@ def cmd_eval_coach(args: argparse.Namespace) -> None:
     from trailtraining.util.state import save_json
 
     def _inner() -> None:
-        input_path = args.input or str(
-            Path(config.PROMPTING_DIRECTORY) / "coach_brief_training-plan.json"
-        )
-        report_path = args.report or str(Path(config.PROMPTING_DIRECTORY) / "eval_report.json")
+        runtime = config.current()
+        prompting_dir = Path(runtime.paths.prompting_directory)
+
+        input_path = args.input or str(prompting_dir / "coach_brief_training-plan.json")
+        report_path = args.report or str(prompting_dir / "eval_report.json")
 
         cfg = constraint_config_from_env(
             max_ramp_pct=float(args.max_ramp_pct),
@@ -148,6 +149,9 @@ def cmd_revise_plan(args: argparse.Namespace) -> None:
     from trailtraining.llm.revise import RevisePlanConfig, run_revise_plan
 
     def _inner() -> None:
+        runtime = config.current()
+        prompting_dir = Path(runtime.paths.prompting_directory)
+
         base_cfg = CoachConfig.from_env()
         revise_cfg = RevisePlanConfig(
             model=args.model or base_cfg.model,
@@ -157,10 +161,8 @@ def cmd_revise_plan(args: argparse.Namespace) -> None:
             primary_goal=args.goal or base_cfg.primary_goal,
         )
 
-        input_path = args.input or str(
-            Path(config.PROMPTING_DIRECTORY) / "coach_brief_training-plan.json"
-        )
-        report_path = args.report or str(Path(config.PROMPTING_DIRECTORY) / "eval_report.json")
+        input_path = args.input or str(prompting_dir / "coach_brief_training-plan.json")
+        report_path = args.report or str(prompting_dir / "eval_report.json")
 
         text, out_path = run_revise_plan(
             cfg=revise_cfg,
