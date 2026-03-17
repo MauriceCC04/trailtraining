@@ -20,10 +20,16 @@ def test_cli_subcommand_help() -> None:
     commands = [
         ["doctor", "-h"],
         ["auth-strava", "-h"],
+        ["fetch-strava", "-h"],
+        ["fetch-garmin", "-h"],
+        ["fetch-intervals", "-h"],
+        ["combine", "-h"],
         ["run-all", "-h"],
+        ["run-all-intervals", "-h"],
         ["forecast", "-h"],
         ["coach", "-h"],
         ["eval-coach", "-h"],
+        ["revise-plan", "-h"],
     ]
 
     for cmd in commands:

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Pipelines for Garmin/Strava + fatigue modeling"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = "MIT"
 authors = [{ name = "Cameron" }]
 keywords = ["data-pipeline", "strava", "garmin", "etl", "llm-evaluation", "cli"]
 dependencies = [
@@ -20,7 +20,6 @@ dependencies = [
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
 
@@ -83,7 +82,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --disable-warnings --maxfail=1"
+addopts = "-q --disable-warnings --maxfail=1 --strict-config --strict-markers"
 pythonpath = ["src"]
 
 [tool.coverage.run]
@@ -93,7 +92,7 @@ source = ["trailtraining"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 10
+fail_under = 25
 
 [tool.ruff]
 target-version = "py39"
