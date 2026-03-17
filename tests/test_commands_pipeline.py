@@ -2,10 +2,10 @@ import sys
 from types import ModuleType, SimpleNamespace
 
 import trailtraining
+import trailtraining.commands.pipeline_commands as pc
 import trailtraining.data as data_pkg
 import trailtraining.forecast as forecast_pkg
 import trailtraining.pipelines as pipelines_pkg
-from trailtraining.commands import pipeline_commands as pc
 
 
 def _install_module(monkeypatch, package, full_name: str, attr_name: str, **attrs):

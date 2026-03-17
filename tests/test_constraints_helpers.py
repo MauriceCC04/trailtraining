@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from trailtraining.llm.constraints import (
     ConstraintConfig,
     _citation_value,
@@ -113,13 +115,15 @@ def test_sparse_capability_and_forecast_reason_text_branches():
 
 
 def test_score_from_violations_handles_bad_penalties_and_default_category():
-    report = score_from_violations(
+    violations = cast(
+        list[dict[str, Any]],
         [
             {"penalty": "oops", "category": "structure", "severity": "medium"},
             "not-a-dict",
             {"severity": "low"},
-        ]
+        ],
     )
+    report = score_from_violations(violations)
 
     assert report["score"] == 87
     assert report["grade"] == "B"

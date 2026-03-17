@@ -6,7 +6,7 @@ from trailtraining.commands import common
 
 
 def test_run_passes_through_success_and_system_exit():
-    assert common._run(lambda: None) is None
+    common._run(lambda: None)
 
     with pytest.raises(SystemExit) as exc:
         common._run(lambda: (_ for _ in ()).throw(SystemExit(3)))
