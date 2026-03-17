@@ -53,9 +53,6 @@ AFTER_BUFFER_SECONDS = int(
     os.getenv("TRAILTRAINING_STRAVA_AFTER_BUFFER_SECONDS", str(7 * 24 * 3600))
 )  # 7 days
 
-# Reuse a single session across requests
-_SESSION = requests.Session()
-
 
 def _parse_strava_datetime(s: Optional[str]) -> Optional[datetime]:
     if not s:
