@@ -43,7 +43,7 @@ jobs:
       - name: Ruff lint
         run: python -m ruff check .
 
-      - name: Mypy (package)
+      - name: Mypy (full repo)
         run: python -m mypy src/trailtraining tests
 
   test:

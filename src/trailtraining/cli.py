@@ -43,7 +43,7 @@ __all__ = [
 ]
 
 
-def main(argv=None) -> None:
+def main(argv: list[str] | None = None) -> None:
     configure_logging(os.getenv("TRAILTRAINING_LOG_LEVEL", "INFO"))
     parser = build_parser()
     args = parser.parse_args(argv)

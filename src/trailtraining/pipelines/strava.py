@@ -32,11 +32,11 @@ ACTIVITIES_PATH = "/athlete/activities"
 
 
 # Files written/used by this pipeline
-def ACTIVITIES_JSON():
+def ACTIVITIES_JSON() -> str:
     return os.path.join(config.PROCESSING_DIRECTORY, "strava_activities.json")
 
 
-def META_JSON():
+def META_JSON() -> str:
     return os.path.join(config.PROCESSING_DIRECTORY, "strava_meta.json")
 
 
@@ -71,7 +71,7 @@ def _parse_strava_datetime(s: Optional[str]) -> Optional[datetime]:
 
 
 def _request_with_retry(
-    session: requests.Session, method: str, url: str, **kwargs
+    session: requests.Session, method: str, url: str, **kwargs: Any
 ) -> requests.Response:
     """
     Retries on:
@@ -276,7 +276,7 @@ def _merge_by_id(
             merged[str(a["id"])] = a
 
     # stable order by start_date desc (fallback by id)
-    def key_fn(x: dict[str, Any]):
+    def key_fn(x: dict[str, Any]) -> tuple[int, int]:
         dt = _parse_strava_datetime(x.get("start_date"))
         ts = int(dt.timestamp()) if dt else 0
         return (ts, int(x.get("id") or 0))

@@ -63,7 +63,7 @@ def _auth_headers() -> dict[str, str]:
 
 
 def _request_with_retry(
-    session: requests.Session, method: str, url: str, **kwargs
+    session: requests.Session, method: str, url: str, **kwargs: Any
 ) -> requests.Response:
     """
     Retries on:

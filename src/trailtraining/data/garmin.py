@@ -2,6 +2,7 @@ import glob
 import json
 import os
 from datetime import datetime, timedelta
+from typing import Any
 
 from trailtraining import config
 
@@ -29,7 +30,7 @@ def combine_json_files(directory: str, output_file: str) -> None:
         json.dump(combined_data, file, indent=4)
 
 
-def format_personal_data(input_path, output_path) -> None:
+def format_personal_data(input_path: str, output_path: str) -> None:
     """
     Format personal data from Garmin JSON file.
     """
@@ -95,8 +96,6 @@ def shorten_sleep(input_path: str, output_path: str) -> None:
         output_path (str): Path to the output JSON file.
     """
     today = datetime.now()
-    # the following needs to be changed
-    # there is no more "dailySleepDTO", the entry is "calendarDate"
     cutoff = today - timedelta(days=200)
     with open(input_path, encoding="utf-8") as file:
         data = json.load(file)
@@ -105,14 +104,6 @@ def shorten_sleep(input_path: str, output_path: str) -> None:
         os.remove(output_path)
 
     filtered = []
-    # for entry in data:
-    #    metrics = entry.get("dailySleepDTO", {})
-    #    if metrics:
-    #        date_str = metrics.get("calendarDate")
-    #        if date_str:
-    #            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-    #            if date_obj >= cutoff:
-    #                filtered.append(entry)
     for entry in data:
         date_str = entry.get("calendarDate")
         if date_str:
@@ -166,13 +157,15 @@ def filter_sleep(input_path: str, output_path: str) -> None:
         "avgOvernightHrv",
     ]
 
-    def pick(entry: dict, key: str):
+    # bare dict intentional — internal helper, not worth subscripting
+    def pick(entry: dict, key: str) -> Any:
         dto = entry.get("dailySleepDTO")
         if isinstance(dto, dict) and dto.get(key) is not None:
             return dto.get(key)
         return entry.get(key)
 
-    def to_int(v, default: int = -1) -> int:
+    # v is json.load output — Any is the correct type
+    def to_int(v: Any, default: int = -1) -> int:
         if v is None:
             return default
         try:
@@ -199,7 +192,7 @@ def filter_sleep(input_path: str, output_path: str) -> None:
         json.dump(out, f, indent=4)
 
 
-def main():
+def main() -> None:
     # Combine JSON files
     combine_json_files(config.RHR_DIRECTORY, os.path.join(config.PROCESSING_DIRECTORY, "rhr.json"))
     combine_json_files(

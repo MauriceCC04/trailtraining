@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import os
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from trailtraining.commands.common import _run
 from trailtraining.llm.rubrics import default_primary_goal_for_style
 
 
-def cmd_coach(args) -> None:
+def cmd_coach(args: argparse.Namespace) -> None:
     from trailtraining.llm.coach import CoachConfig, run_coach_brief
 
     def _inner() -> None:
@@ -49,7 +50,7 @@ def cmd_coach(args) -> None:
     _run(_inner)
 
 
-def cmd_eval_coach(args) -> None:
+def cmd_eval_coach(args: argparse.Namespace) -> None:
     from trailtraining import config
     from trailtraining.llm.constraints import constraint_config_from_env
     from trailtraining.llm.eval import evaluate_training_plan_quality_file
@@ -140,7 +141,7 @@ def cmd_eval_coach(args) -> None:
     _run(_inner)
 
 
-def cmd_revise_plan(args) -> None:
+def cmd_revise_plan(args: argparse.Namespace) -> None:
     from trailtraining import config
     from trailtraining.llm.coach import CoachConfig
     from trailtraining.llm.revise import RevisePlanConfig, run_revise_plan

@@ -13,7 +13,7 @@ from trailtraining.data import garmin as garmin_processing
 from trailtraining.pipelines import download_garmin_data
 
 
-def main():
+def main() -> None:
     print("Starting Garmin data processing pipeline...")
 
     # Profile-specific HOME for GarminDb so auth/session/cache can't leak across users

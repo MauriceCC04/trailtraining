@@ -1,5 +1,6 @@
+import argparse
 import sys
-from types import ModuleType, SimpleNamespace
+from types import ModuleType
 
 import trailtraining
 import trailtraining.commands.pipeline_commands as pc
@@ -73,23 +74,23 @@ def test_pipeline_commands_delegate_to_underlying_modules(monkeypatch):
         main=lambda: calls.append(("doctor", None)),
     )
 
-    pc.cmd_auth_strava(SimpleNamespace(force=True))
-    pc.cmd_fetch_strava(SimpleNamespace())
-    pc.cmd_fetch_garmin(SimpleNamespace())
-    pc.cmd_combine(SimpleNamespace())
+    pc.cmd_auth_strava(argparse.Namespace(force=True))
+    pc.cmd_fetch_strava(argparse.Namespace())
+    pc.cmd_fetch_garmin(argparse.Namespace())
+    pc.cmd_combine(argparse.Namespace())
     pc.cmd_run_all(
-        SimpleNamespace(
+        argparse.Namespace(
             clean=True,
             clean_processing=False,
             clean_prompting=True,
             wellness_provider="intervals",
         )
     )
-    pc.cmd_fetch_intervals(SimpleNamespace(oldest="2026-01-01", newest="2026-01-31"))
+    pc.cmd_fetch_intervals(argparse.Namespace(oldest="2026-01-01", newest="2026-01-31"))
     pc.cmd_run_all_intervals(
-        SimpleNamespace(clean=False, clean_processing=True, clean_prompting=False)
+        argparse.Namespace(clean=False, clean_processing=True, clean_prompting=False)
     )
-    pc.cmd_doctor(SimpleNamespace())
+    pc.cmd_doctor(argparse.Namespace())
 
     assert calls == [
         ("auth_strava", True),
@@ -131,7 +132,7 @@ def test_forecast_command_prints_saved_path_and_result(monkeypatch, capsys):
         },
     )
 
-    pc.cmd_forecast(SimpleNamespace(input="in-dir", output="out.json"))
+    pc.cmd_forecast(argparse.Namespace(input="in-dir", output="out.json"))
 
     out = capsys.readouterr().out
     assert "[Saved] out.json" in out

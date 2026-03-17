@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import argparse
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import ModuleType
 
 import pytest
 import trailtraining.llm as llm_pkg
@@ -90,7 +91,7 @@ def test_cmd_coach_builds_config_and_prints_saved_files(monkeypatch, tmp_path, c
         run_coach_brief=fake_run_coach_brief,
     )
 
-    args = SimpleNamespace(
+    args = argparse.Namespace(
         style=None,
         goal=None,
         model=None,
@@ -162,7 +163,7 @@ def test_cmd_eval_coach_prints_report_and_exits_zero(monkeypatch, tmp_path, caps
         save_json=lambda path, obj, compact=False: saved.append((Path(path), obj, compact)),
     )
 
-    args = SimpleNamespace(
+    args = argparse.Namespace(
         input=None,
         report=None,
         max_ramp_pct=12.0,
@@ -232,7 +233,7 @@ def test_cmd_eval_coach_exits_one_for_high_severity_violation(monkeypatch, tmp_p
         save_json=lambda *args, **kwargs: None,
     )
 
-    args = SimpleNamespace(
+    args = argparse.Namespace(
         input=None,
         report=None,
         max_ramp_pct=12.0,
@@ -279,7 +280,7 @@ def test_cmd_revise_plan_prints_saved_artifacts(monkeypatch, tmp_path, capsys):
     revised_txt = revised_json.parent / f"{revised_json.stem}.txt"
     revised_txt.write_text("summary", encoding="utf-8")
 
-    args = SimpleNamespace(
+    args = argparse.Namespace(
         model=None,
         reasoning_effort=None,
         verbosity=None,
