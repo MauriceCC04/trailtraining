@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import datetime as dt
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class StrictModel(BaseModel):
@@ -13,6 +14,14 @@ class StrictModel(BaseModel):
 
 
 class SnapshotStats(StrictModel):
+    """Snapshot statistics for a time window.
+
+    Numeric-looking fields are kept as ``str`` because the LLM may emit
+    empty strings for unavailable values.  Validators coerce obvious
+    numerics so downstream code can parse them, but empty string
+    (``""``) is preserved as-is to mean "not available".
+    """
+
     distance_km: str
     moving_time_hours: str
     elevation_m: str
@@ -21,13 +30,41 @@ class SnapshotStats(StrictModel):
     hrv_mean: str
     rhr_mean: str
 
+    @field_validator(
+        "distance_km",
+        "moving_time_hours",
+        "elevation_m",
+        "activity_count",
+        "sleep_hours_mean",
+        "hrv_mean",
+        "rhr_mean",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_to_str(cls, v: Any) -> str:
+        """Accept numeric inputs and coerce to string representation."""
+        if v is None:
+            return ""
+        if isinstance(v, (int, float)):
+            return str(v)
+        return str(v)
+
 
 class TrainingMeta(StrictModel):
-    today: str
-    plan_start: str
+    today: dt.date
+    plan_start: dt.date
     plan_days: int = Field(ge=1, le=28)
     style: str
     primary_goal: str = "to become a faster endurance athlete"
+
+    @field_validator("today", "plan_start", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any) -> dt.date:
+        if isinstance(v, dt.date):
+            return v
+        if isinstance(v, str):
+            return dt.date.fromisoformat(v[:10])
+        raise ValueError(f"Cannot parse date from {v!r}")
 
 
 class Readiness(StrictModel):
@@ -43,7 +80,7 @@ class WeeklyTotals(StrictModel):
 
 
 class PlanDay(StrictModel):
-    date: str
+    date: dt.date
     title: str
     session_type: Literal[
         "rest",
@@ -64,6 +101,15 @@ class PlanDay(StrictModel):
     workout: str
     purpose: str
     signal_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any) -> dt.date:
+        if isinstance(v, dt.date):
+            return v
+        if isinstance(v, str):
+            return dt.date.fromisoformat(v[:10])
+        raise ValueError(f"Cannot parse date from {v!r}")
 
 
 class Plan(StrictModel):
@@ -161,7 +207,7 @@ class EvaluationReportArtifact(StrictModel):
 
 
 class ForecastInputs(StrictModel):
-    as_of_date: str
+    as_of_date: dt.date
     rhr_7d_mean_bpm: Optional[float] = None
     rhr_28d_mean_bpm: Optional[float] = None
     rhr_28d_std_bpm: Optional[float] = None
@@ -185,6 +231,15 @@ class ForecastInputs(StrictModel):
 
     notes: list[str] = Field(default_factory=list)
 
+    @field_validator("as_of_date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any) -> dt.date:
+        if isinstance(v, dt.date):
+            return v
+        if isinstance(v, str):
+            return dt.date.fromisoformat(v[:10])
+        raise ValueError(f"Cannot parse date from {v!r}")
+
 
 class ForecastDrivers(StrictModel):
     readiness: list[str] = Field(default_factory=list)
@@ -202,11 +257,20 @@ class ForecastRisk(StrictModel):
 
 
 class ForecastResultArtifact(StrictModel):
-    date: str
+    date: dt.date
     readiness: ForecastReadiness
     overreach_risk: ForecastRisk
     inputs: ForecastInputs
     drivers: ForecastDrivers
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any) -> dt.date:
+        if isinstance(v, dt.date):
+            return v
+        if isinstance(v, str):
+            return dt.date.fromisoformat(v[:10])
+        raise ValueError(f"Cannot parse date from {v!r}")
 
 
 class ForecastArtifact(StrictModel):

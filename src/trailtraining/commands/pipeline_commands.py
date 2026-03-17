@@ -95,6 +95,7 @@ def cmd_plan_to_ics(args: argparse.Namespace) -> None:
             prompting_dir,
             output_path=getattr(args, "output", None),
             start_hour=getattr(args, "start_hour", 7),
+            timezone_id=getattr(args, "timezone_id", None),
         )
         print(f"[Read]  {plan_path}")
         print(f"[Saved] {ics_path}")

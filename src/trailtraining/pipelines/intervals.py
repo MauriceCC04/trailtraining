@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from datetime import date, timedelta
 from typing import Any, Optional
 
@@ -15,6 +14,7 @@ from trailtraining.util.errors import (
     DataValidationError,
     ExternalServiceError,
 )
+from trailtraining.util.http_retry import request_with_retry
 
 BASE_URL = os.getenv("INTERVALS_BASE_URL", "https://intervals.icu/api/v1")
 _SESSION = requests.Session()
@@ -65,53 +65,8 @@ def _auth_headers() -> dict[str, str]:
 def _request_with_retry(
     session: requests.Session, method: str, url: str, **kwargs: Any
 ) -> requests.Response:
-    """
-    Retries on:
-      - 429 (rate limit): uses Retry-After when present
-      - 5xx: exponential backoff
-      - timeouts/connection errors: exponential backoff
-    """
-    last_err: Optional[Exception] = None
-
-    for attempt in range(0, 6):
-        try:
-            resp = session.request(method, url, timeout=30, **kwargs)
-        except (requests.Timeout, requests.ConnectionError) as err:
-            last_err = err
-            time.sleep(min(30, 2**attempt))
-            continue
-
-        if resp.status_code == 429:
-            retry_after = resp.headers.get("Retry-After")
-            wait = int(retry_after) if (retry_after and retry_after.isdigit()) else (2**attempt)
-            time.sleep(min(60, max(1, wait)))
-            continue
-
-        if 500 <= resp.status_code <= 599:
-            last_err = ExternalServiceError(
-                message=f"Intervals server error ({resp.status_code}) for {method} {url}",
-                hint=resp.text[:300]
-                if resp.text
-                else "The service may be temporarily unavailable.",
-            )
-            time.sleep(min(30, 2**attempt))
-            continue
-
-        if 400 <= resp.status_code <= 499:
-            raise ExternalServiceError(
-                message=f"Intervals request failed with HTTP {resp.status_code}",
-                hint=resp.text[:300] if resp.text else f"{method} {url}",
-            )
-
-        return resp
-
-    if isinstance(last_err, ExternalServiceError):
-        raise last_err
-
-    raise ExternalServiceError(
-        message=f"Intervals request failed after retries: {method} {url}",
-        hint=str(last_err) if last_err else "Check network access and Intervals availability.",
-    )
+    """Delegate to shared retry utility with Intervals-specific service name."""
+    return request_with_retry(session, method, url, service_name="Intervals.icu", **kwargs)
 
 
 def fetch_wellness(oldest: str, newest: str) -> list[dict[str, Any]]:
@@ -150,7 +105,6 @@ def fetch_wellness(oldest: str, newest: str) -> list[dict[str, Any]]:
 
 
 def normalize_to_filtered_sleep(entry: dict[str, Any]) -> dict[str, Any]:
-    # Date key: Intervals often uses `id` for the day (YYYY-MM-DD)
     day = str(_pick(entry, "id", "day", "date", "calendarDate", default=""))[:10]
     if not day:
         raise DataValidationError(
@@ -160,8 +114,6 @@ def normalize_to_filtered_sleep(entry: dict[str, Any]) -> dict[str, Any]:
 
     sleep_secs = _to_int(_pick(entry, "sleepSecs", "sleep_seconds", "sleepTimeSeconds"))
     resting_hr = _to_int(_pick(entry, "restingHR", "restingHr", "restingHeartRate"))
-
-    # HRV/status/body battery are Garmin-ish fields expected by your current schema
     avg_hrv = _to_int(_pick(entry, "avgOvernightHrv", "hrv", "hrvRmssd", "rmssd"))
 
     return {
@@ -201,11 +153,6 @@ def _validate_ymd(s: str, name: str) -> str:
 def main(*, oldest: Optional[str] = None, newest: Optional[str] = None) -> None:
     config.ensure_directories()
 
-    # Priority:
-    # 1) CLI args
-    # 2) New env names: TRAILTRAINING_WELLNESS_OLDEST / TRAILTRAINING_WELLNESS_NEWEST
-    # 3) Back-compat env names used by README/node script: OLDEST / NEWEST
-    # 4) Fallback: lookback window to today
     newest_raw = (
         newest
         or os.getenv("TRAILTRAINING_WELLNESS_NEWEST")

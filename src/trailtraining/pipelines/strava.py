@@ -23,6 +23,7 @@ from trailtraining.data.strava import (
     get_valid_token,
     save_token,
 )
+from trailtraining.util.http_retry import request_with_retry
 from trailtraining.util.state import load_json, save_json
 from trailtraining.web.auth_server import start_auth_server, wait_for_code
 
@@ -72,35 +73,8 @@ def _parse_strava_datetime(s: Optional[str]) -> Optional[datetime]:
 def _request_with_retry(
     session: requests.Session, method: str, url: str, **kwargs: Any
 ) -> requests.Response:
-    """
-    Retries on:
-      - 429 (rate limit): uses Retry-After when present
-      - 5xx: exponential backoff
-      - request timeouts: exponential backoff
-    """
-    last_err: Optional[Exception] = None
-    for attempt in range(0, 6):
-        try:
-            resp = session.request(method, url, timeout=30, **kwargs)
-        except (requests.Timeout, requests.ConnectionError) as e:
-            last_err = e
-            time.sleep(min(30, 2**attempt))
-            continue
-
-        if resp.status_code == 429:
-            retry_after = resp.headers.get("Retry-After")
-            wait = int(retry_after) if (retry_after and retry_after.isdigit()) else (2**attempt)
-            time.sleep(min(60, max(1, wait)))
-            continue
-
-        if 500 <= resp.status_code <= 599:
-            time.sleep(min(30, 2**attempt))
-            continue
-
-        resp.raise_for_status()
-        return resp
-
-    raise RuntimeError(f"HTTP request failed after retries: {method} {url} ({last_err})")
+    """Delegate to shared retry utility with Strava-specific service name."""
+    return request_with_retry(session, method, url, service_name="Strava", **kwargs)
 
 
 def _api_get(
@@ -184,10 +158,18 @@ def auth_main(*, force: bool = False) -> None:
     print(f"✅ Saved Strava token → {token_path}")
 
 
-def _compute_after_unix(existing: list[dict[str, Any]], meta: dict[str, Any]) -> int:
-    """
-    Prefer meta.max_start_date_ts (UTC), otherwise compute from existing activities,
-    otherwise fall back to NOW - lookback_days.
+def _compute_after_unix(
+    existing: list[dict[str, Any]],
+    meta: dict[str, Any],
+    *,
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+) -> int:
+    """Compute the ``after`` epoch for the Strava activities endpoint.
+
+    Priority:
+    1. ``meta.max_start_date_ts`` from a previous sync (minus buffer)
+    2. Latest ``start_date`` in existing activities (minus buffer)
+    3. ``NOW - lookback_days`` on first sync (respects configured window)
     """
     max_ts = meta.get("max_start_date_ts")
     if isinstance(max_ts, (int, float)) and max_ts > 0:
@@ -204,7 +186,9 @@ def _compute_after_unix(existing: list[dict[str, Any]], meta: dict[str, Any]) ->
     if best > 0:
         return max(0, best - AFTER_BUFFER_SECONDS)
 
-    return 0
+    # First sync: respect the configured lookback window
+    now = int(datetime.now(tz=timezone.utc).timestamp())
+    return max(0, now - lookback_days * 86400)
 
 
 def fetch_activities_incremental(

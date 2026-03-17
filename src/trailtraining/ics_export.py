@@ -63,12 +63,20 @@ def plan_to_ics(
     *,
     start_hour: int = 7,
     calendar_name: str = "Training Plan",
+    timezone_id: str | None = None,
 ) -> str:
     """Return ICS text for a TrainingPlanArtifact.
 
-    Non-rest sessions become timed events starting at ``start_hour`` (local,
-    no timezone — Calendar.app treats these as floating/local times).  Rest
-    days become all-day events.
+    Non-rest sessions become timed events starting at ``start_hour``.
+    Rest days become all-day events.
+
+    Timezone behavior:
+    - If ``timezone_id`` is provided (e.g. ``"Europe/Rome"``), a VTIMEZONE
+      reference is emitted and DTSTART/DTEND use TZID.
+    - If ``timezone_id`` is None (default), events use floating local times
+      (no TZID, no ``Z`` suffix).  RFC 5545 §3.3.5 says these are
+      interpreted in the viewer's local timezone, which is the correct
+      default for a training plan generated without knowing the user's tz.
     """
     dtstamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
@@ -80,13 +88,16 @@ def plan_to_ics(
     lines.append("CALSCALE:GREGORIAN\r\n")
     lines.append("METHOD:PUBLISH\r\n")
     lines.append(_prop("X-WR-CALNAME", _ics_escape(calendar_name)))
-    lines.append("X-WR-TIMEZONE:America/Los_Angeles\r\n")  # floating; consumer sets tz
+
+    if timezone_id:
+        lines.append(_prop("X-WR-TIMEZONE", timezone_id))
 
     for day in artifact.plan.days:
-        # Parse date
-        year, month, day_num = (int(p) for p in day.date.split("-"))
+        # Parse date — day.date is now a proper date object from contracts
+        day_date = day.date
+        year, month, day_num = day_date.year, day_date.month, day_date.day
 
-        event_uid = f"trailtraining-{day.date}-{uuid.uuid4().hex[:8]}@trailtraining"
+        event_uid = f"trailtraining-{day_date.isoformat()}-{uuid.uuid4().hex[:8]}@trailtraining"
 
         # Build description block
         desc_parts = []
@@ -111,9 +122,8 @@ def plan_to_ics(
         lines.append(_prop("CATEGORIES", category))
 
         if day.is_rest_day or day.duration_minutes == 0:
-            # All-day event
+            # All-day event (always floating — DATE values have no tz)
             dtstart = f"{year:04d}{month:02d}{day_num:02d}"
-            # DTEND is exclusive next day for all-day
             next_day = datetime(year, month, day_num) + timedelta(days=1)
             dtend = next_day.strftime("%Y%m%d")
             lines.append(_prop("DTSTART;VALUE=DATE", dtstart))
@@ -122,8 +132,16 @@ def plan_to_ics(
             # Timed event at start_hour
             start_dt = datetime(year, month, day_num, start_hour, 0, 0)
             end_dt = start_dt + timedelta(minutes=day.duration_minutes)
-            lines.append(_prop("DTSTART", start_dt.strftime("%Y%m%dT%H%M%S")))
-            lines.append(_prop("DTEND", end_dt.strftime("%Y%m%dT%H%M%S")))
+            fmt = "%Y%m%dT%H%M%S"
+
+            if timezone_id:
+                lines.append(_prop(f"DTSTART;TZID={timezone_id}", start_dt.strftime(fmt)))
+                lines.append(_prop(f"DTEND;TZID={timezone_id}", end_dt.strftime(fmt)))
+            else:
+                # Floating local time (no TZID, no Z suffix)
+                lines.append(_prop("DTSTART", start_dt.strftime(fmt)))
+                lines.append(_prop("DTEND", end_dt.strftime(fmt)))
+
             lines.append(_prop("DURATION", f"PT{day.duration_minutes}M"))
 
         lines.append("END:VEVENT\r\n")
@@ -158,6 +176,7 @@ def export_plan_to_ics(
     output_path: str | None = None,
     start_hour: int = 7,
     calendar_name: str = "Training Plan",
+    timezone_id: str | None = None,
 ) -> tuple[Path, Path]:
     """Load the most recent plan, write an ICS file, return (plan_path, ics_path)."""
     import json
@@ -166,7 +185,12 @@ def export_plan_to_ics(
     raw = json.loads(plan_path.read_text(encoding="utf-8"))
     artifact = TrainingPlanArtifact.model_validate(raw)
 
-    ics_text = plan_to_ics(artifact, start_hour=start_hour, calendar_name=calendar_name)
+    ics_text = plan_to_ics(
+        artifact,
+        start_hour=start_hour,
+        calendar_name=calendar_name,
+        timezone_id=timezone_id,
+    )
 
     if output_path:
         ics_path = Path(output_path).expanduser().resolve()

@@ -27,3 +27,20 @@ class ExternalServiceError(TrailTrainingError):
 
 class ArtifactError(TrailTrainingError):
     pass
+
+
+class LLMUnsupportedParameterError(TrailTrainingError):
+    """Raised when an LLM provider rejects an unsupported parameter.
+
+    Only this error type should trigger parameter-stripping fallback.
+    Auth, network, rate-limit, and server errors must NOT be retried
+    via parameter stripping.
+    """
+
+    pass
+
+
+class MissingArtifactError(TrailTrainingError):
+    """Raised when a required pipeline artifact is missing or empty."""
+
+    pass
