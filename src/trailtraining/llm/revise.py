@@ -26,6 +26,10 @@ from trailtraining.llm.shared import (
 from trailtraining.util.state import load_json, save_json
 from trailtraining.util.text import _safe_json_snippet
 
+# Backward-compatible aliases for tests that monkeypatch these names.
+_make_openrouter_client = make_openrouter_client
+_call_with_schema = call_with_schema
+
 log = logging.getLogger(__name__)
 
 
@@ -196,7 +200,7 @@ def run_revise_plan(
         or default_primary_goal_for_style(style)
     )
 
-    client = make_openrouter_client()
+    client = _make_openrouter_client()
     prompt_text = _build_revise_prompt(
         plan_obj,
         report_obj,
@@ -217,7 +221,7 @@ def run_revise_plan(
     if cfg.reasoning_effort == "none" and cfg.temperature is not None:
         kwargs["temperature"] = cfg.temperature
 
-    resp = call_with_schema(client, kwargs, TRAINING_PLAN_SCHEMA)
+    resp = _call_with_schema(client, kwargs, TRAINING_PLAN_SCHEMA)
     out_text = getattr(resp, "output_text", None) or str(resp)
 
     try:
@@ -238,7 +242,7 @@ def run_revise_plan(
             "reasoning": {"effort": "none"},
             "text": {"verbosity": "low"},
         }
-        repair_resp = call_with_schema(client, repair_kwargs, TRAINING_PLAN_SCHEMA)
+        repair_resp = _call_with_schema(client, repair_kwargs, TRAINING_PLAN_SCHEMA)
         repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
         obj = ensure_training_plan_shape(json.loads(extract_json_object(repaired)))
         recompute_planned_hours(obj)
