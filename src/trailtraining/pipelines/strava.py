@@ -23,6 +23,7 @@ from trailtraining.data.strava import (
     get_valid_token,
     save_token,
 )
+from trailtraining.util.errors import DataValidationError, ExternalServiceError
 from trailtraining.util.http_retry import request_with_retry
 from trailtraining.util.state import load_json, save_json
 from trailtraining.web.auth_server import start_auth_server, wait_for_code
@@ -31,7 +32,6 @@ STRAVA_API_BASE = "https://www.strava.com/api/v3"
 ACTIVITIES_PATH = "/athlete/activities"
 
 
-# Files written/used by this pipeline
 def ACTIVITIES_JSON() -> str:
     return os.path.join(config.PROCESSING_DIRECTORY, "strava_activities.json")
 
@@ -40,32 +40,24 @@ def META_JSON() -> str:
     return os.path.join(config.PROCESSING_DIRECTORY, "strava_meta.json")
 
 
-# Defaults (tweak via env)
 DEFAULT_LOOKBACK_DAYS = int(os.getenv("TRAILTRAINING_STRAVA_LOOKBACK_DAYS", "365"))
-
-# 0 = unlimited (recommended; avoids silent truncation for high-volume users)
 MAX_PAGES = int(os.getenv("TRAILTRAINING_STRAVA_MAX_PAGES", "0"))
-
-# Safety cap to prevent runaway loops if something unexpected happens
 HARD_MAX_PAGES = int(os.getenv("TRAILTRAINING_STRAVA_HARD_MAX_PAGES", "1000"))
-
-PER_PAGE = int(os.getenv("TRAILTRAINING_STRAVA_PER_PAGE", "200"))  # Strava max is 200
+PER_PAGE = int(os.getenv("TRAILTRAINING_STRAVA_PER_PAGE", "200"))
 AFTER_BUFFER_SECONDS = int(
     os.getenv("TRAILTRAINING_STRAVA_AFTER_BUFFER_SECONDS", str(7 * 24 * 3600))
-)  # 7 days
+)
 
 
 def _parse_strava_datetime(s: Optional[str]) -> Optional[datetime]:
     if not s:
         return None
-    # Strava uses ISO8601; start_date is often "...Z"
     s = s.replace("Z", "+00:00")
     try:
         dt = datetime.fromisoformat(s)
     except ValueError:
         return None
     if dt.tzinfo is None:
-        # treat as UTC if missing tz
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
 
@@ -73,7 +65,6 @@ def _parse_strava_datetime(s: Optional[str]) -> Optional[datetime]:
 def _request_with_retry(
     session: requests.Session, method: str, url: str, **kwargs: Any
 ) -> requests.Response:
-    """Delegate to shared retry utility with Strava-specific service name."""
     return request_with_retry(session, method, url, service_name="Strava", **kwargs)
 
 
@@ -87,14 +78,16 @@ def _api_get(
         headers={"Authorization": f"Bearer {access_token}"},
         params=params or {},
     )
-    return resp.json()
+    try:
+        return resp.json()
+    except ValueError as err:
+        raise ExternalServiceError(
+            message="Strava JSON parse failed.",
+            hint=f"HTTP {resp.status_code}: {resp.text[:300]}",
+        ) from err
 
 
 def _slim_activity(a: dict[str, Any]) -> dict[str, Any]:
-    """
-    Keep only fields commonly needed downstream.
-    Include BOTH start_date (UTC) and start_date_local.
-    """
     return {
         "id": a.get("id"),
         "name": a.get("name"),
@@ -119,7 +112,6 @@ def _get_or_auth_token(cfg: StravaOAuthConfig) -> dict[str, Any]:
     if token:
         return token
 
-    # First-time OAuth
     start_auth_server(host="127.0.0.1", port=5000)
     url, _state = build_authorize_url(cfg)
     print("\nOpen this URL to authorize Strava:\n")
@@ -132,11 +124,6 @@ def _get_or_auth_token(cfg: StravaOAuthConfig) -> dict[str, Any]:
 
 
 def auth_main(*, force: bool = False) -> None:
-    """
-    Authorize Strava for this profile and write the token file.
-
-    Unlike `main()`, this does NOT fetch activities.
-    """
     config.ensure_directories()
     cfg = StravaOAuthConfig.from_env()
     token_path = default_token_path()
@@ -144,7 +131,7 @@ def auth_main(*, force: bool = False) -> None:
     if not force:
         token = get_valid_token(cfg, token_path=token_path)
         if token:
-            print(f"✅ Strava already authorized → {token_path}")
+            print(f"✅ Strava already authorized -> {token_path}")
             return
 
     start_auth_server(host="127.0.0.1", port=5000)
@@ -155,7 +142,7 @@ def auth_main(*, force: bool = False) -> None:
     code = wait_for_code(timeout=300.0)
     token = exchange_code_for_token(cfg, code)
     save_token(token, token_path)
-    print(f"✅ Saved Strava token → {token_path}")
+    print(f"✅ Saved Strava token -> {token_path}")
 
 
 def _compute_after_unix(
@@ -164,13 +151,6 @@ def _compute_after_unix(
     *,
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
 ) -> int:
-    """Compute the ``after`` epoch for the Strava activities endpoint.
-
-    Priority:
-    1. ``meta.max_start_date_ts`` from a previous sync (minus buffer)
-    2. Latest ``start_date`` in existing activities (minus buffer)
-    3. ``NOW - lookback_days`` on first sync (respects configured window)
-    """
     max_ts = meta.get("max_start_date_ts")
     if isinstance(max_ts, (int, float)) and max_ts > 0:
         return max(0, int(max_ts) - AFTER_BUFFER_SECONDS)
@@ -186,7 +166,6 @@ def _compute_after_unix(
     if best > 0:
         return max(0, best - AFTER_BUFFER_SECONDS)
 
-    # First sync: respect the configured lookback window
     now = int(datetime.now(tz=timezone.utc).timestamp())
     return max(0, now - lookback_days * 86400)
 
@@ -200,9 +179,6 @@ def fetch_activities_incremental(
     max_pages: int = MAX_PAGES,
     hard_max_pages: int = HARD_MAX_PAGES,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """
-    Returns: (activities, pagination_info)
-    """
     out: list[dict[str, Any]] = []
 
     page = 1
@@ -226,6 +202,18 @@ def fetch_activities_incremental(
             access_token,
             params={"page": page, "per_page": per_page, "after": after_unix},
         )
+        if not isinstance(items, list):
+            raise DataValidationError(
+                message="Unexpected Strava activities response.",
+                hint=f"Expected a list for page {page}, got {type(items).__name__}.",
+            )
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                raise DataValidationError(
+                    message="Unexpected Strava activity item.",
+                    hint=f"Page {page} item {idx} is {type(item).__name__}, expected dict.",
+                )
+
         if not items:
             break
 
@@ -258,7 +246,6 @@ def _merge_by_id(
         if a.get("id") is not None:
             merged[str(a["id"])] = a
 
-    # stable order by start_date desc (fallback by id)
     def key_fn(x: dict[str, Any]) -> tuple[int, int]:
         dt = _parse_strava_datetime(x.get("start_date"))
         ts = int(dt.timestamp()) if dt else 0
@@ -295,7 +282,6 @@ def main() -> None:
     slim_new = [_slim_activity(a) for a in raw_new]
     merged = _merge_by_id(existing, slim_new)
 
-    # update meta
     max_start_ts = 0
     for a in merged:
         dt = _parse_strava_datetime(a.get("start_date"))
@@ -314,7 +300,7 @@ def main() -> None:
     save_json(ACTIVITIES_JSON(), merged, compact=True)
     save_json(META_JSON(), meta_out, compact=True)
 
-    print(f"Saved {len(merged)} activities → {ACTIVITIES_JSON()}")
+    print(f"Saved {len(merged)} activities -> {ACTIVITIES_JSON()}")
     if slim_new:
         print(f"(Fetched {len(slim_new)} new/updated since after={after_unix})")
 

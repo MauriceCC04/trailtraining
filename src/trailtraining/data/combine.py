@@ -221,8 +221,8 @@ def main() -> None:
     save_json(out_summary, combined, compact=True)
 
     out_rollups = os.path.join(config.PROMPTING_DIRECTORY, "combined_rollups.json")
+    rollups_written = False
 
-    # Rollups (7d + 28d) ending at the most recent date we have
     if combined:
         last_date = _as_date(combined[-1]["date"])
         if last_date:
@@ -234,6 +234,7 @@ def main() -> None:
                 },
             }
             save_json(out_rollups, rollups, compact=True)
+            rollups_written = True
 
     personal_path = os.path.join(config.PROMPTING_DIRECTORY, "formatted_personal_data.json")
     build_formatted_personal_profile(
@@ -243,7 +244,10 @@ def main() -> None:
     )
 
     print(f"Wrote: {out_summary}")
-    print(f"Wrote: {out_rollups}")
+    if rollups_written:
+        print(f"Wrote: {out_rollups}")
+    else:
+        print(f"Skipped rollups: no dated combined data available for {out_rollups}")
     print(f"Wrote: {personal_path}")
 
 

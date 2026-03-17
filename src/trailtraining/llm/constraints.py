@@ -1,4 +1,3 @@
-# src/trailtraining/llm/constraints.py
 from __future__ import annotations
 
 import os
@@ -6,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Optional
 
+from trailtraining.llm.windowing import extract_last7_hours, normalize_plan_days, rolling_windows
 from trailtraining.util.dates import _as_date
 
 
@@ -140,14 +140,6 @@ def _v(
     }
 
 
-def _rolling7(days: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
-    if not days:
-        return []
-    if len(days) <= 7:
-        return [days]
-    return [days[i : i + 7] for i in range(0, len(days) - 7 + 1)]
-
-
 def _as_clean_str(v: Any) -> Optional[str]:
     if not isinstance(v, str):
         return None
@@ -218,19 +210,6 @@ def _forecast_reason_text(ctx: dict[str, Optional[str]]) -> str:
     return "; ".join(reasons)
 
 
-def _normalize_days(plan_obj: dict[str, Any]) -> list[dict[str, Any]]:
-    raw = (plan_obj.get("plan") or {}).get("days")
-    if not isinstance(raw, list):
-        return []
-    days: list[dict[str, Any]] = [d for d in raw if isinstance(d, dict)]
-
-    def key(d: dict[str, Any]) -> tuple[int, str]:
-        dd = _as_date(d.get("date"))
-        return (0, dd.isoformat()) if dd else (1, str(d.get("date") or ""))
-
-    return sorted(days, key=key)
-
-
 def _planned_week_hours(plan_obj: dict[str, Any]) -> Optional[float]:
     wt = (plan_obj.get("plan") or {}).get("weekly_totals") or {}
     v = wt.get("planned_moving_time_hours")
@@ -258,17 +237,12 @@ def validate_training_plan(
     cfg: ConstraintConfig,
 ) -> list[dict[str, Any]]:
     violations: list[dict[str, Any]] = []
-    days = _normalize_days(plan_obj)
+    days = normalize_plan_days(plan_obj)
 
     declared_planned_hours = _planned_week_hours(plan_obj)
     actual_first7_hours = _sum_hours(days[: min(7, len(days))]) if days else None
 
-    last7_hours = None
-    try:
-        w7 = (rollups or {}).get("windows", {}).get("7", {})
-        last7_hours = w7.get("activities", {}).get("total_moving_time_hours")
-    except Exception:
-        last7_hours = None
+    last7_hours = extract_last7_hours(rollups)
 
     ramp_basis_hours = (
         actual_first7_hours if actual_first7_hours is not None else declared_planned_hours
@@ -326,7 +300,7 @@ def evaluate_training_plan_quality(
             v0.setdefault("penalty", _default_penalty(str(v0.get("severity", "medium"))))
             violations.append(v0)
 
-    days = _normalize_days(plan_obj)
+    days = normalize_plan_days(plan_obj)
 
     hard_days = sum(1 for d in days if bool(d.get("is_hard_day")))
     rest_days = sum(1 for d in days if bool(d.get("is_rest_day")))
@@ -421,12 +395,7 @@ def evaluate_training_plan_quality(
                 )
             )
 
-    last7_hours = None
-    try:
-        w7 = (rollups or {}).get("windows", {}).get("7", {})
-        last7_hours = w7.get("activities", {}).get("total_moving_time_hours")
-    except Exception:
-        last7_hours = None
+    last7_hours = extract_last7_hours(rollups)
 
     actual_first7_hours = _sum_hours(days[: min(7, len(days))]) if days else None
     ramp_basis_hours = actual_first7_hours if actual_first7_hours is not None else planned_hours
@@ -458,7 +427,7 @@ def evaluate_training_plan_quality(
                 )
             )
 
-    for i, wk in enumerate(_rolling7(days)):
+    for i, wk in enumerate(rolling_windows(days, size=7)):
         h = sum(1 for d in wk if bool(d.get("is_hard_day")))
         if h > cfg.max_hard_per_7d:
             violations.append(
@@ -476,7 +445,7 @@ def evaluate_training_plan_quality(
                 )
             )
 
-    for i, wk in enumerate(_rolling7(days)):
+    for i, wk in enumerate(rolling_windows(days, size=7)):
         r = sum(1 for d in wk if bool(d.get("is_rest_day")))
         if r < cfg.min_rest_per_7d:
             sev = "high" if r == 0 else "medium"
@@ -500,7 +469,7 @@ def evaluate_training_plan_quality(
         reason_text = _forecast_reason_text(fx)
         sev = "high" if fx.get("overreach_risk_level") == "high" else "medium"
 
-        for i, wk in enumerate(_rolling7(days)):
+        for i, wk in enumerate(rolling_windows(days, size=7)):
             h = sum(1 for d in wk if bool(d.get("is_hard_day")))
             if h > effective_max_hard_per_7d:
                 violations.append(

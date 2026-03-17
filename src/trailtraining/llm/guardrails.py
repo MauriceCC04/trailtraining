@@ -1,36 +1,13 @@
-# src/trailtraining/llm/guardrails.py
 from __future__ import annotations
 
 from typing import Any, Optional
 
 from trailtraining.llm.constraints import ConstraintConfig, constraint_config_from_env
+from trailtraining.llm.windowing import extract_last7_hours, normalize_plan_days, rolling_windows
 
 
 def _get_cfg() -> ConstraintConfig:
     return constraint_config_from_env()
-
-
-def _get_last7_hours(rollups: Optional[dict[str, Any]]) -> Optional[float]:
-    try:
-        v = (
-            (rollups or {})
-            .get("windows", {})
-            .get("7", {})
-            .get("activities", {})
-            .get("total_moving_time_hours")
-        )
-        return float(v) if isinstance(v, (int, float)) else None
-    except Exception:
-        return None
-
-
-def _normalize_days(plan_obj: dict[str, Any]) -> list[dict[str, Any]]:
-    days = (plan_obj.get("plan") or {}).get("days")
-    if not isinstance(days, list):
-        return []
-    out = [d for d in days if isinstance(d, dict)]
-    out.sort(key=lambda d: str(d.get("date") or "9999-99-99"))
-    return out
 
 
 def _sum_minutes(days: list[dict[str, Any]]) -> int:
@@ -43,7 +20,7 @@ def _sum_minutes(days: list[dict[str, Any]]) -> int:
 
 
 def _set_weekly_hours(plan_obj: dict[str, Any]) -> float:
-    days = _normalize_days(plan_obj)
+    days = normalize_plan_days(plan_obj)
     first7 = days[: min(7, len(days))]
     total_min = _sum_minutes(first7)
     hours = total_min / 60.0
@@ -158,16 +135,23 @@ def _enforce_max_hard_per_7d(days: list[dict[str, Any]], max_hard: int) -> list[
     if max_hard <= 0:
         return changed
 
-    # Enforce per non-overlapping 7-day week across the full plan (supports multi-week plans)
-    for start in range(0, len(days), 7):
-        wk = days[start : start + 7]
-        hard = [d for d in wk if bool(d.get("is_hard_day")) and not bool(d.get("is_rest_day"))]
+    windows = rolling_windows(days, size=7)
+    for _ in range(len(days)):
+        violating: list[dict[str, Any]] | None = None
+        hard: list[dict[str, Any]] = []
 
-        while len(hard) > max_hard:
-            cand = max(hard, key=_hard_downgrade_score)
-            cand["is_hard_day"] = False
-            changed.append(str(cand.get("date") or ""))
+        for wk in windows:
             hard = [d for d in wk if bool(d.get("is_hard_day")) and not bool(d.get("is_rest_day"))]
+            if len(hard) > max_hard:
+                violating = wk
+                break
+
+        if violating is None:
+            break
+
+        cand = max(hard, key=_hard_downgrade_score)
+        cand["is_hard_day"] = False
+        changed.append(str(cand.get("date") or ""))
 
     return changed
 
@@ -183,7 +167,6 @@ def _rest_convert_score(d: dict[str, Any]) -> int:
         return 3
     if st == "long":
         return 4
-    # tempo / intervals / hills — last resort
     return 5
 
 
@@ -197,9 +180,9 @@ def _enforce_min_rest_per_rolling7d(days: list[dict[str, Any]], min_rest: int) -
     if min_rest <= 0:
         return changed
 
-    windows = [days[i : i + 7] for i in range(0, len(days) - 7 + 1)] if len(days) > 7 else [days]
+    windows = rolling_windows(days, size=7)
 
-    for _ in range(len(days)):  # safety bound
+    for _ in range(len(days)):
         violating: list[dict[str, Any]] | None = None
         for wk in windows:
             if sum(1 for d in wk if bool(d.get("is_rest_day"))) < min_rest:
@@ -248,7 +231,7 @@ def _enforce_max_consecutive_hard(days: list[dict[str, Any]], max_consec: int) -
 
 def build_eval_constraints_block(rollups: Optional[dict[str, Any]]) -> str:
     cfg = _get_cfg()
-    last7 = _get_last7_hours(rollups)
+    last7 = extract_last7_hours(rollups)
     allowed = (
         (last7 * (1.0 + cfg.max_ramp_pct / 100.0)) if isinstance(last7, (int, float)) else None
     )
@@ -286,7 +269,7 @@ def apply_eval_coach_guardrails(
         return
 
     cfg = _get_cfg()
-    days = _normalize_days(plan_obj)
+    days = normalize_plan_days(plan_obj)
 
     for d in days:
         if bool(d.get("is_rest_day")):
@@ -299,7 +282,7 @@ def apply_eval_coach_guardrails(
     changed_hard_consec = _enforce_max_consecutive_hard(days, cfg.max_consecutive_hard)
     changed_rest = _enforce_min_rest_per_rolling7d(days, cfg.min_rest_per_7d)
 
-    last7 = _get_last7_hours(rollups)
+    last7 = extract_last7_hours(rollups)
     if isinstance(last7, (int, float)) and last7 > 0:
         allowed_hours = float(last7) * (1.0 + cfg.max_ramp_pct / 100.0)
 

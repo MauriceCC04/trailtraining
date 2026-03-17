@@ -1,10 +1,10 @@
 import glob
-import json
 import os
 from datetime import datetime, timedelta
 from typing import Any
 
 from trailtraining import config
+from trailtraining.util.state import load_json, save_json
 
 
 def combine_json_files(directory: str, output_file: str) -> None:
@@ -15,31 +15,26 @@ def combine_json_files(directory: str, output_file: str) -> None:
         directory (str): Path to the directory containing JSON files.
         output_file (str): Path to the output JSON file.
     """
-    json_files = glob.glob(os.path.join(directory, "*.json"))
+    json_files = sorted(glob.glob(os.path.join(directory, "*.json")))
     combined_data = []
 
     for json_file in json_files:
-        with open(json_file, encoding="utf-8") as file:
-            data = json.load(file)
-            combined_data.append(data)
-    # delete the output file if it exists
-    if os.path.exists(output_file):
-        os.remove(output_file)
+        combined_data.append(load_json(json_file, default=None))
 
-    with open(output_file, "w", encoding="utf-8") as file:
-        json.dump(combined_data, file, indent=4)
+    save_json(output_file, combined_data, compact=False)
 
 
 def format_personal_data(input_path: str, output_path: str) -> None:
     """
     Format personal data from Garmin JSON file.
     """
-    with open(input_path, encoding="utf-8") as f:
-        data = json.load(f)
-    # Remove specified keys from userInfo
+    data = load_json(input_path, default={})
+    if not isinstance(data, dict):
+        data = {}
+
     for key in ["email", "locale", "timeZone", "countryCode"]:
         data.get("userInfo", {}).pop(key, None)
-    # Remove specified keys from biometricProfile
+
     for key in [
         "userId",
         "vo2Max",
@@ -49,13 +44,13 @@ def format_personal_data(input_path: str, output_path: str) -> None:
         "activityClass",
     ]:
         data.get("biometricProfile", {}).pop(key, None)
-    # Remove top-level timeZone
+
     data.pop("timeZone", None)
     data.pop("locale", None)
     data.pop("birthDate", None)
     data.pop("gender", None)
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+
+    save_json(output_path, data, compact=False)
 
 
 def shorten_rhr(input_path: str, output_path: str) -> None:
@@ -65,14 +60,12 @@ def shorten_rhr(input_path: str, output_path: str) -> None:
         input_path (str): Path to the input JSON file.
         output_path (str): Path to the output JSON file.
     """
-    # delete the output file if it exists
-    if os.path.exists(output_path):
-        os.remove(output_path)
-
     today = datetime.now()
     cutoff = today - timedelta(days=200)
-    with open(input_path, encoding="utf-8") as file:
-        data = json.load(file)
+    data = load_json(input_path, default=[])
+    if not isinstance(data, list):
+        data = []
+
     filtered = []
     for entry in data:
         metrics = (
@@ -84,8 +77,8 @@ def shorten_rhr(input_path: str, output_path: str) -> None:
                 date_obj = datetime.strptime(date_str, "%Y-%m-%d")
                 if date_obj >= cutoff:
                     filtered.append(entry)
-    with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(filtered, file, indent=4)
+
+    save_json(output_path, filtered, compact=False)
 
 
 def shorten_sleep(input_path: str, output_path: str) -> None:
@@ -97,11 +90,9 @@ def shorten_sleep(input_path: str, output_path: str) -> None:
     """
     today = datetime.now()
     cutoff = today - timedelta(days=200)
-    with open(input_path, encoding="utf-8") as file:
-        data = json.load(file)
-    # delete the output file if it exists
-    if os.path.exists(output_path):
-        os.remove(output_path)
+    data = load_json(input_path, default=[])
+    if not isinstance(data, list):
+        data = []
 
     filtered = []
     for entry in data:
@@ -110,9 +101,8 @@ def shorten_sleep(input_path: str, output_path: str) -> None:
             date_obj = datetime.strptime(date_str, "%Y-%m-%d")
             if date_obj >= cutoff:
                 filtered.append(entry)
-    # Write the filtered data to the output file
-    with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(filtered, file, indent=4)
+
+    save_json(output_path, filtered, compact=False)
 
 
 def filter_sleep(input_path: str, output_path: str) -> None:
@@ -127,10 +117,8 @@ def filter_sleep(input_path: str, output_path: str) -> None:
         * a list[list[dict]] (flattens)
         * a dict (wraps to list)
     """
-    with open(input_path, encoding="utf-8") as f:
-        raw = json.load(f)
+    raw = load_json(input_path, default=[])
 
-    # Normalize shapes
     entries = []
     if isinstance(raw, dict):
         entries = [raw]
@@ -157,14 +145,12 @@ def filter_sleep(input_path: str, output_path: str) -> None:
         "avgOvernightHrv",
     ]
 
-    # bare dict intentional — internal helper, not worth subscripting
     def pick(entry: dict, key: str) -> Any:
         dto = entry.get("dailySleepDTO")
         if isinstance(dto, dict) and dto.get(key) is not None:
             return dto.get(key)
         return entry.get(key)
 
-    # v is json.load output — Any is the correct type
     def to_int(v: Any, default: int = -1) -> int:
         if v is None:
             return default
@@ -188,36 +174,30 @@ def filter_sleep(input_path: str, output_path: str) -> None:
 
         out.append(row)
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(out, f, indent=4)
+    save_json(output_path, out, compact=False)
 
 
 def main() -> None:
-    # Combine JSON files
     combine_json_files(config.RHR_DIRECTORY, os.path.join(config.PROCESSING_DIRECTORY, "rhr.json"))
     combine_json_files(
         config.SLEEP_DIRECTORY, os.path.join(config.PROCESSING_DIRECTORY, "sleep.json")
     )
 
-    # Format personal data
     format_personal_data(
         os.path.join(config.FIT_DIRECTORY, "personal-information.json"),
         os.path.join(config.PROMPTING_DIRECTORY, "formatted_personal_data.json"),
     )
 
-    # Shorten RHR data
     shorten_rhr(
         os.path.join(config.PROCESSING_DIRECTORY, "rhr.json"),
         os.path.join(config.PROMPTING_DIRECTORY, "shortened_rhr.json"),
     )
 
-    # Filter sleep data
     filter_sleep(
         os.path.join(config.PROCESSING_DIRECTORY, "sleep.json"),
         os.path.join(config.PROCESSING_DIRECTORY, "filtered_sleep.json"),
     )
 
-    # Shorten sleep data
     shorten_sleep(
         os.path.join(config.PROCESSING_DIRECTORY, "filtered_sleep.json"),
         os.path.join(config.PROMPTING_DIRECTORY, "shortened_sleep.json"),

@@ -1,4 +1,3 @@
-# src/trailtraining/llm/coach.py
 from __future__ import annotations
 
 import calendar
@@ -25,6 +24,8 @@ from trailtraining.llm.schemas import (
 )
 from trailtraining.llm.signals import build_retrieval_context
 from trailtraining.util.dates import _as_date
+from trailtraining.util.errors import LLMUnsupportedParameterError
+from trailtraining.util.llm_helpers import _classify_and_raise
 from trailtraining.util.state import load_json, save_json
 from trailtraining.util.text import _safe_json_snippet
 
@@ -73,7 +74,7 @@ def _parse_race_context(goal_text: str, today: Optional[date] = None) -> dict[st
     Supports:
     - ISO dates:              "2026-07-30"
     - Full dates:             "July 30 2026", "July 30, 2026"
-    - Month + year:           "July 2026"  (approximate → last day of month)
+    - Month + year:           "July 2026"  (approximate -> last day of month)
     - Month only:             "in April"  (next occurrence, approximate)
 
     Returns an empty dict if no recognisable date is found or the date has passed.
@@ -83,13 +84,11 @@ def _parse_race_context(goal_text: str, today: Optional[date] = None) -> dict[st
     race_date: Optional[date] = None
     is_approximate = False
 
-    # ISO date: 2026-07-30
     m = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", goal_text)
     if m:
         with contextlib.suppress(ValueError):
             race_date = date.fromisoformat(m.group(1))
 
-    # Full date: "July 30 2026" / "July 30, 2026"
     if not race_date:
         m = re.search(
             rf"\b({_MONTH_PATTERN})\s+(\d{{1,2}}),?\s+(\d{{4}})\b",
@@ -101,7 +100,6 @@ def _parse_race_context(goal_text: str, today: Optional[date] = None) -> dict[st
                 with contextlib.suppress(ValueError):
                     race_date = date(int(m.group(3)), month, int(m.group(2)))
 
-    # Month + year: "July 2026"
     if not race_date:
         m = re.search(rf"\b({_MONTH_PATTERN})\s+(\d{{4}})\b", low)
         if m:
@@ -113,7 +111,6 @@ def _parse_race_context(goal_text: str, today: Optional[date] = None) -> dict[st
                     race_date = date(year, month, last_day)
                     is_approximate = True
 
-    # Month only: "in April" or bare month name
     if not race_date:
         m = re.search(rf"\b(?:in\s+)?({_MONTH_PATTERN})\b", low)
         if m:
@@ -130,7 +127,7 @@ def _parse_race_context(goal_text: str, today: Optional[date] = None) -> dict[st
 
     days_to_race = (race_date - today).days
     if days_to_race < 0:
-        return {}  # race already passed
+        return {}
 
     return {
         "race_date": race_date.isoformat(),
@@ -145,16 +142,16 @@ def _race_context_section(primary_goal: str) -> list[str]:
     ctx = _parse_race_context(primary_goal)
     if not ctx:
         return []
-    approx = " (approximate — use last day of the stated month)" if ctx["is_approximate"] else ""
+    approx = " (approximate -> use last day of the stated month)" if ctx["is_approximate"] else ""
     weeks = ctx["weeks_to_race"]
     if weeks <= 2:
-        phase = "TAPER / RACE-READY — reduce volume ~20-30 %, sharpen with short quality only."
+        phase = "TAPER / RACE-READY -> reduce volume ~20-30 %, sharpen with short quality only."
     elif weeks <= 6:
-        phase = "PEAK — maintain quality, cap volume, practice race-specific efforts."
+        phase = "PEAK -> maintain quality, cap volume, practice race-specific efforts."
     elif weeks <= 12:
-        phase = "BUILD — progressive loading, race-specific workouts increasing in frequency."
+        phase = "BUILD -> progressive loading, race-specific workouts increasing in frequency."
     else:
-        phase = "BASE / DEVELOPMENT — aerobic foundation; race-specific intensity starts later."
+        phase = "BASE / DEVELOPMENT -> aerobic foundation; race-specific intensity starts later."
 
     return [
         "## Race Goal Context (use to calibrate periodization)",
@@ -232,17 +229,27 @@ def _call_with_param_fallback(client: OpenAI, kwargs: dict[str, Any]) -> Any:
         return {k: v for k, v in kw.items() if k != "reasoning"}
 
     attempts = [
-        kwargs,
-        _strip_verbosity(kwargs),
-        _strip_reasoning(kwargs),
-        _strip_reasoning(_strip_verbosity(kwargs)),
+        ("full", kwargs),
+        ("no_text_verbosity", _strip_verbosity(kwargs)),
+        ("no_reasoning", _strip_reasoning(kwargs)),
+        ("bare_minimum", _strip_reasoning(_strip_verbosity(kwargs))),
     ]
     last_exc: Optional[Exception] = None
-    for kw in attempts:
+    for label, kw in attempts:
         try:
             return client.responses.create(**kw)
         except Exception as exc:
-            last_exc = exc
+            try:
+                _classify_and_raise(exc)
+            except LLMUnsupportedParameterError as unsupported:
+                log.warning(
+                    "LLM call rejected %s attempt due to unsupported parameters: %s",
+                    label,
+                    unsupported,
+                )
+                last_exc = unsupported
+                continue
+            raise
     assert last_exc is not None
     raise last_exc
 
@@ -251,34 +258,39 @@ def _call_with_schema(client: OpenAI, kwargs: dict[str, Any], schema: dict[str, 
     """Try structured JSON output, fall back to plain call if the model doesn't support it."""
     name, body = schema.get("name"), schema.get("schema")
 
-    try:  # newer: text.format
-        kw = {
-            **kwargs,
-            "text": {
-                **kwargs.get("text", {}),
-                "format": {
-                    "type": "json_schema",
-                    "name": name,
-                    "schema": body,
-                    "strict": True,
+    structured_attempts = [
+        (
+            "text.format",
+            {
+                **kwargs,
+                "text": {
+                    **kwargs.get("text", {}),
+                    "format": {
+                        "type": "json_schema",
+                        "name": name,
+                        "schema": body,
+                        "strict": True,
+                    },
                 },
             },
-        }
-        return _call_with_param_fallback(client, kw)
-    except Exception:
-        pass
-
-    try:  # older: response_format
-        kw = {
-            **kwargs,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {"name": name, "strict": True, "schema": body},
+        ),
+        (
+            "response_format",
+            {
+                **kwargs,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": name, "strict": True, "schema": body},
+                },
             },
-        }
-        return _call_with_param_fallback(client, kw)
-    except Exception:
-        pass
+        ),
+    ]
+
+    for label, kw in structured_attempts:
+        try:
+            return _call_with_param_fallback(client, kw)
+        except LLMUnsupportedParameterError as exc:
+            log.warning("Structured output mode %s unavailable; falling back: %s", label, exc)
 
     return _call_with_param_fallback(client, kwargs)
 
@@ -411,7 +423,10 @@ def _load_or_compute_deterministic_forecast(
     forecast_p = base_dir / "readiness_and_risk_forecast.json"
     if forecast_p.exists():
         obj = load_json(forecast_p, default=None)
-        return obj if isinstance(obj, dict) else None
+        if isinstance(obj, dict):
+            return obj
+        log.warning("Ignoring malformed deterministic forecast artifact at %s", forecast_p)
+        return None
     try:
         from trailtraining.forecast.forecast import compute_readiness_and_risk
 
@@ -429,10 +444,13 @@ def _load_or_compute_deterministic_forecast(
                 "drivers": fr.drivers,
             },
         }
-        with contextlib.suppress(Exception):
+        try:
             save_json(forecast_p, payload, compact=False)
+        except Exception as exc:
+            log.warning("Failed to persist deterministic forecast to %s: %s", forecast_p, exc)
         return payload
-    except Exception:
+    except (ImportError, AttributeError, TypeError, ValueError) as exc:
+        log.warning("Deterministic forecast unavailable: %s", exc)
         return None
 
 
@@ -779,7 +797,7 @@ class CoachConfig:
     temperature: Optional[float] = None
     style: str = "trailrunning"
     primary_goal: str = ""
-    plan_days: int = 7  # output plan duration (set via --plan-days or TRAILTRAINING_PLAN_DAYS)
+    plan_days: int = 7
 
     @classmethod
     def from_env(cls) -> CoachConfig:
