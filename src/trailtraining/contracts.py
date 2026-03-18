@@ -14,14 +14,6 @@ class StrictModel(BaseModel):
 
 
 class SnapshotStats(StrictModel):
-    """Snapshot statistics for a time window.
-
-    Numeric-looking fields are kept as ``str`` because the LLM may emit
-    empty strings for unavailable values.  Validators coerce obvious
-    numerics so downstream code can parse them, but empty string
-    (``""``) is preserved as-is to mean "not available".
-    """
-
     distance_km: str
     moving_time_hours: str
     elevation_m: str
@@ -42,7 +34,6 @@ class SnapshotStats(StrictModel):
     )
     @classmethod
     def _coerce_to_str(cls, v: Any) -> str:
-        """Accept numeric inputs and coerce to string representation."""
         if v is None:
             return ""
         if isinstance(v, (int, float)):
@@ -175,6 +166,7 @@ class MarkerAssessmentArtifact(StrictModel):
     marker: str
     verdict: Literal["pass", "partial", "fail"]
     score: Union[int, float]
+    observation: Optional[str] = None  # what the model observes in the plan before scoring
     evidence: str
     improvement_hint: str
 
@@ -194,6 +186,8 @@ class SoftAssessmentArtifact(StrictModel):
     suggested_improvements: list[str] = Field(default_factory=list)
     repaired: bool = False
     derived_fields: list[str] = Field(default_factory=list)
+    inter_rater_runs: Optional[int] = None
+    inter_rater_variance: Optional[dict[str, float]] = None
 
 
 class EvaluationReportArtifact(StrictModel):
@@ -208,54 +202,36 @@ class EvaluationReportArtifact(StrictModel):
 # ---------- forecast artifact ----------
 
 
-# Patch: replace the ForecastInputs class in src/trailtraining/contracts.py
-#
-# The only change from the original is the addition of eight new Optional fields
-# (sleep_28d_*, sleep_delta_*, sleep_z, hrv_28d_*, hrv_delta_*, hrv_z) that
-# forecast.py now populates.  StrictModel forbids extra keys, so without these
-# additions ForecastInputs.model_validate(fr.inputs) would raise.
-#
-# Replace the existing ForecastInputs class (everything between
-# "class ForecastInputs(StrictModel):" and the blank line before
-# "class ForecastDrivers(StrictModel):") with the block below.
-
-
 class ForecastInputs(StrictModel):
     as_of_date: dt.date
 
-    # Resting heart rate
     rhr_7d_mean_bpm: Optional[float] = None
     rhr_28d_mean_bpm: Optional[float] = None
     rhr_28d_std_bpm: Optional[float] = None
     rhr_delta_bpm: Optional[float] = None
     rhr_z: Optional[float] = None
 
-    # Training load
     training_load_7d_hours: Optional[float] = None
     training_load_rolling7_mean_hours: Optional[float] = None
     training_load_rolling7_std_hours: Optional[float] = None
     training_load_delta_hours: Optional[float] = None
     training_load_z: Optional[float] = None
 
-    # Sleep — 7d values were already present; 28d baseline is new
     sleep_7d_mean_hours: Optional[float] = None
-    sleep_28d_mean_hours: Optional[float] = None  # NEW
-    sleep_28d_std_hours: Optional[float] = None  # NEW
-    sleep_delta_hours: Optional[float] = None  # NEW
-    sleep_z: Optional[float] = None  # NEW
+    sleep_28d_mean_hours: Optional[float] = None
+    sleep_28d_std_hours: Optional[float] = None
+    sleep_delta_hours: Optional[float] = None
+    sleep_z: Optional[float] = None
 
-    # HRV — 7d value was already present; 28d baseline is new
     hrv_7d_mean_ms: Optional[float] = None
-    hrv_28d_mean_ms: Optional[float] = None  # NEW
-    hrv_28d_std_ms: Optional[float] = None  # NEW
-    hrv_delta_ms: Optional[float] = None  # NEW
-    hrv_z: Optional[float] = None  # NEW
+    hrv_28d_mean_ms: Optional[float] = None
+    hrv_28d_std_ms: Optional[float] = None
+    hrv_delta_ms: Optional[float] = None
+    hrv_z: Optional[float] = None
 
-    # Capability summary
     recovery_capability_key: str = "load_only"
     recovery_capability_label: str = "I only have training data"
 
-    # Signal day counts
     sleep_days_7d: int = 0
     resting_hr_days_7d: int = 0
     hrv_days_7d: int = 0

@@ -149,7 +149,7 @@ def _build_revise_prompt(
             "## Non-negotiable rules",
             "- Return JSON only.",
             "- The output must match the training-plan schema exactly.",
-            f"- The revised plan MUST contain exactly {plan_days} days in plan.days — do NOT reduce the day count.",
+            f"- The revised plan MUST contain exactly {plan_days} days in plan.days.",
             "- Preserve meta.plan_days and the overall date range unless evaluator feedback clearly requires a change.",
             "- Keep the plan grounded in the original artifact's signals and citations.",
             "- Do not invent new signal_ids unless they already exist in the original plan/citations.",
@@ -179,7 +179,16 @@ def run_revise_plan(
     output_path: Optional[str] = None,
     rollups_path: Optional[str] = None,
     runtime: Optional[config.RuntimeConfig] = None,
+    auto_reeval: bool = False,
 ) -> tuple[str, str]:
+    """
+    Revise a training plan using evaluator feedback.
+
+    When auto_reeval=True, the revised plan is immediately re-evaluated with
+    the deterministic constraint engine and the delta_score is written to a
+    companion file ``<stem>-reeval.json`` next to the revised plan.
+    A warning is logged and printed if the revision degraded the score.
+    """
     runtime = runtime or config.current()
     config.ensure_directories(runtime)
     paths = runtime.paths
@@ -266,5 +275,69 @@ def run_revise_plan(
     txt_p = out_p.parent / f"{out_p.stem}.txt"
     txt_p.write_text(training_plan_to_text(final_obj), encoding="utf-8")
 
+    # --- Optional auto-reeval ---
+    if auto_reeval:
+        _run_auto_reeval(
+            revised_plan_path=out_p,
+            original_report_obj=report_obj,
+            rollups_path=rollups_path,
+        )
+
     pretty = json.dumps(final_obj, indent=2, ensure_ascii=False)
     return pretty, str(out_p)
+
+
+def _run_auto_reeval(
+    revised_plan_path: Path,
+    original_report_obj: dict[str, Any],
+    rollups_path: Optional[str],
+) -> None:
+    """
+    Re-evaluate the revised plan with the deterministic constraint engine and
+    write a delta report to ``<stem>-reeval.json``.
+
+    Logs and prints a warning if the revision degraded the deterministic score.
+    """
+    from trailtraining.llm.eval import evaluate_training_plan_quality_file
+
+    original_score = float(original_report_obj.get("score", 0))
+
+    try:
+        revised_report, _ = evaluate_training_plan_quality_file(
+            str(revised_plan_path),
+            rollups_path=rollups_path,
+        )
+    except Exception as exc:
+        log.warning("Auto-reeval failed: %s", exc)
+        return
+
+    revised_score = float(revised_report.get("score", 0))
+    delta = revised_score - original_score
+
+    reeval_data: dict[str, Any] = {
+        "original_score": original_score,
+        "revised_score": revised_score,
+        "delta_score": round(delta, 1),
+        "violations": revised_report.get("violations", []),
+        "grade": revised_report.get("grade", "?"),
+    }
+
+    reeval_path = revised_plan_path.parent / f"{revised_plan_path.stem}-reeval.json"
+    try:
+        save_json(reeval_path, reeval_data, compact=False)
+        print(f"[Saved] {reeval_path}")
+    except Exception as exc:
+        log.warning("Could not write reeval file: %s", exc)
+
+    if delta < 0:
+        msg = (
+            f"⚠️  Revision degraded deterministic score: "
+            f"{original_score:.0f} → {revised_score:.0f} ({delta:+.1f}). "
+            f"See {reeval_path.name} for violations."
+        )
+        log.warning(msg)
+        print(msg)
+    else:
+        print(
+            f"✅ Auto-reeval: score {original_score:.0f} → {revised_score:.0f} " f"({delta:+.1f})."
+        )

@@ -23,7 +23,7 @@ from trailtraining.commands.pipeline_commands import (
 )
 
 # ---------------------------------------------------------------------------
-# Shared argument-group helpers (Issue 7: reduce repetition)
+# Shared argument-group helpers
 # ---------------------------------------------------------------------------
 
 
@@ -62,12 +62,12 @@ def _add_clean_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--clean",
         action="store_true",
-        help="Delete files in BOTH processing/ and prompting/ before running (disables incremental Strava).",
+        help="Delete files in BOTH processing/ and prompting/ before running.",
     )
     parser.add_argument(
         "--clean-processing",
         action="store_true",
-        help="Delete files in processing/ before running (disables incremental Strava).",
+        help="Delete files in processing/ before running.",
     )
     parser.add_argument(
         "--clean-prompting",
@@ -189,7 +189,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--style",
         default=None,
         choices=["trailrunning", "triathlon"],
-        help="Prompt preset: changes system instructions; training-plan prompt is sport-specific.",
+        help="Prompt preset: changes system instructions.",
     )
     coach_p.set_defaults(func=cmd_coach)
 
@@ -227,6 +227,19 @@ def build_parser() -> argparse.ArgumentParser:
     eval_p.add_argument(
         "--soft-eval-model", default=None, help="OpenRouter model for soft evaluation"
     )
+    eval_p.add_argument(
+        "--soft-eval-runs",
+        type=int,
+        default=1,
+        dest="soft_eval_runs",
+        metavar="N",
+        help=(
+            "Run the soft evaluator N times and report per-marker score variance. "
+            "Values > 1 measure inter-rater reliability. "
+            "Requires temperature variance (temperature > 0 used automatically). "
+            "Markers with std > 0.5 on a 1-5 scale are flagged as potentially ambiguous."
+        ),
+    )
     _add_goal_arg(eval_p)
     eval_p.add_argument(
         "--soft-eval-reasoning-effort",
@@ -259,6 +272,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--rollups",
         default=None,
         help="Optional path to combined_rollups.json",
+    )
+    revise_p.add_argument(
+        "--auto-reeval",
+        action="store_true",
+        dest="auto_reeval",
+        help=(
+            "After revising, immediately re-evaluate the revised plan with the deterministic "
+            "constraint engine and write a delta report to <stem>-reeval.json. "
+            "A warning is printed if the revision degraded the score."
+        ),
     )
     _add_llm_model_args(revise_p)
     _add_goal_arg(revise_p)

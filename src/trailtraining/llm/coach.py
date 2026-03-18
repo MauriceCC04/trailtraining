@@ -46,7 +46,7 @@ from trailtraining.llm.shared import (
 from trailtraining.llm.signals import build_retrieval_context
 from trailtraining.util.dates import _as_date
 from trailtraining.util.errors import ArtifactError, MissingArtifactError
-from trailtraining.util.state import load_json, save_json
+from trailtraining.util.state import _json_default, load_json, save_json
 from trailtraining.util.text import _safe_json_snippet
 
 log = logging.getLogger(__name__)
@@ -558,7 +558,7 @@ def _run_training_plan(
     except Exception as exc:
         log.warning("Failed to write training-plan text: %s", exc)
 
-    return json.dumps(obj, indent=2, ensure_ascii=False), str(out_p)
+    return json.dumps(obj, indent=2, ensure_ascii=False, default=_json_default), str(out_p)
 
 
 def run_coach_brief(

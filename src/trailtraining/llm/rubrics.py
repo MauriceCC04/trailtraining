@@ -22,6 +22,7 @@ class MarkerDefinition:
     marker_id: str
     label: str
     description: str
+    failure_condition: str = ""  # crisp condition under which this marker scores 1 or fails
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,10 @@ _STYLE_MARKERS: dict[str, dict[str, tuple[MarkerDefinition, ...]]] = {
                 marker_id="non_competing_focus",
                 label="Non-competing focus",
                 description="Extra sessions support the main goal rather than distracting from it.",
+                failure_condition=(
+                    "More than one non-running session per week without a stated rationale "
+                    "connecting it to the trail goal."
+                ),
             ),
         ),
         "plan_coherence": (
@@ -115,9 +120,20 @@ _STYLE_MARKERS: dict[str, dict[str, tuple[MarkerDefinition, ...]]] = {
                 description="Hard sessions are spaced sensibly with recovery around them.",
             ),
             MarkerDefinition(
-                marker_id="weekly_internal_consistency",
-                label="Internal consistency",
-                description="Day details, session types, and weekly totals feel mutually consistent.",
+                marker_id="weekly_totals_arithmetic",
+                label="Weekly totals arithmetic",
+                description=(
+                    "The sum of individual session durations matches the stated weekly_totals "
+                    "planned_moving_time_hours within a reasonable tolerance."
+                ),
+            ),
+            MarkerDefinition(
+                marker_id="session_type_purpose_alignment",
+                label="Session type/purpose alignment",
+                description=(
+                    "Each session's type and workout description match the stated purpose for "
+                    "that day — e.g. a session labelled 'easy' should not have an interval workout."
+                ),
             ),
             MarkerDefinition(
                 marker_id="workout_purpose_fit",
@@ -128,6 +144,19 @@ _STYLE_MARKERS: dict[str, dict[str, tuple[MarkerDefinition, ...]]] = {
                 marker_id="load_progression_logic",
                 label="Load progression logic",
                 description="The load and emphasis across the week feel plausible and coherent.",
+                failure_condition=(
+                    "Planned week 1 volume is more than 15% above last 7 days without explicit "
+                    "justification in the plan narrative."
+                ),
+            ),
+            MarkerDefinition(
+                marker_id="week_coherence",
+                label="Week coherence (score last)",
+                description=(
+                    "Given all individual sessions, does the week make sense as a unit — not just "
+                    "per-session, but in terms of how fatigue accumulates and whether the hard/easy "
+                    "pattern holds up end-to-end."
+                ),
             ),
         ),
         "explanation_quality": (
@@ -159,9 +188,20 @@ _STYLE_MARKERS: dict[str, dict[str, tuple[MarkerDefinition, ...]]] = {
                 description="Warnings match the actual context instead of overreacting or underreacting.",
             ),
             MarkerDefinition(
-                marker_id="missing_data_handling",
-                label="Missing-data handling",
-                description="The plan reacts sensibly to sparse telemetry or uncertainty.",
+                marker_id="missing_data_acknowledgment",
+                label="Missing data acknowledgment",
+                description=(
+                    "The plan explicitly acknowledges when recovery signals (sleep, HRV, RHR) "
+                    "are missing or sparse rather than silently omitting them."
+                ),
+            ),
+            MarkerDefinition(
+                marker_id="missing_data_behavioral_response",
+                label="Missing data behavioral response",
+                description=(
+                    "When data is missing, the plan adjusts its prescriptions conservatively "
+                    "rather than proceeding as if full telemetry were present."
+                ),
             ),
             MarkerDefinition(
                 marker_id="caution_tone",
@@ -214,18 +254,26 @@ _STYLE_MARKERS: dict[str, dict[str, tuple[MarkerDefinition, ...]]] = {
                 marker_id="non_competing_focus",
                 label="Non-competing focus",
                 description="Extra sessions support the main goal rather than distracting from it.",
+                failure_condition=(
+                    "Non-swim/bike/run sessions included without a stated recovery or "
+                    "complementary rationale connecting them to triathlon performance."
+                ),
             ),
         ),
         "plan_coherence": (
             MarkerDefinition(
                 marker_id="hard_easy_spacing",
                 label="Hard/easy spacing",
-                description="Hard sessions are spaced sensibly with recovery around them across disciplines.",
+                description=(
+                    "Hard sessions are spaced sensibly with recovery around them across disciplines."
+                ),
             ),
             MarkerDefinition(
                 marker_id="discipline_distribution",
                 label="Discipline distribution",
-                description="Swim, bike, and run stress are distributed in a coherent way across the week.",
+                description=(
+                    "Swim, bike, and run stress are distributed in a coherent way across the week."
+                ),
             ),
             MarkerDefinition(
                 marker_id="workout_purpose_fit",
@@ -236,6 +284,19 @@ _STYLE_MARKERS: dict[str, dict[str, tuple[MarkerDefinition, ...]]] = {
                 marker_id="load_progression_logic",
                 label="Load progression logic",
                 description="The load and emphasis across the week feel plausible and coherent.",
+                failure_condition=(
+                    "Planned week 1 volume is more than 15% above last 7 days without explicit "
+                    "justification in the plan narrative."
+                ),
+            ),
+            MarkerDefinition(
+                marker_id="week_coherence",
+                label="Week coherence (score last)",
+                description=(
+                    "Given all individual sessions, does the week make sense as a unit across "
+                    "all three disciplines — in terms of cumulative fatigue and the overall "
+                    "hard/easy pattern end-to-end."
+                ),
             ),
         ),
         "explanation_quality": (
@@ -247,7 +308,10 @@ _STYLE_MARKERS: dict[str, dict[str, tuple[MarkerDefinition, ...]]] = {
             MarkerDefinition(
                 marker_id="discipline_reasoning",
                 label="Discipline reasoning",
-                description="The plan explains why swim, bike, and run work are included and how they fit together.",
+                description=(
+                    "The plan explains why swim, bike, and run work are included and how they "
+                    "fit together."
+                ),
             ),
             MarkerDefinition(
                 marker_id="non_generic_language",
@@ -269,12 +333,26 @@ _STYLE_MARKERS: dict[str, dict[str, tuple[MarkerDefinition, ...]]] = {
             MarkerDefinition(
                 marker_id="cross_discipline_load_awareness",
                 label="Cross-discipline load awareness",
-                description="Cautions reflect total stress across swim, bike, and run rather than only one modality.",
+                description=(
+                    "Cautions reflect total stress across swim, bike, and run rather than only "
+                    "one modality."
+                ),
             ),
             MarkerDefinition(
-                marker_id="missing_data_handling",
-                label="Missing-data handling",
-                description="The plan reacts sensibly to sparse telemetry or uncertainty.",
+                marker_id="missing_data_acknowledgment",
+                label="Missing data acknowledgment",
+                description=(
+                    "The plan explicitly acknowledges when recovery signals (sleep, HRV, RHR) "
+                    "are missing or sparse."
+                ),
+            ),
+            MarkerDefinition(
+                marker_id="missing_data_behavioral_response",
+                label="Missing data behavioral response",
+                description=(
+                    "When data is missing, the plan adjusts its prescriptions conservatively "
+                    "rather than proceeding as if full telemetry were present."
+                ),
             ),
         ),
         "actionability": (
@@ -373,7 +451,46 @@ def render_rubrics_for_prompt(
     for rubric in rr:
         lines.append(f"- {rubric.rubric_id} ({rubric.weight}%): {rubric.description}")
         for marker in rubric.markers:
-            lines.append(f"  - {marker.marker_id}: {marker.description}")
+            marker_line = f"  - {marker.marker_id}: {marker.description}"
+            if marker.failure_condition:
+                marker_line += f" [FAIL if: {marker.failure_condition}]"
+            lines.append(marker_line)
+        lines.append("")
+    return "\n".join(lines).strip()
+
+
+def render_rubric_batch_for_prompt(
+    rubric_ids: list[str],
+    *,
+    style: str | None = None,
+    primary_goal: str | None = None,
+) -> str:
+    """Render only the rubrics in rubric_ids for use in a per-batch prompt."""
+    resolved_style = _normalize_style(style)
+    resolved_goal = str(primary_goal or "").strip() or default_primary_goal_for_style(
+        resolved_style
+    )
+    all_rubrics = {r.rubric_id: r for r in get_default_rubrics(resolved_style)}
+    lines = [
+        f"Style: {resolved_style}",
+        f"Primary goal: {resolved_goal}",
+        "Score each rubric from 0 to 100.",
+        "Score each marker from 0 to 5.",
+        "Use pass / partial / fail for each marker.",
+        "For each marker: write observation first (what you see), then score.",
+        "Reason from the provided plan and context only.",
+        "",
+    ]
+    for rubric_id in rubric_ids:
+        rubric = all_rubrics.get(rubric_id)
+        if not rubric:
+            continue
+        lines.append(f"- {rubric.rubric_id} ({rubric.weight}%): {rubric.description}")
+        for marker in rubric.markers:
+            marker_line = f"  - {marker.marker_id}: {marker.description}"
+            if marker.failure_condition:
+                marker_line += f" [FAIL if: {marker.failure_condition}]"
+            lines.append(marker_line)
         lines.append("")
     return "\n".join(lines).strip()
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import tempfile
@@ -50,6 +51,12 @@ def atomic_write_text(path: PathLike, text: str) -> None:
             pass
 
 
+def _json_default(o: object) -> str:
+    if isinstance(o, (datetime.date, datetime.datetime)):
+        return o.isoformat()
+    raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+
+
 def save_json(
     path: PathLike,
     obj: Any,
@@ -58,7 +65,11 @@ def save_json(
     ensure_ascii: bool = False,
 ) -> None:
     if compact:
-        text = json.dumps(obj, ensure_ascii=ensure_ascii, separators=(",", ":"))
+        text = json.dumps(
+            obj, ensure_ascii=ensure_ascii, separators=(",", ":"), default=_json_default
+        )
     else:
-        text = json.dumps(obj, ensure_ascii=ensure_ascii, indent=2, sort_keys=True)
+        text = json.dumps(
+            obj, ensure_ascii=ensure_ascii, indent=2, sort_keys=True, default=_json_default
+        )
     atomic_write_text(path, text)

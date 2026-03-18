@@ -84,12 +84,15 @@ def cmd_eval_coach(args: argparse.Namespace) -> None:
                 primary_goal=args.goal or default_soft.primary_goal,
             )
 
+        soft_eval_runs = max(1, int(getattr(args, "soft_eval_runs", 1) or 1))
+
         report, _obj = evaluate_training_plan_quality_file(
             input_path,
             rollups_path=args.rollups,
             cfg=cfg,
             soft_eval_cfg=soft_cfg,
             primary_goal=args.goal,
+            soft_eval_runs=soft_eval_runs,
         )
         violations = report.get("violations", [])
 
@@ -124,6 +127,18 @@ def cmd_eval_coach(args: argparse.Namespace) -> None:
                     item = rubric_scores.get(key) or {}
                     parts.append(f"{key}={item.get('score', 0)}")
                 print("Rubric scores:", ", ".join(parts))
+
+            # Report inter-rater stats if N > 1 runs were used
+            stats = report.get("stats", {}) or {}
+            n_runs = stats.get("inter_rater_runs")
+            if n_runs and int(n_runs) > 1:
+                print(f"Inter-rater runs: {n_runs}")
+                high_var = stats.get("high_variance_markers", {})
+                if high_var:
+                    flagged = ", ".join(
+                        f"{mid}(std={std:.2f})" for mid, std in sorted(high_var.items())
+                    )
+                    print(f"⚠️  High-variance markers (ambiguous rubrics): {flagged}")
 
         if not violations:
             print("✅ eval-coach: no violations")
@@ -163,6 +178,7 @@ def cmd_revise_plan(args: argparse.Namespace) -> None:
 
         input_path = args.input or str(prompting_dir / "coach_brief_training-plan.json")
         report_path = args.report or str(prompting_dir / "eval_report.json")
+        auto_reeval = bool(getattr(args, "auto_reeval", False))
 
         text, out_path = run_revise_plan(
             cfg=revise_cfg,
@@ -170,6 +186,7 @@ def cmd_revise_plan(args: argparse.Namespace) -> None:
             eval_report_path=report_path,
             output_path=args.output,
             rollups_path=args.rollups,
+            auto_reeval=auto_reeval,
         )
 
         print(text)
@@ -179,5 +196,9 @@ def cmd_revise_plan(args: argparse.Namespace) -> None:
             txt_p = p.parent / f"{p.stem}.txt"
             if txt_p.exists():
                 print(f"[Saved] {txt_p}")
+            if auto_reeval:
+                reeval_p = p.parent / f"{p.stem}-reeval.json"
+                if reeval_p.exists():
+                    print(f"[Saved] {reeval_p}")
 
     _run(_inner)

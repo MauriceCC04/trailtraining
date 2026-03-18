@@ -30,14 +30,15 @@ Strava / Garmin / Intervals.icu
         ├──► coach_brief_training-plan.json / .txt
         │
         ▼
-  eval-coach [--soft-eval]
+  eval-coach [--soft-eval] [--soft-eval-runs N]
         │
         ├──► eval_report.json
         │
         ▼
-  revise-plan
+  revise-plan [--auto-reeval]
         │
         ├──► revised-plan.json / .txt
+        ├──► revised-plan-reeval.json     ← delta score (with --auto-reeval)
         │
         ▼
   plan-to-ics  ──► training-plan.ics → Calendar.app
@@ -53,7 +54,13 @@ The pipeline runs in one direction: ingest → forecast → generate → evaluat
 
 **Two-stage evaluation.** `eval-coach` runs deterministic checks (ramp %, consecutive hard days, citation coverage). With `--soft-eval`, a second model acts as an independent judge using a rubric-driven schema — strengths, concerns, marker-level evidence. The soft evaluator can be a different model family than the generator.
 
-**Revision is part of the pipeline.** `revise-plan` takes the original plan and its eval report and produces a revised artifact. Generate → critique → revise → re-check is the intended loop, not a nice-to-have.
+**Per-rubric batch evaluation.** The soft evaluator runs one LLM call per rubric group rather than one monolithic call across all 18+ markers. This eliminates inter-marker anchoring bias — early marker scores no longer pull later ones toward them. `goal_alignment` and `plan_coherence` are batched together (load and goal logic are related); `caution_proportionality` is isolated because it is the hardest to score consistently. Rubric scores are always derived from marker averages, never asked for separately.
+
+**Observation-before-score.** Each marker result requires an `observation` field — a plain-language description of what the model sees in the plan — before it may assign a score. This makes scoring decisions auditable and catches lazy scoring where a model would anchor on a number without reading the plan.
+
+**Revision is part of the pipeline.** `revise-plan` takes the original plan and its eval report and produces a revised artifact. With `--auto-reeval`, the revised plan is immediately re-evaluated against the deterministic constraint engine, a `delta_score` is computed, and a warning is printed if the revision made things worse. Generate → critique → revise → re-check is the intended loop, not a nice-to-have.
+
+**Inter-rater reliability measurement.** `--soft-eval-runs N` runs the soft evaluator N times with temperature > 0 and reports per-marker score variance. Markers with standard deviation above 0.5 on a 1–5 scale are flagged in the report — high variance signals a rubric definition that is too ambiguous to score consistently and may need tightening.
 
 **Structured contracts throughout.** Artifacts are validated with strict Pydantic models. The LLM is prompted with a JSON schema and the output is validated on the way out — malformed responses trigger a repair pass before anything is saved.
 
@@ -122,6 +129,27 @@ trailtraining --profile alice coach --prompt training-plan --plan-days 28
 
 The plan is split into phased training weeks (build → build → peak → recovery). Hard-day and rest-day constraints are enforced per rolling 7-day window across all weeks. `weekly_totals` in the artifact reflects week 1 so ramp-rate validation remains accurate.
 
+### Soft evaluation with inter-rater reliability
+
+```bash
+# Single evaluation pass (default)
+trailtraining --profile alice eval-coach --soft-eval
+
+# Run 5 times and flag markers with high score variance
+trailtraining --profile alice eval-coach --soft-eval --soft-eval-runs 5
+```
+
+With `--soft-eval-runs N`, the evaluator runs N independent passes with temperature > 0. The report includes per-marker score variance; any marker with std > 0.5 on a 1–5 scale is printed as a warning. High variance means the rubric definition is ambiguous — it is useful for calibrating rubrics during development or before deploying a new prompt to production.
+
+### Revision with automatic re-evaluation
+
+```bash
+# Revise and immediately check whether the revision helped
+trailtraining --profile alice revise-plan --auto-reeval
+```
+
+With `--auto-reeval`, the revised plan is re-evaluated straight away against the deterministic constraint engine. A delta report is written to `revised-plan-reeval.json` with `original_score`, `revised_score`, `delta_score`, and any remaining violations. If the delta is negative the CLI prints a warning so you know to inspect the report before accepting the revision.
+
 ### Calendar export
 
 ```bash
@@ -144,9 +172,33 @@ trailtraining --profile alice plan-to-ics --start-hour 6 --output ~/Desktop/plan
 ├── coach_brief_training-plan.json / .txt
 ├── eval_report.json
 ├── revised-plan.json / .txt
-├── training-plan.ics                          ← calendar export
+├── revised-plan-reeval.json               ← delta score (--auto-reeval only)
+├── training-plan.ics                      ← calendar export
 └── coach_brief_<recovery-status|meal-plan|session-review>.md
 ```
+
+---
+
+## Soft evaluation rubrics
+
+The soft evaluator grades plans across five rubrics (weights for trail running shown):
+
+| Rubric | Weight | What it checks |
+|---|---|---|
+| `goal_alignment` | 30% | Plan targets trail running specifically, not generic fitness |
+| `plan_coherence` | 25% | Hard/easy spacing, session type matches purpose, totals arithmetic, week-level fatigue logic |
+| `explanation_quality` | 20% | Reasoning is specific and non-generic, day purposes are useful |
+| `caution_proportionality` | 15% | Warnings match context; missing data is acknowledged and acted on |
+| `actionability` | 10% | Sessions are concrete enough to execute day-to-day |
+
+Each rubric is scored independently in its own LLM call. Rubric scores are derived from the average of their marker scores — they are never asked for directly, which prevents the model from anchoring a rubric score and then reverse-engineering marker evidence to match it.
+
+Key markers include `week_coherence` (scored last within `plan_coherence`, after all per-session markers are filled), `weekly_totals_arithmetic` (checks that session durations match the stated weekly total), `missing_data_acknowledgment`, and `missing_data_behavioral_response` (checks that the plan actually adjusts conservatively when telemetry is absent, not just mentions it).
+
+Two markers carry explicit **failure conditions** that trigger a score of 1 regardless of other evidence:
+
+- `load_progression_logic` — planned week 1 volume is more than 15% above the last 7 days without explicit justification.
+- `non_competing_focus` — more than one non-running session per week without a stated rationale connecting it to the trail goal.
 
 ---
 
