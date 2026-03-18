@@ -8,6 +8,14 @@ from trailtraining.commands.common import _run
 from trailtraining.llm.rubrics import default_primary_goal_for_style
 
 
+def _resolve_lifestyle_notes(args: argparse.Namespace) -> str:
+    """Resolve lifestyle notes from CLI flag or env var."""
+    cli_val: str = str(getattr(args, "lifestyle_notes", None) or "")
+    if cli_val.strip():
+        return cli_val.strip()
+    return (os.getenv("TRAILTRAINING_LIFESTYLE_NOTES") or "").strip()
+
+
 def cmd_coach(args: argparse.Namespace) -> None:
     from trailtraining.llm.coach import CoachConfig, run_coach_brief
 
@@ -19,6 +27,7 @@ def cmd_coach(args: argparse.Namespace) -> None:
             or os.getenv("TRAILTRAINING_PRIMARY_GOAL")
             or default_primary_goal_for_style(style)
         )
+        lifestyle_notes = _resolve_lifestyle_notes(args) or base_cfg.lifestyle_notes
 
         cfg = CoachConfig(
             model=args.model or base_cfg.model,
@@ -30,6 +39,7 @@ def cmd_coach(args: argparse.Namespace) -> None:
             style=style,
             primary_goal=primary_goal,
             plan_days=getattr(args, "plan_days", None) or base_cfg.plan_days,
+            lifestyle_notes=lifestyle_notes,
         )
         text, out_path = run_coach_brief(
             prompt=args.prompt,
@@ -73,6 +83,7 @@ def cmd_eval_coach(args: argparse.Namespace) -> None:
         soft_cfg = None
         if getattr(args, "soft_eval", False):
             default_soft = SoftEvalConfig.from_env()
+            lifestyle_notes = _resolve_lifestyle_notes(args) or default_soft.lifestyle_notes
             soft_cfg = SoftEvalConfig(
                 enabled=True,
                 model=args.soft_eval_model or default_soft.model,
@@ -82,6 +93,13 @@ def cmd_eval_coach(args: argparse.Namespace) -> None:
                 ),
                 verbosity=(getattr(args, "soft_eval_verbosity", None) or default_soft.verbosity),
                 primary_goal=args.goal or default_soft.primary_goal,
+                lifestyle_notes=lifestyle_notes,
+                skip_synthesis=getattr(args, "skip_synthesis", False)
+                or default_soft.skip_synthesis,
+                parallel_batches=(
+                    not getattr(args, "no_parallel_batches", False)
+                    and default_soft.parallel_batches
+                ),
             )
 
         soft_eval_runs = max(1, int(getattr(args, "soft_eval_runs", 1) or 1))
@@ -128,7 +146,6 @@ def cmd_eval_coach(args: argparse.Namespace) -> None:
                     parts.append(f"{key}={item.get('score', 0)}")
                 print("Rubric scores:", ", ".join(parts))
 
-            # Report inter-rater stats if N > 1 runs were used
             stats = report.get("stats", {}) or {}
             n_runs = stats.get("inter_rater_runs")
             if n_runs and int(n_runs) > 1:
@@ -168,12 +185,15 @@ def cmd_revise_plan(args: argparse.Namespace) -> None:
         prompting_dir = Path(runtime.paths.prompting_directory)
 
         base_cfg = CoachConfig.from_env()
+        lifestyle_notes = _resolve_lifestyle_notes(args) or base_cfg.lifestyle_notes
+
         revise_cfg = RevisePlanConfig(
             model=args.model or base_cfg.model,
             reasoning_effort=args.reasoning_effort or base_cfg.reasoning_effort,
             verbosity=args.verbosity or base_cfg.verbosity,
             temperature=args.temperature,
             primary_goal=args.goal or base_cfg.primary_goal,
+            lifestyle_notes=lifestyle_notes,
         )
 
         input_path = args.input or str(prompting_dir / "coach_brief_training-plan.json")

@@ -22,6 +22,8 @@ _UNSUPPORTED_PARAM_PATTERNS = (
     re.compile(r"unknown\s+param", re.IGNORECASE),
     re.compile(r"not\s+support", re.IGNORECASE),
     re.compile(r"invalid.*param", re.IGNORECASE),
+    re.compile(r"invalid\s+argument", re.IGNORECASE),
+    re.compile(r"INVALID_ARGUMENT", re.IGNORECASE),
     re.compile(r"unexpected.*key", re.IGNORECASE),
     re.compile(r"unrecognized.*field", re.IGNORECASE),
     re.compile(r"additional\s+properties", re.IGNORECASE),

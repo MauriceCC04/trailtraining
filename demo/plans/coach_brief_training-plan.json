@@ -1,241 +1,811 @@
 {
   "citations": [
     {
-      "date_range": "2026-03-07..2026-03-13",
+      "date_range": "2026-03-11..2026-03-17",
       "signal_id": "load.last7.distance_km",
       "source": "combined_rollups.json:windows.7.activities.total_distance_km",
-      "value": "233.024"
+      "value": "118.242"
     },
     {
-      "date_range": "2026-03-07..2026-03-13",
+      "date_range": "2026-03-11..2026-03-17",
       "signal_id": "load.last7.moving_time_hours",
       "source": "combined_rollups.json:windows.7.activities.total_moving_time_hours",
-      "value": "11.324"
+      "value": "5.124"
     },
     {
-      "date_range": "2026-03-07..2026-03-13",
+      "date_range": "2026-03-11..2026-03-17",
       "signal_id": "load.last7.elevation_m",
       "source": "combined_rollups.json:windows.7.activities.total_elevation_m",
-      "value": "2069.0"
+      "value": "249.0"
     },
     {
-      "date_range": "2026-03-07..2026-03-13",
+      "date_range": "2026-03-11..2026-03-17",
       "signal_id": "load.last7.training_load_hours",
       "source": "combined_rollups.json:windows.7.activities.total_training_load_hours",
-      "value": "25.394"
+      "value": "11.816"
     },
     {
-      "date_range": "2026-03-07..2026-03-13",
+      "date_range": "2026-03-11..2026-03-17",
       "signal_id": "load.last7.activity_count",
       "source": "combined_rollups.json:windows.7.activities.count",
-      "value": "7"
+      "value": "4"
     },
     {
-      "date_range": "2026-03-07..2026-03-13",
+      "date_range": "2026-03-11..2026-03-17",
       "signal_id": "load.last7.sleep_days_with_data",
       "source": "combined_rollups.json:windows.7.sleep_days_with_data",
       "value": "0"
     },
     {
-      "date_range": "2026-02-14..2026-03-13",
+      "date_range": "2026-02-18..2026-03-17",
       "signal_id": "load.baseline28.distance_km",
       "source": "combined_rollups.json:windows.28.activities.total_distance_km",
-      "value": "635.297"
+      "value": "538.705"
     },
     {
-      "date_range": "2026-02-14..2026-03-13",
+      "date_range": "2026-02-18..2026-03-17",
       "signal_id": "load.baseline28.moving_time_hours",
       "source": "combined_rollups.json:windows.28.activities.total_moving_time_hours",
-      "value": "36.674"
+      "value": "32.529"
     },
     {
-      "date_range": "2026-02-14..2026-03-13",
+      "date_range": "2026-02-18..2026-03-17",
       "signal_id": "load.baseline28.elevation_m",
       "source": "combined_rollups.json:windows.28.activities.total_elevation_m",
-      "value": "5876.0"
+      "value": "5116.0"
     },
     {
-      "date_range": "2026-02-14..2026-03-13",
+      "date_range": "2026-02-18..2026-03-17",
       "signal_id": "load.baseline28.training_load_hours",
       "source": "combined_rollups.json:windows.28.activities.total_training_load_hours",
-      "value": "82.268"
+      "value": "73.661"
     },
     {
-      "date_range": "2026-02-14..2026-03-13",
+      "date_range": "2026-03-11..2026-03-17",
+      "signal_id": "recovery.last7.sleep_hours_mean",
+      "source": "combined_summary.json:sleep.sleepTimeSeconds",
+      "value": ""
+    },
+    {
+      "date_range": "2026-02-18..2026-03-17",
       "signal_id": "recovery.last28.sleep_hours_mean",
       "source": "combined_summary.json:sleep.sleepTimeSeconds",
-      "value": "8.67"
+      "value": "8.65"
     },
     {
-      "date_range": "2026-03-12..2026-03-12",
+      "date_range": "2026-03-11..2026-03-17",
+      "signal_id": "recovery.last7.hrv_mean",
+      "source": "combined_summary.json:sleep.avgOvernightHrv",
+      "value": ""
+    },
+    {
+      "date_range": "2026-03-11..2026-03-17",
+      "signal_id": "recovery.last7.rhr_mean",
+      "source": "combined_summary.json:sleep.restingHeartRate",
+      "value": ""
+    },
+    {
+      "date_range": "2026-03-17..2026-03-17",
+      "signal_id": "forecast.recovery_capability.label",
+      "source": "readiness_and_risk_forecast.json:result.inputs.recovery_capability_label",
+      "value": "I only have training data"
+    },
+    {
+      "date_range": "2026-03-17..2026-03-17",
+      "signal_id": "forecast.recovery_capability.key",
+      "source": "readiness_and_risk_forecast.json:result.inputs.recovery_capability_key",
+      "value": "load_only"
+    },
+    {
+      "date_range": "2026-03-17..2026-03-17",
       "signal_id": "forecast.readiness.status",
       "source": "readiness_and_risk_forecast.json:result.readiness.status",
       "value": "steady"
     },
     {
-      "date_range": "2026-03-12..2026-03-12",
+      "date_range": "2026-03-17..2026-03-17",
       "signal_id": "forecast.readiness.score",
       "source": "readiness_and_risk_forecast.json:result.readiness.score",
-      "value": "56.2"
+      "value": "65.6"
     },
     {
-      "date_range": "2026-03-12..2026-03-12",
+      "date_range": "2026-03-17..2026-03-17",
+      "signal_id": "forecast.recovery_capability.sleep_days_7d",
+      "source": "readiness_and_risk_forecast.json:result.inputs.sleep_days_7d",
+      "value": "0"
+    },
+    {
+      "date_range": "2026-03-17..2026-03-17",
+      "signal_id": "forecast.recovery_capability.resting_hr_days_7d",
+      "source": "readiness_and_risk_forecast.json:result.inputs.resting_hr_days_7d",
+      "value": "0"
+    },
+    {
+      "date_range": "2026-03-17..2026-03-17",
+      "signal_id": "forecast.recovery_capability.hrv_days_7d",
+      "source": "readiness_and_risk_forecast.json:result.inputs.hrv_days_7d",
+      "value": "0"
+    },
+    {
+      "date_range": "2026-03-17..2026-03-17",
       "signal_id": "forecast.overreach_risk.level",
       "source": "readiness_and_risk_forecast.json:result.overreach_risk.level",
       "value": "moderate"
     },
     {
-      "date_range": "2026-03-12..2026-03-12",
+      "date_range": "2026-03-17..2026-03-17",
       "signal_id": "forecast.overreach_risk.score",
       "source": "readiness_and_risk_forecast.json:result.overreach_risk.score",
-      "value": "66.0"
+      "value": "44.8"
     }
   ],
   "data_notes": [
-    "Used combined_rollups.json windows['7'] and windows['28'] as authoritative for load totals (distance, moving time, elevation, training load).",
-    "Last 7 days have no sleep records (sleep_days_with_data=0), so last-7 averages for sleep/HRV/RHR are unavailable; avoided making recovery trend claims from missing data.",
-    "Deterministic readiness inputs are as-of 2026-03-12, while rollup window ends 2026-03-13; small differences in reported 7-day training load are expected due to the different end dates.",
+    "Rollup values were treated as authoritative for 7-day and 28-day comparisons; daily detail was used only to describe the recent sessions.",
+    "All missing recovery values and any -1-style missing values were treated as absent and excluded from averages.",
+    "Weekday training respects the lifestyle constraint: flat road runs or cycling only during the week, trail running only on Saturday or Sunday.",
+    "The athlete’s profile shows a strong trailrunning background, but recent load and current readiness were used to cap the next 28 days rather than historical peaks.",
+    "No activity date conflicts were observed in the provided recent daily detail.",
     "Readiness status was set from deterministic readiness_and_risk_forecast.json.",
-    "Guardrails: enforced ramp rate (max_ramp_pct=10.0%). last7_hours=11.324, allowed_hours=12.456, planned_hours=8.700."
+    "Guardrails: enforced ramp rate (max_ramp_pct=10.0%). last7_hours=5.124, allowed_hours=5.636, planned_hours=5.200."
   ],
   "meta": {
-    "plan_days": 7,
-    "plan_start": "2026-03-14",
-    "primary_goal": "to become a faster trail runner",
+    "lifestyle_notes": "Only flat road runs or cycling allowed during the week days. Trail runs limited to Saturday or Sunday only.",
+    "plan_days": 28,
+    "plan_start": "2026-03-18",
+    "primary_goal": "21k trail race, 1500m elevation on September 15 2026",
     "style": "trailrunning",
-    "today": "2026-03-13"
+    "today": "2026-03-18"
   },
   "plan": {
     "days": [
       {
-        "date": "2026-03-14",
-        "duration_minutes": 0,
-        "is_hard_day": false,
-        "is_rest_day": true,
-        "purpose": "Absorb the elevated recent load and create space for run-quality later in the week.",
-        "session_type": "rest",
-        "signal_ids": [
-          "forecast.overreach_risk.level",
-          "load.last7.training_load_hours",
-          "load.last7.sleep_days_with_data"
-        ],
-        "target_intensity": "Off",
-        "terrain": "N/A",
-        "title": "Rest + mobility reset",
-        "workout": "No training. Optional: 15–20 min easy mobility (hips/ankles/T-spine) + 5–10 min light foam roll."
-      },
-      {
-        "date": "2026-03-15",
-        "duration_minutes": 60,
+        "date": "2026-03-18",
+        "duration_minutes": 45,
         "is_hard_day": false,
         "is_rest_day": false,
-        "purpose": "Increase run frequency and neuromuscular speed for faster trail running while keeping overall stress controlled.",
+        "purpose": "Start the block with low-impact aerobic consistency. If you feel unusually flat, keep this to 30-35 min and leave out any extra strides.",
         "session_type": "easy",
         "signal_ids": [
           "forecast.readiness.status",
-          "load.last7.moving_time_hours",
-          "load.last7.activity_count"
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
         ],
-        "target_intensity": "Easy conversational. Finish with 6–8 x 12–15s strides (fast but relaxed), full walk-back recovery.",
-        "terrain": "Flat to gently rolling; smooth surface/trail",
-        "title": "Easy run + strides (leg speed without fatigue)",
-        "workout": "10–15 min easy warm-up → 35–40 min easy → 6–8 strides → easy cool-down."
+        "target_intensity": "RPE 3-4/10, conversational aerobic",
+        "terrain": "flat road",
+        "title": "Easy road run",
+        "workout": "Warm-up: 10 min very easy jog with leg swings to settle the legs. Main set: 25 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk plus light calf and hip mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only."
       },
       {
-        "date": "2026-03-16",
-        "duration_minutes": 90,
+        "date": "2026-03-19",
+        "duration_minutes": 45,
         "is_hard_day": false,
         "is_rest_day": false,
-        "purpose": "Maintain aerobic engine with low mechanical stress so your run quality can be better later this week.",
-        "session_type": "aerobic",
-        "signal_ids": [
-          "load.last7.activity_count",
-          "load.last7.moving_time_hours",
-          "load.baseline28.moving_time_hours"
-        ],
-        "target_intensity": "Mostly easy aerobic (steady, you can talk). Avoid turning it into a smash-fest.",
-        "terrain": "Road/gravel; keep it smooth",
-        "title": "Aerobic ride (support volume, low impact)",
-        "workout": "90 min continuous aerobic. Optional: include 3 x 6 min high-cadence (95–105 rpm) with 3 min easy between."
-      },
-      {
-        "date": "2026-03-17",
-        "duration_minutes": 70,
-        "is_hard_day": true,
-        "is_rest_day": false,
-        "purpose": "Build uphill power + lactate management specific to faster trail running (quality stimulus without needing a huge long run).",
-        "session_type": "hills",
+        "purpose": "Add aerobic volume with minimal impact and keep the running legs fresh for Friday quality and the weekend trail run. If fatigue builds, keep the whole ride easy and skip the cadence surges.",
+        "session_type": "cross",
         "signal_ids": [
           "forecast.readiness.status",
           "forecast.overreach_risk.level",
           "load.last7.training_load_hours",
-          "load.last7.elevation_m"
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
         ],
-        "target_intensity": "Controlled hard: strong uphill effort you can sustain; downhill easy/jog to recover. Stop if form breaks.",
-        "terrain": "Trail with a runnable climb (4–10 min) + safe descent",
-        "title": "Trail hill strength-tempo (quality #1)",
-        "workout": "15 min warm-up easy → 4 x 6 min uphill at strong/controlled effort (jog/walk back down for recovery) → 10–15 min cool-down. Keep total hard work = 24 min."
-      },
-      {
-        "date": "2026-03-18",
-        "duration_minutes": 65,
-        "is_hard_day": false,
-        "is_rest_day": false,
-        "purpose": "Reinforce tissue durability for trails and support faster running economy without adding another hard day.",
-        "session_type": "strength",
-        "signal_ids": [
-          "forecast.overreach_risk.level",
-          "load.last7.moving_time_hours",
-          "load.last7.sleep_days_with_data"
-        ],
-        "target_intensity": "Run easy; strength controlled (leave 2–3 reps in reserve).",
-        "terrain": "Easy terrain; avoid steep/technical if sore",
-        "title": "Easy run + strength (durability)",
-        "workout": "Run 45 min easy + 20 min strength: split squats, calf raises, hip hinges (RDL), side planks, step-downs. Keep it crisp, not maximal."
-      },
-      {
-        "date": "2026-03-19",
-        "duration_minutes": 55,
-        "is_hard_day": true,
-        "is_rest_day": false,
-        "purpose": "Improve speed and VO2-style stimulus that carries over to faster trail pace, while staying within a manageable weekly stress.",
-        "session_type": "intervals",
-        "signal_ids": [
-          "forecast.readiness.status",
-          "forecast.overreach_risk.level",
-          "load.last7.training_load_hours"
-        ],
-        "target_intensity": "Fast but controlled; you should finish feeling like you could do 1–2 more reps.",
-        "terrain": "Flat or gentle grade; firm surface",
-        "title": "Short intervals (quality #2, controlled)",
-        "workout": "15 min warm-up easy + drills → 10 x 1 min fast / 1 min easy → 10–15 min cool-down easy. Keep the fast reps smooth (no sprinting)."
+        "target_intensity": "RPE 3-4/10, aerobic spin",
+        "terrain": "flat road or stationary bike",
+        "title": "Aerobic bike",
+        "workout": "Warm-up: 10 min easy spin to raise temperature and check leg freshness. Main set: 25 min steady aerobic ride with 3 x 3 min high-cadence efforts, separated by 3 min easy spin. Cool-down: 10 min very easy spin. Target: RPE 3-4/10, Zone 2 feel. Terrain/equipment: flat road or stationary bike."
       },
       {
         "date": "2026-03-20",
-        "duration_minutes": 180,
+        "duration_minutes": 50,
+        "is_hard_day": true,
+        "is_rest_day": false,
+        "purpose": "Keep one quality stimulus in the week without pushing beyond current readiness. If fatigue appears mid-week, convert this to 30-40 min easy running and keep the weekend trail run fully aerobic.",
+        "session_type": "tempo",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "forecast.overreach_risk.score",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 6-7/10, controlled comfortably hard",
+        "terrain": "flat road",
+        "title": "Controlled tempo run",
+        "workout": "Warm-up: 15 min easy jog with drills and 4 short relaxed pickups. Main set: 3 x 8 min controlled tempo on flat road with 3 min easy jog between reps. Cool-down: 10 min easy jog and light stretching. Target: RPE 6-7/10, controlled tempo effort. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-03-21",
+        "duration_minutes": 95,
         "is_hard_day": false,
         "is_rest_day": false,
-        "purpose": "Build trail-specific endurance and climbing efficiency to support faster performance without turning the week into a high-intensity block.",
+        "purpose": "Use the weekend trail window for specificity while keeping the session well within current load. Stay conservative on descents so the next week starts fresh.",
         "session_type": "long",
         "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
           "load.last7.elevation_m",
           "load.baseline28.elevation_m",
-          "forecast.overreach_risk.level"
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d"
         ],
-        "target_intensity": "Easy aerobic all the way; hike the steeps. Keep it honest-easy after yesterday’s quality.",
-        "terrain": "Trail; aim for steady climbing, avoid overly technical descents if fatigued",
-        "title": "Long easy trail (endurance + climbing economy)",
-        "workout": "3:00 easy trail time-on-feet. Include continuous climb segments, but no hard surges. Practice fueling: start at ~30 min, then every 20–30 min."
+        "target_intensity": "RPE 3-4/10, aerobic with relaxed climbing",
+        "terrain": "Saturday trail with moderate elevation",
+        "title": "Long trail run",
+        "workout": "Warm-up: 15 min easy jog on gentle terrain to open the stride. Main set: 60 min easy trail running with smooth climbing and controlled descending, keeping effort conversational the whole time. Cool-down: 20 min very easy jog/walk plus mobility. Target: RPE 3-4/10, aerobic. Terrain/equipment: Saturday trail run, moderate rolling trail, about 200-250 m of gain."
+      },
+      {
+        "date": "2026-03-22",
+        "duration_minutes": 0,
+        "is_hard_day": false,
+        "is_rest_day": true,
+        "purpose": "Absorb the first build week and protect the next microcycle. Keep the day truly easy rather than sneaking in extra volume.",
+        "session_type": "rest",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "Recovery only, RPE 1-2/10",
+        "terrain": "off-feet",
+        "title": "Rest day",
+        "workout": "Warm-up: none. Main set: none. Cool-down: optional 10-15 min easy walk and gentle mobility only if stiff. Target: full recovery, RPE 1-2/10. Terrain/equipment: off-feet."
+      },
+      {
+        "date": "2026-03-23",
+        "duration_minutes": 45,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Restart the legs after the rest day and keep the volume aerobic. If the weekend trail run left you heavy, shorten by 10 min and keep it purely easy.",
+        "session_type": "easy",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, conversational aerobic",
+        "terrain": "flat road",
+        "title": "Easy road run",
+        "workout": "Warm-up: 10 min very easy jog and ankle mobility. Main set: 25 min relaxed flat-road run, staying smooth and light. Cool-down: 10 min easy jog/walk and brief calf work. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-03-24",
+        "duration_minutes": 35,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Maintain trail-running durability without adding much fatigue. If you feel worn down, cut the circuit to one lighter round and finish early.",
+        "session_type": "strength",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 5-6/10, controlled strength effort",
+        "terrain": "home or gym",
+        "title": "Strength session",
+        "workout": "Warm-up: 10 min easy spin or brisk walk with dynamic mobility. Main set: 20 min circuit of split squats, calf raises, step-ups, dead bugs, side planks, and glute bridges for 2-3 rounds with perfect control. Cool-down: 5 min easy stretching and breathing. Target: RPE 5-6/10, submax strength. Terrain/equipment: bodyweight or light load at home or gym."
+      },
+      {
+        "date": "2026-03-25",
+        "duration_minutes": 50,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Set up the second build week with steady aerobic work. Keep the effort honest-easy so Friday quality and Saturday trail work stay sharp.",
+        "session_type": "easy",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, conversational aerobic",
+        "terrain": "flat road",
+        "title": "Easy road run",
+        "workout": "Warm-up: 10 min very easy jog with leg swings. Main set: 30 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and light mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-03-26",
+        "duration_minutes": 45,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Keep the aerobic load moving without pounding the legs. If the week feels heavy, make this an uninterrupted easy spin only.",
+        "session_type": "cross",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, aerobic spin",
+        "terrain": "flat road or stationary bike",
+        "title": "Aerobic bike",
+        "workout": "Warm-up: 10 min easy spin. Main set: 25 min steady aerobic ride with 3 x 3 min high-cadence efforts, separated by 3 min easy. Cool-down: 10 min very easy spin. Target: RPE 3-4/10, Zone 2 feel. Terrain/equipment: flat road or stationary bike."
+      },
+      {
+        "date": "2026-03-27",
+        "duration_minutes": 55,
+        "is_hard_day": true,
+        "is_rest_day": false,
+        "purpose": "Progress the quality by extending the sustained work slightly while keeping the effort controlled. If fatigue appears mid-week, cut this to 2 reps and keep the rest of the day easy.",
+        "session_type": "tempo",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "forecast.overreach_risk.score",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 6-7/10, controlled comfortably hard",
+        "terrain": "flat road",
+        "title": "Controlled tempo run",
+        "workout": "Warm-up: 15 min easy jog with drills and 4 short strides. Main set: 3 x 10 min controlled tempo on flat road with 2 min easy jog between reps. Cool-down: 10 min easy jog and light stretching. Target: RPE 6-7/10, controlled tempo effort. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-03-28",
+        "duration_minutes": 100,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Add a small step in trail duration and vertical without making the weekend a race. Keep the pace controlled enough that Sunday remains a true rest day.",
+        "session_type": "long",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.elevation_m",
+          "load.baseline28.elevation_m",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, aerobic with relaxed climbing",
+        "terrain": "Saturday trail with moderate elevation",
+        "title": "Long trail run",
+        "workout": "Warm-up: 15 min easy jog on gentle terrain. Main set: 65 min easy trail run, keeping climbs relaxed and descents smooth. Cool-down: 20 min very easy jog/walk plus mobility. Target: RPE 3-4/10, aerobic. Terrain/equipment: Saturday trail run, moderate rolling trail, about 250-300 m of gain."
+      },
+      {
+        "date": "2026-03-29",
+        "duration_minutes": 0,
+        "is_hard_day": false,
+        "is_rest_day": true,
+        "purpose": "Absorb the build and protect the next block. Keep this completely off-feet if the Saturday trail run leaves any lingering soreness.",
+        "session_type": "rest",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "Recovery only, RPE 1-2/10",
+        "terrain": "off-feet",
+        "title": "Rest day",
+        "workout": "Warm-up: none. Main set: none. Cool-down: optional 10-15 min easy walk and gentle mobility only if stiff. Target: full recovery, RPE 1-2/10. Terrain/equipment: off-feet."
+      },
+      {
+        "date": "2026-03-30",
+        "duration_minutes": 45,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Begin the next week with comfortable volume after the rest day. If the weekend trail load lingers, stay at the easy end of the pace range.",
+        "session_type": "easy",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, conversational aerobic",
+        "terrain": "flat road",
+        "title": "Easy road run",
+        "workout": "Warm-up: 10 min very easy jog and mobility. Main set: 25 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and calf/hip mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-03-31",
+        "duration_minutes": 40,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Support tissue durability as the running workload builds. If you feel flat, make it a short mobility and core session only.",
+        "session_type": "strength",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 5-6/10, controlled strength effort",
+        "terrain": "home or gym",
+        "title": "Strength session",
+        "workout": "Warm-up: 10 min easy spin or brisk walk with dynamic mobility. Main set: 22 min circuit of split squats, calf raises, step-ups, dead bugs, side planks, and glute bridges for 2-3 rounds with good form. Cool-down: 8 min easy stretching and breathing. Target: RPE 5-6/10, submax strength. Terrain/equipment: bodyweight or light load at home or gym."
+      },
+      {
+        "date": "2026-04-01",
+        "duration_minutes": 50,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Keep the load consistent while avoiding unnecessary strain before the Friday quality session. Stay smooth rather than trying to force pace.",
+        "session_type": "easy",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, conversational aerobic",
+        "terrain": "flat road",
+        "title": "Easy road run",
+        "workout": "Warm-up: 10 min very easy jog with leg swings. Main set: 30 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and light mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-04-02",
+        "duration_minutes": 45,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Use cycling to support aerobic development while keeping impact low. If fatigue is present, ride steady and ignore the cadence bursts.",
+        "session_type": "cross",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, aerobic spin",
+        "terrain": "flat road or stationary bike",
+        "title": "Aerobic bike",
+        "workout": "Warm-up: 10 min easy spin. Main set: 25 min steady aerobic ride with 3 x 3 min high-cadence efforts, separated by 3 min easy. Cool-down: 10 min very easy spin. Target: RPE 3-4/10, Zone 2 feel. Terrain/equipment: flat road or stationary bike."
+      },
+      {
+        "date": "2026-04-03",
+        "duration_minutes": 60,
+        "is_hard_day": true,
+        "is_rest_day": false,
+        "purpose": "This is the highest-quality run of the block, but it should still feel controlled rather than aggressive. If you are carrying fatigue mid-week, reduce to 3 reps and keep the final rep easy-to-moderate.",
+        "session_type": "tempo",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "forecast.overreach_risk.score",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 6-7/10, controlled comfortably hard",
+        "terrain": "flat road",
+        "title": "Controlled tempo run",
+        "workout": "Warm-up: 15 min easy jog with drills and 4 short strides. Main set: 4 x 8 min controlled tempo on flat road with 2 min easy jog between reps. Cool-down: 10 min easy jog and light stretching. Target: RPE 6-7/10, controlled tempo effort. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-04-04",
+        "duration_minutes": 105,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Extend the weekend trail exposure a little more while still staying in base-development territory. Keep the effort easy enough that the Sunday rest day feels earned rather than necessary.",
+        "session_type": "long",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.elevation_m",
+          "load.baseline28.elevation_m",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, aerobic with relaxed climbing",
+        "terrain": "Saturday trail with moderate elevation",
+        "title": "Long trail run",
+        "workout": "Warm-up: 15 min easy jog on gentle terrain. Main set: 70 min easy trail run, keeping climbs relaxed and descents smooth. Cool-down: 20 min very easy jog/walk plus mobility. Target: RPE 3-4/10, aerobic. Terrain/equipment: Saturday trail run, moderate rolling trail, about 300-350 m of gain."
+      },
+      {
+        "date": "2026-04-05",
+        "duration_minutes": 0,
+        "is_hard_day": false,
+        "is_rest_day": true,
+        "purpose": "Consolidate the biggest week of the block and let the legs rebound. If soreness lingers, keep all non-essential movement light and short.",
+        "session_type": "rest",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "Recovery only, RPE 1-2/10",
+        "terrain": "off-feet",
+        "title": "Rest day",
+        "workout": "Warm-up: none. Main set: none. Cool-down: optional 10-15 min easy walk and gentle mobility only if stiff. Target: full recovery, RPE 1-2/10. Terrain/equipment: off-feet."
+      },
+      {
+        "date": "2026-04-06",
+        "duration_minutes": 45,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Return to running gently after the rest day and begin the recovery/consolidation week. Keep this easy even if the legs feel good.",
+        "session_type": "easy",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, conversational aerobic",
+        "terrain": "flat road",
+        "title": "Easy road run",
+        "workout": "Warm-up: 10 min very easy jog and mobility. Main set: 25 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and light calf work. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-04-07",
+        "duration_minutes": 45,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Maintain durability while the running volume eases slightly. If the week has already felt heavy, trim the final round and stop at fresh form.",
+        "session_type": "strength",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 5-6/10, controlled strength effort",
+        "terrain": "home or gym",
+        "title": "Strength session",
+        "workout": "Warm-up: 10 min easy spin or brisk walk with dynamic mobility. Main set: 25 min circuit of split squats, calf raises, step-ups, dead bugs, side planks, and glute bridges for 2-3 rounds with clean form. Cool-down: 10 min easy stretching and breathing. Target: RPE 5-6/10, submax strength. Terrain/equipment: bodyweight or light load at home or gym."
+      },
+      {
+        "date": "2026-04-08",
+        "duration_minutes": 40,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Start the recovery week with lighter volume and fresh legs. Keep the pace relaxed and avoid the temptation to squeeze in extra work.",
+        "session_type": "easy",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, conversational aerobic",
+        "terrain": "flat road",
+        "title": "Easy road run",
+        "workout": "Warm-up: 10 min very easy jog with leg swings. Main set: 20 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and brief mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-04-09",
+        "duration_minutes": 40,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Keep aerobic support in place while the week trends down. If you feel any fatigue, make the whole ride easy and skip the cadence work.",
+        "session_type": "cross",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, aerobic spin",
+        "terrain": "flat road or stationary bike",
+        "title": "Aerobic bike",
+        "workout": "Warm-up: 10 min easy spin. Main set: 20 min steady aerobic ride with 2 x 3 min high-cadence efforts, separated by 3 min easy spin. Cool-down: 10 min very easy spin. Target: RPE 3-4/10, Zone 2 feel. Terrain/equipment: flat road or stationary bike."
+      },
+      {
+        "date": "2026-04-10",
+        "duration_minutes": 45,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "A small aerobic stimulus keeps the rhythm without adding stress in the deload week. If you feel tired, make this a pure easy run and leave out the steadier middle.",
+        "session_type": "aerobic",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, steady aerobic",
+        "terrain": "flat road",
+        "title": "Aerobic road run",
+        "workout": "Warm-up: 10 min easy jog and mobility. Main set: 25 min steady but conversational flat-road running, staying smooth rather than fast. Cool-down: 10 min easy jog/walk and light stretching. Target: RPE 3-4/10, aerobic support. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-04-11",
+        "duration_minutes": 85,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Consolidation week trail touch: keep the specificity, but lower the total stress. This should feel like a controlled maintenance outing rather than a big effort.",
+        "session_type": "long",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.elevation_m",
+          "load.baseline28.elevation_m",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, easy aerobic",
+        "terrain": "Saturday trail with moderate elevation",
+        "title": "Long trail run",
+        "workout": "Warm-up: 15 min easy jog on gentle terrain. Main set: 50 min easy trail run with relaxed climbing and smooth descending. Cool-down: 20 min very easy jog/walk plus mobility. Target: RPE 3-4/10, aerobic. Terrain/equipment: Saturday trail run, moderate rolling trail, about 150-200 m of gain."
+      },
+      {
+        "date": "2026-04-12",
+        "duration_minutes": 0,
+        "is_hard_day": false,
+        "is_rest_day": true,
+        "purpose": "Use the extra recovery day to absorb the down week. Keep it quiet and avoid adding hidden load through errands or extra exercise.",
+        "session_type": "rest",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "Recovery only, RPE 1-2/10",
+        "terrain": "off-feet",
+        "title": "Rest day",
+        "workout": "Warm-up: none. Main set: none. Cool-down: optional 10-15 min easy walk and gentle mobility only if stiff. Target: full recovery, RPE 1-2/10. Terrain/equipment: off-feet."
+      },
+      {
+        "date": "2026-04-13",
+        "duration_minutes": 35,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Keep a touch of running rhythm without rebuilding fatigue. If the trail run left your legs dull, shorten to 25 min total and keep it purely easy.",
+        "session_type": "easy",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.activity_count",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 3-4/10, conversational aerobic",
+        "terrain": "flat road",
+        "title": "Easy road run",
+        "workout": "Warm-up: 10 min very easy jog with mobility. Main set: 15 min relaxed flat-road run, staying light and smooth. Cool-down: 10 min easy jog/walk and brief stretching. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only."
+      },
+      {
+        "date": "2026-04-14",
+        "duration_minutes": 30,
+        "is_hard_day": false,
+        "is_rest_day": false,
+        "purpose": "Finish the block with a small durability dose and leave the athlete ready for the next build. If you feel run down, make this mobility-only and stop early.",
+        "session_type": "strength",
+        "signal_ids": [
+          "forecast.readiness.status",
+          "forecast.overreach_risk.level",
+          "load.last7.training_load_hours",
+          "load.baseline28.training_load_hours",
+          "load.last7.sleep_days_with_data",
+          "forecast.recovery_capability.sleep_days_7d",
+          "forecast.recovery_capability.resting_hr_days_7d",
+          "forecast.recovery_capability.hrv_days_7d"
+        ],
+        "target_intensity": "RPE 5-6/10, controlled strength effort",
+        "terrain": "home or gym",
+        "title": "Strength session",
+        "workout": "Warm-up: 8 min easy spin or brisk walk with dynamic mobility. Main set: 17 min circuit of split squats, calf raises, step-ups, dead bugs, side planks, and glute bridges for 2 rounds with clean form. Cool-down: 5 min easy stretching and breathing. Target: RPE 5-6/10, submax strength. Terrain/equipment: bodyweight or light load at home or gym."
       }
     ],
     "weekly_totals": {
-      "planned_distance_km": 90.0,
-      "planned_elevation_m": 1900.0,
-      "planned_moving_time_hours": 8.7
+      "planned_distance_km": 56.0,
+      "planned_elevation_m": 360.0,
+      "planned_moving_time_hours": 5.2
     }
   },
   "readiness": {
-    "rationale": "Deterministic readiness is steady with moderate overreach risk driven by elevated recent training load versus your recent rolling baseline. With 0 sleep days in the last 7 days, we’ll keep intensity controlled and prioritize run-specific quality (for speed on trails) without adding extra overall load.",
+    "rationale": "Deterministic readiness: steady (score 65.6).",
     "signal_ids": [
       "forecast.readiness.status",
       "forecast.readiness.score",
@@ -243,70 +813,79 @@
       "forecast.overreach_risk.score",
       "load.last7.training_load_hours",
       "load.baseline28.training_load_hours",
-      "load.last7.sleep_days_with_data"
+      "forecast.recovery_capability.sleep_days_7d",
+      "forecast.recovery_capability.resting_hr_days_7d",
+      "forecast.recovery_capability.hrv_days_7d"
     ],
     "status": "steady"
   },
   "recovery": {
     "actions": [
-      "Because last 7 days have 0 sleep records, prioritize consistent sleep opportunity this week; aim to match your 28-day average sleep pattern (baseline sleep is present over 28 days, but missing recently).",
-      "Fuel the two quality days: a carb-forward meal 2–4 hours pre-session; 20–30 g protein within ~1–2 hours post.",
-      "Long trail day: practice fueling/hydration early and consistently (don’t wait until you feel depleted).",
-      "Daily 5–10 min ankle/calf/hip mobility to support climbing/descending economy."
+      "Target 8-9 hours of sleep nightly and keep the schedule consistent, because the last 7 days had no usable sleep, HRV, or resting-HR telemetry.",
+      "Fuel Friday quality and Saturday trail sessions with carbs before and after; do not underfuel the long run.",
+      "Hydrate after rides and trail runs, and add sodium if the weather is warm or sweat rate is high.",
+      "Use 10-15 minutes of mobility after easy days and keep the weekly strength work controlled, not fatiguing."
     ],
     "signal_ids": [
       "load.last7.sleep_days_with_data",
-      "recovery.last28.sleep_hours_mean",
-      "forecast.overreach_risk.level"
+      "forecast.recovery_capability.sleep_days_7d",
+      "forecast.recovery_capability.resting_hr_days_7d",
+      "forecast.recovery_capability.hrv_days_7d",
+      "forecast.readiness.status",
+      "load.last7.training_load_hours"
     ]
   },
   "risks": [
     {
-      "message": "Overreach risk is moderate and driven by elevated recent training load; keep intensity capped to 2 quality sessions and protect the long run from drifting into moderate/hard effort.",
+      "message": "Recovery telemetry is missing for the last 7 days, so fatigue management has to rely on training load and subjective feel rather than sleep/HRV/RHR.",
+      "severity": "medium",
+      "signal_ids": [
+        "load.last7.sleep_days_with_data",
+        "forecast.recovery_capability.sleep_days_7d",
+        "forecast.recovery_capability.resting_hr_days_7d",
+        "forecast.recovery_capability.hrv_days_7d"
+      ]
+    },
+    {
+      "message": "Recent 7-day load is elevated versus the recent baseline and overreach risk is moderate, so a second hard day or an aggressive long run would be too much right now.",
       "severity": "medium",
       "signal_ids": [
         "forecast.overreach_risk.level",
         "forecast.overreach_risk.score",
-        "load.last7.training_load_hours"
-      ]
-    },
-    {
-      "message": "Recovery data gap: 0 sleep days with data in the last 7 days reduces confidence in readiness; if you feel unusually flat/irritable or HR is unusually high during warm-ups, downgrade quality sessions to easy aerobic.",
-      "severity": "medium",
-      "signal_ids": [
-        "load.last7.sleep_days_with_data",
+        "load.last7.training_load_hours",
+        "load.baseline28.training_load_hours",
         "forecast.readiness.status"
       ]
     },
     {
-      "message": "Recent week is cycling-heavy; increasing run specificity is important for the goal, but keep the ramp gradual by focusing on time-on-feet and controlled quality rather than adding big extra volume.",
+      "message": "Historical trailrunning capacity is much larger than the current week, but the plan deliberately stays conservative and does not try to match old peak loads.",
       "severity": "low",
       "signal_ids": [
-        "load.last7.activity_count",
-        "load.baseline28.moving_time_hours",
-        "load.last7.moving_time_hours"
+        "load.baseline28.training_load_hours",
+        "forecast.readiness.status",
+        "load.last7.training_load_hours"
       ]
     }
   ],
   "snapshot": {
     "baseline28": {
-      "activity_count": "26",
-      "distance_km": "635.297",
-      "elevation_m": "5876",
+      "activity_count": "24",
+      "distance_km": "538.705",
+      "elevation_m": "5116.0",
       "hrv_mean": "",
-      "moving_time_hours": "36.674",
-      "rhr_mean": "",
-      "sleep_hours_mean": "8.67"
+      "moving_time_hours": "32.529",
+      "rhr_mean": "51.08",
+      "sleep_hours_mean": "8.65"
     },
     "last7": {
-      "activity_count": "7",
-      "distance_km": "233.024",
-      "elevation_m": "2069",
+      "activity_count": "4",
+      "distance_km": "118.242",
+      "elevation_m": "249.0",
       "hrv_mean": "",
-      "moving_time_hours": "11.324",
+      "moving_time_hours": "5.124",
       "rhr_mean": "",
       "sleep_hours_mean": ""
     },
-    "notes": "Last 7 days are high total volume and training load and are cycling-dominant (6 rides, 1 trail run). No sleep data recorded in the last 7 days, so recovery interpretation is limited."
+    "notes": "Yesterday was a 5 km run in 28 min; the last 7 days were bike-dominant with 2 rides and 2 runs, 11.816 load-hours, and no usable sleep/HRV/RHR telemetry. The 28-day baseline is much larger and includes 14 rides, 7 runs, and 3 trail runs. Historical profile shows trailrunning as the primary discipline with much larger past capacities, but current planning stays anchored to recent load."
   }
 }

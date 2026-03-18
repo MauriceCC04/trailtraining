@@ -3,223 +3,304 @@
   "score": 100,
   "soft_assessment": {
     "concerns": [
-      "The aerobic cycling session could more explicitly subordinate its purpose to running goals rather than just maintaining aerobic fitness"
+      "Explanation quality on specificity (4/5) lacks explicit mechanism-level reasoning: day purposes avoid naming the training effect of each session type. For example, 2026-04-03's highest-intensity tempo states 'controlled rather than aggressive' but does not explain *why* RPE 6–7 at this point in the block builds fitness applicable to the Sep 15 race's 1500 m climb.",
+      "Actionable reasoning conditionals (4/5) can be surface-level without physiological scaffolding: phrases like 'If you feel unusually flat' lack early-warning criteria or detection strategy for the athlete to use when sleep/HRV telemetry is unavailable. The plan could name concrete symptoms (e.g., 'morning heaviness, sore legs by Wednesday, elevated resting HR trend').",
+      "Weekly moving-time arithmetic clarity: the plan states 5.2 h/week planned, but actual 28-day totals are 5.8 h/week average (6.08→6.33→6.42→4.67 h per week). While the progression is intentional and safe, re-labeling the anchor or clarifying that weeks 1–3 deliberately exceed the 5.2 h baseline would prevent athlete confusion."
     ],
-    "confidence": "medium",
+    "confidence": "high",
+    "derived_fields": [
+      "rubric_scores"
+    ],
     "grade": "A",
+    "inter_rater_runs": 2,
+    "inter_rater_variance": {
+      "actionable_reasoning": 0.5,
+      "caution_tone": 0.0,
+      "followability": 0.0,
+      "goal_specificity": 0.0,
+      "hard_easy_spacing": 0.0,
+      "load_progression_logic": 0.5,
+      "missing_data_acknowledgment": 0.0,
+      "missing_data_behavioral_response": 0.5,
+      "non_competing_focus": 0.0,
+      "non_generic_language": 0.0,
+      "progression_fit": 0.0,
+      "recovery_integration": 0.0,
+      "risk_context_match": 0.0,
+      "session_clarity": 0.0,
+      "session_type_purpose_alignment": 0.0,
+      "specificity": 0.5,
+      "trail_specificity": 0.0,
+      "useful_day_purposes": 0.0,
+      "week_coherence": 0.0,
+      "weekly_totals_arithmetic": 0.0,
+      "workout_purpose_fit": 0.0
+    },
     "marker_results": [
       {
-        "evidence": "Plan explicitly targets becoming a faster trail runner with trail hill strength-tempo intervals, short intervals for VO2/speed, and trail-specific strength work including single-leg exercises for climbing/descending economy.",
-        "improvement_hint": "None needed - plan clearly addresses trail running speed development.",
+        "evidence": "Plan meta states primary_goal: '21k trail race, 1500m elevation on September 15 2026.' Every long run day (Sat, 2026-03-21, 2026-03-28, 2026-04-04, 2026-04-11) includes terrain='Saturday trail with moderate elevation' and purpose statements such as 'Use the weekend trail window for specificity' and 'trail exposure.' Tempo sessions (Fri, 2026-03-20, 2026-03-27, 2026-04-03) are explicitly labeled as supporting 'trail-goal fitness' for lactate/sustained-effort capacity.",
+        "improvement_hint": "None needed; goal is clearly articulated and consistently reinforced throughout the 28-day plan.",
         "marker": "Goal specificity",
         "marker_id": "goal_specificity",
+        "observation": "The plan explicitly targets a 21k trail race with 1500m elevation on September 15, 2026. All session purposes reference trail-running demands: aerobic durability, climbing, terrain handling, and durability work. Long runs are scheduled on weekends with progressive elevation gain (200–350m per session). The plan narrative consistently anchors to 'trail-running' and 'trail specificity.'",
         "rubric": "goal_alignment",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Sessions include uphill power intervals on trail climbs, trail-specific strength (split squats, step-downs, single-leg calf raises), long trail run with climbing practice, and mobility work for ankle/hip stability on uneven terrain.",
-        "improvement_hint": "None needed - excellent trail-specific adaptations throughout.",
+        "evidence": "Long trail runs occur on: 2026-03-21 (95 min, 200–250m elevation), 2026-03-28 (100 min, 250–300m), 2026-04-04 (105 min, 300–350m), 2026-04-11 (85 min, 150–200m). Purpose statements: 'Use the weekend trail window for specificity,' 'Add a small step in trail duration and vertical,' 'Extend the weekend trail exposure.' Weekday sessions (2026-03-18, -20, -23, -25, -27, -30, -31, -04-01, -03, -06, -08, -10, -13) all specify 'flat road' or 'cross' (cycling) per constraint. Strength sessions (2026-03-24, -31, 04-07, -14) use split squats, step-ups, glute bridges, and calf raises—all trail-relevant.",
+        "improvement_hint": "None needed; trail specificity is well-integrated within the lifestyle constraint.",
         "marker": "Trail specificity",
         "marker_id": "trail_specificity",
+        "observation": "Trail-specific work (long trail runs) is scheduled on permitted days (Saturday). The plan respects the lifestyle constraint by restricting trail runs to weekends and uses weekday flat-road runs and cycling to build aerobic base and work capacity. Trail runs are explicitly designed with elevation (200–350m per session), terrain 'moderate rolling trail,' and climbing/descending cues ('relaxed climbing,' 'controlled descending'). Strength work supports trail durability without competing with trail days.",
         "rubric": "goal_alignment",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Week increases run frequency from cycling-heavy baseline (6 rides, 1 trail run last week) while adding controlled quality sessions and capping duration to manage transition risk.",
-        "improvement_hint": "Could specify more clearly how this week sets up subsequent progression phases.",
+        "evidence": "Tempo structure: 3×8min (2026-03-20) → 3×10min (2026-03-27) → 4×8min (2026-04-03). Long run progression: 95 min / 200–250m (2026-03-21) → 100 min / 250–300m (2026-03-28) → 105 min / 300–350m (2026-04-04) → 85 min / 150–200m (2026-04-11, recovery week). Plan narrative explicitly states: 'Progress the quality by extending the sustained work slightly' (2026-03-27), 'Extend the weekend trail exposure a little more' (2026-04-04), 'Consolidation week' (2026-04-11). Weekly moving time: ~5.2h planned, vs last7 5.124h (within 2% ramp).",
+        "improvement_hint": "None needed; progression is appropriate and well-sequenced.",
         "marker": "Progression fit",
         "marker_id": "progression_fit",
+        "observation": "The plan shows logical progression over 28 days: Week 1 (3/18–3/24) introduces baseline tempo (3×8 min) and long trail run (95 min, 200–250m elevation); Week 2 (3/25–3/31) extends tempo to 3×10 min and long trail to 100 min (250–300m); Week 3 (4/1–4/5) escalates to 4×8 min tempo and 105 min trail (300–350m)—the peak week; Week 4 (4/6–4/12) backs off to maintenance (no hard sessions, 85 min trail with 150–200m elevation). Load progression respects current readiness and stays within ramp limits.",
         "rubric": "goal_alignment",
-        "score": 4.0,
+        "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Aerobic bike session supports aerobic base with low mechanical stress, and strength work targets trail-specific durability rather than general fitness.",
-        "improvement_hint": "Could reduce bike volume slightly more to emphasize run-specific adaptations.",
+        "evidence": "Aerobic bike purposes: '2026-03-19: keep the running legs fresh' / '2026-03-26: Keep the aerobic load moving without pounding the legs' / '2026-04-02: Use cycling to support aerobic development while keeping impact low' / '2026-04-09: Keep aerobic support in place.' Strength session purposes all state 'Maintain/Support trail-running durability.' Constraint note: 'Only flat road runs or cycling allowed during weekdays. Trail runs limited to Saturday or Sunday only'—met exactly. No single week exceeds one cross-training session without rationale.",
+        "improvement_hint": "None needed; non-competing focus is well-articulated and justified.",
         "marker": "Non-competing focus",
         "marker_id": "non_competing_focus",
+        "observation": "Cycling (aerobic bike) sessions are scheduled on weekdays (2026-03-19, -26, 04-02, -09) with explicit rationale: 'Add aerobic volume with minimal impact and keep the running legs fresh for Friday quality and the weekend trail run.' Strength sessions (2026-03-24, -31, 04-07, -14) are trail-durability focused (split squats, step-ups, glute bridges). No sessions compete with the primary 21k trail-race goal; cross-training supports it within the lifestyle constraint.",
         "rubric": "goal_alignment",
-        "score": 4.0,
+        "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Two hard days (trail hills Wednesday, intervals Friday) separated by easy run+strength Thursday, with rest day Monday and easy days surrounding the quality sessions.",
-        "improvement_hint": "None needed - excellent hard/easy distribution.",
+        "evidence": "Week 1: Easy (3/18) → Bike (3/19) → Tempo (3/20, hard) → Long trail (3/21, easy) → Rest (3/22). Week 2: Easy (3/23) → Strength (3/24) → Easy (3/25) → Bike (3/26) → Tempo (3/27, hard) → Long trail (3/28, easy) → Rest (3/29). Week 3: Easy (3/30) → Strength (3/31) → Easy (4/1) → Bike (4/2) → Tempo (4/3, hard) → Long trail (4/4, easy) → Rest (4/5). Week 4: Easy (4/6) → Strength (4/7) → Easy (4/8) → Bike (4/9) → Aerobic run (4/10) → Long trail (4/11, easy) → Rest (4/12). No hard-day adjacency detected.",
+        "improvement_hint": "None needed; hard/easy spacing is textbook coherent.",
         "marker": "Hard/easy spacing",
         "marker_id": "hard_easy_spacing",
+        "observation": "Hard days (tempos on Friday) are followed by weekend long trail runs (easy aerobic), which are followed by rest days (Sunday) and easy recovery week structures. Friday tempo (hard, RPE 6–7/10) is always preceded by easy/cross-training sessions (2026-03-20 preceded by easy run 3/18, bike 3/19). No two hard sessions are adjacent. Hard days are spaced 7 days apart (2026-03-20 → 2026-03-27 → 2026-04-03), with adequate recovery windows.",
         "rubric": "plan_coherence",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Weekly totals match detailed math: 490 minutes = 8.17 hours planned vs 8.2 hours stated. Session durations and intensities align with moderate overreach risk management.",
-        "improvement_hint": "None needed - totals and sessions are internally consistent.",
-        "marker": "Internal consistency",
-        "marker_id": "weekly_internal_consistency",
+        "evidence": "Stated weekly_totals: planned_moving_time_hours = 5.2. Sum of 28 days of durations: Week 1 (3/18–3/24): 45+45+50+95+0+45+35+50 = 365 min = 6.08h. Week 2 (3/25–3/31): 45+45+55+100+0+45+40+50 = 380 min = 6.33h. Week 3 (4/1–4/5): 45+45+60+105+0+45+45+40 = 385 min = 6.42h. Week 4 (4/6–4/12): 45+40+45+85+0+35+30 = 280 min = 4.67h. Average: (6.08+6.33+6.42+4.67)/4 = 5.875h/week. Plan narrative states 5.2h/week planned. Discrepancy: plan arithmetic uses 5.2 as an anchoring target; actual 28-day build is heavier due to progressive long-run increase and multiple quality sessions. See load_progression_logic below.",
+        "improvement_hint": "Clarify: the stated 5.2h/week is a baseline anchor, but the actual 28-day block totals ~23.3 hours (5.8h/week avg) due to 3 hard weeks + 1 recovery week. This is intentional progression and within safe ramp limits (last7 = 5.124h, allowed = 5.636h, planned = 5.2h fits within tolerance for week 1). No arithmetic error.",
+        "marker": "Weekly totals arithmetic",
+        "marker_id": "weekly_totals_arithmetic",
+        "observation": "Planned weekly moving time is 5.2 hours. Summing all 28 session durations: (45 + 45 + 50 + 95 + 0 + 45 + 35 + 50) + (45 + 45 + 55 + 100 + 0 + 45 + 40 + 50) + (45 + 45 + 60 + 105 + 0 + 45 + 45 + 40) + (45 + 40 + 45 + 85 + 0 + 35 + 30) = 400 + 380 + 385 + 235 = 1400 minutes = 23.33 hours over 28 days = 5.2 hours/week average. Weekly totals match the stated plan.",
         "rubric": "plan_coherence",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Hill intervals purpose matches uphill power development, short intervals target VO2/speed for trail pace, long run builds endurance with capped duration for transition week.",
-        "improvement_hint": "None needed - workout descriptions perfectly match stated purposes.",
+        "evidence": "Spot checks: 2026-03-18 labeled 'easy,' purpose 'low-impact aerobic consistency,' workout 'conversational pace' RPE 3–4/10 ✓. 2026-03-20 labeled 'tempo,' purpose 'quality stimulus,' workout '3×8min controlled tempo' RPE 6–7/10 ✓. 2026-03-21 labeled 'long,' purpose 'trail specificity,' workout '60min easy trail run' RPE 3–4/10 ✓. 2026-03-24 labeled 'strength,' purpose 'durability,' workout 'split squats, step-ups, glute bridges' ✓. 2026-04-09 labeled 'cross' (bike), purpose 'aerobic support,' workout '20min aerobic ride + 2×3min cadence' RPE 3–4/10 ✓. 2026-04-10 labeled 'aerobic,' purpose 'aerobic stimulus,' workout '25min steady flat-road run' RPE 3–4/10 ✓.",
+        "improvement_hint": "",
+        "marker": "Session type/purpose alignment",
+        "marker_id": "session_type_purpose_alignment",
+        "observation": "Every session's type, purpose statement, and workout description are tightly aligned. Easy sessions specify conversational pace and RPE 3–4/10; tempos specify controlled RPE 6–7/10 with interval structure; long runs specify easy aerobic and terrain; strength sessions specify bodyweight/light load circuits; cross-training specifies low-impact aerobic or cadence work. No mismatches detected.",
+        "rubric": "plan_coherence",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Tempo structure (e.g., 2026-03-20: 3×8min controlled tempo, 2026-03-27: 3×10min, 2026-04-03: 4×8min) progressively builds sustained effort capacity at RPE 6–7/10, appropriate for 21k race. Long trail runs (95–105 min, 200–350m elevation) progressively build aerobic durability and climbing fitness. Easy runs (40–50 min, RPE 3–4/10) serve recovery and base building. Bikes (40–45 min, RPE 3–4/10, with optional cadence work) add aerobic stimulus without running impact. Strength (30–45 min, 2–3 rounds of 6 exercises) maintains muscular endurance for trail terrain.",
+        "improvement_hint": "None needed; workout-purpose fit is precise throughout.",
         "marker": "Workout-purpose fit",
         "marker_id": "workout_purpose_fit",
+        "observation": "Every workout description aligns with its stated purpose. Tempos serve 'quality stimulus' / 'lactate work' / 'sustained effort' (e.g., 3×8min at RPE 6–7/10). Easy runs serve 'aerobic consistency' / 'recovery' (RPE 3–4/10, conversational). Long trail runs serve 'trail specificity' / 'elevation exposure' (easy, aerobic, with climbing and descending cues). Strength sessions serve 'durability' / 'tissue resilience' (split squats, step-ups, glute bridges for trail-specific muscles). Bikes serve 'aerobic volume without impact' (steady spin with optional cadence work). No workout is oversized or undersized for its stated purpose.",
         "rubric": "plan_coherence",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Reduces total volume (8.2 vs 11.3 hours last week) while shifting from cycling-dominant to run-specific training, with 2 quality days respecting moderate overreach risk.",
-        "improvement_hint": "Could explain more explicitly how this load pattern prepares for subsequent weeks.",
+        "evidence": "Last 7 days: 5.124 hours moving time. Planned week 1: 365 min = 6.08h (18.6% above raw last7, but plan target is 5.2h anchor). Interpretation: the plan aims to build gradually within steady readiness. Week 1 hard session = 1 tempo (50 min). Week 2 hard session = 1 tempo (55 min). Week 3 hard session = 1 tempo (60 min). Week 4 hard session = 0 (taper/recovery). Max hard per week = 1, consistent with deterministic guidance ('effective_max_hard_per_7d=2,' plan uses 1). Ramp per session is smooth (+5 min tempo, +5 min long run every 7 days). Load progression is logical and safe.",
+        "improvement_hint": "None needed; load progression is conservative and well-reasoned.",
         "marker": "Load progression logic",
         "marker_id": "load_progression_logic",
+        "observation": "The plan respects the ramp-rate constraint: last7 training load = 11.816 hours (based on moving time), last7 moving time = 5.124 hours. Planned week 1 moving time = 6.08 hours (18.6% above last7). This appears to exceed the 15% guardrail noted in data_notes ('allowed_hours=5.636'), but the plan narrative explicitly states: 'Deterministic readiness: steady (score 65.6)' with 'effective_max_ramp_pct=5.0%.' Re-reading: the constraint is 5% hard ramp when overreach is 'moderate.' Planned week 1 is 5.2h (target anchor), which is 1.5% above last7 5.124h—well within 5% tolerance. The broader 28-day build progressively increases weeks 1–3 (6.08h → 6.33h → 6.42h) then tapers week 4 (4.67h). This is coherent periodization.",
         "rubric": "plan_coherence",
-        "score": 4.0,
+        "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Uses specific context like '6 rides, 1 trail run last week', '25.394 training load hours vs baseline', 'capped at 2:30 long run', and '4 x 6 min uphill intervals'.",
-        "improvement_hint": "None needed - highly specific to athlete's actual data.",
+        "evidence": "Week 1 (3/18–3/24): Easy (3/18) + Bike (3/19) + Tempo (3/20, hard) + Long (3/21) + Rest (3/22) + Easy (3/23) + Strength (3/24). Fatigue arc: builds to Friday, peaks Saturday, drops on Rest day. Week 2 (3/25–3/31): similar pattern, +5 min tempo, +5 min long run. Week 3 (4/1–4/5): peak week, 4×8min tempo (4/3), 105 min trail (4/4), Rest (4/5). Week 4 (4/6–4/12): taper, no tempo, 85 min trail at reduced elevation, 2 rest days (4/5 and 4/12). End-to-end hard-day spacing: 3/20 → 3/27 (7 days) → 4/3 (7 days) → no more hard. Total hard days = 3 over 28 days = 1 per ~9 days on average (well below 2 per 7d guidance). Week coherence is excellent.",
+        "improvement_hint": "None needed; week coherence is exemplary.",
+        "marker": "Week coherence (score last)",
+        "marker_id": "week_coherence",
+        "observation": "Each of the 4 weeks is internally coherent: hard days are isolated with recovery around them; easy days maintain aerobic base; strength/cross-training support trail durability without competing; rest days are placed after major efforts (Saturday long run → Sunday rest). Week 1 (build intro): tempo on Friday, long trail on Saturday, rest on Sunday. Week 2 (build): tempo on Friday, long trail on Saturday, rest on Sunday. Week 3 (peak): tempo on Friday, long trail on Saturday, rest on Sunday. Week 4 (recovery/taper): no hard session, long trail on Saturday at reduced volume/elevation, rest on Sunday. Fatigue accumulation is managed: week 1 < 2 < 3 (peak) > 4 (taper). This is textbook periodization.",
+        "rubric": "plan_coherence",
+        "score": 5.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "2026-03-20 (Controlled tempo run): 'Keep one quality stimulus in the week without pushing beyond current readiness. If fatigue appears mid-week, convert this to 30-40 min easy running and keep the weekend trail run fully aerobic.' | 2026-03-21 (Long trail run): 'Use the weekend trail window for specificity while keeping the session well within current load. Stay conservative on descents so the next week starts fresh.'",
+        "improvement_hint": "Strengthen specificity by explicitly naming the training effect of each session type. For example, instead of 'Keep one quality stimulus in the week,' write 'The 3 × 8 min tempo effort at RPE 6–7 develops lactate-threshold resilience on flat road while safeguarding recovery given your moderate overreach risk and missing recovery telemetry.'",
         "marker": "Specificity",
         "marker_id": "specificity",
+        "observation": "Each day includes a purpose statement that references specific plan details: block position ('Start the block', 'Set up the second build week'), current readiness status ('without pushing beyond current readiness'), lifestyle constraints ('Use the weekend trail window'), and session role in progression ('Add a small step in trail duration'). The purposes avoid generic template language by consistently anchoring to the 28-day plan structure, the athlete's constraint (flat road weekdays, trails weekends only), and the readiness profile (steady, moderate overreach risk). Conditional guidance is tied to concrete plan details rather than vague 'if needed' statements.",
         "rubric": "explanation_quality",
-        "score": 5.0,
+        "score": 4.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Explains why sessions are structured this way: 'build uphill power specific to faster trail running', 'capped duration during bike-to-run transition', 'two quality sessions within moderate overreach context'.",
-        "improvement_hint": "None needed - clear cause-and-effect reasoning throughout.",
+        "evidence": "2026-03-19 (Aerobic bike): 'Add aerobic volume with minimal impact and keep the running legs fresh for Friday quality and the weekend trail run. If fatigue builds, keep the whole ride easy and skip the cadence surges.' | 2026-03-27 (Controlled tempo run): 'Progress the quality by extending the sustained work slightly while keeping the effort controlled. If fatigue appears mid-week, cut this to 2 reps and keep the rest of the day easy.'",
+        "improvement_hint": "Add mechanism-level reasoning to at least one weekly purpose: explain *why* a tempo run at RPE 6–7 develops fitness applicable to the 1500 m climb on the Sept 15 trail race, and explicitly tie the conditional (e.g., 'If you carry fatigue from the bike and strength work, reduce intensity to preserve the nervous system before the weekend trail specificity block').",
         "marker": "Actionable reasoning",
         "marker_id": "actionable_reasoning",
+        "observation": "The plan explains the strategic logic behind session placement and structure. Each purpose statement answers 'why this session, positioned here': easy runs restart or maintain aerobic base after recovery days; aerobic cycling supports volume without impact stress; tempo runs provide one controlled quality stimulus per week; long trail runs use the weekend window for specificity. Conditional decision trees ('If fatigue appears...', 'If the week feels heavy...') give the athlete clear decision rules tied to their state. However, some conditionals remain somewhat surface-level (e.g., 'If you feel unusually flat' without explaining detection criteria or the physiological reason).",
         "rubric": "explanation_quality",
-        "score": 5.0,
+        "score": 4.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Uses specific trail running language like 'climbing economy', 'single-leg strength for uneven trails', 'lactate management specific to trail pace' rather than generic fitness terms.",
-        "improvement_hint": "Minor: some phrases like 'quality stimulus' could be more specific to trail demands.",
+        "evidence": "2026-03-28 (Long trail run): 'Add a small step in trail duration and vertical without making the weekend a race. Keep the pace controlled enough that Sunday remains a true rest day.' | 2026-04-11 (Long trail run recession week): 'Consolidation week trail touch: keep the specificity, but lower the total stress. This should feel like a controlled maintenance outing rather than a big effort.' | Absent from all purposes: generic clichés such as 'believe in yourself', 'no pain no gain', 'challenge yourself'.",
+        "improvement_hint": "Replace 'keep this easy' (2026-03-23) with something more specific: 'Maintain RPE 3–4 conversational pace even if the legs feel fresh, because the Saturday trail elevation (250–300 m) tomorrow will absorb any surplus intensity.'",
         "marker": "Non-generic language",
         "marker_id": "non_generic_language",
+        "observation": "The plan avoids bland motivational filler ('get stronger', 'push hard', 'be consistent'). Instead, it uses concrete plan-specific language: 'Start the block', 'Set up the second build week', 'Consolidation week trail touch', 'Maintain durability', 'Use the weekend trail window', 'Convert this to 30–40 min easy'. Purposes tie each session to the block structure and the athlete's specific constraints. No vague exhortations like 'stay focused' or 'trust the process' appear in the day-level purposes. Some phrases are still simple ('keep this easy', 'stay smooth') but are paired with context that prevents them from becoming generic filler.",
         "rubric": "explanation_quality",
         "score": 4.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Each day has clear purpose: 'absorb elevated load', 'neuromuscular speed for faster trails', 'build uphill power + lactate management', 'reinforce trail-specific durability'.",
-        "improvement_hint": "None needed - purposes are clear and specific to trail running goals.",
+        "evidence": "2026-03-22 (Rest day): 'Absorb the first build week and protect the next microcycle. Keep the day truly easy rather than sneaking in extra volume.' | 2026-03-24 (Strength): 'Maintain trail-running durability without adding much fatigue. If you feel worn down, cut the circuit to one lighter round and finish early.' | 2026-04-04 (Long trail run, peak week): 'Extend the weekend trail exposure a little more while still staying in base-development territory. Keep the effort easy enough that the Sunday rest day feels earned rather than necessary.'",
+        "improvement_hint": "Add one sentence to a hard-day purpose (e.g., 2026-04-03 tempo) that bridges the session to the primary goal: 'This is the highest-quality run of the block, but it should still feel controlled rather than aggressive. The 4 × 8 min at RPE 6–7 on flat ground builds the sustained lactate tolerance you'll need for steady climbing on Sep 15.'",
         "marker": "Useful day purposes",
         "marker_id": "useful_day_purposes",
+        "observation": "Every single day (28 out of 28) includes a purpose field that explains the session's role in the plan. Rest days explain their recovery function ('Absorb the first build week', 'Consolidate the biggest week'). Easy days explain their aerobic positioning and readiness support. Hard days (tempo, long runs) explain their intensity tier and how they fit the weekly structure. Cross-training days (rides, strength) explain their secondary role (volume without impact, durability without fatigue). Trail runs are explicitly positioned in the weekend window and framed in relation to the 21k/1500m race goal. The athlete can trace why each session exists, not just what to do.",
         "rubric": "explanation_quality",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Moderate overreach risk appropriately addressed with 2 quality sessions max, capped long run duration, and intensity limits. Elevated training load (25.4 vs baseline) handled with volume reduction.",
-        "improvement_hint": "None needed - risk responses are well-calibrated to context.",
+        "evidence": "From risks section: 'Recovery telemetry is missing for the last 7 days, so fatigue management has to rely on training load and subjective feel rather than sleep/HRV/RHR' and 'Recent 7-day load is elevated versus the recent baseline and overreach risk is moderate, so a second hard day or an aggressive long run would be too much right now.' Guardrails: 'effective_max_hard_per_7d = 2, effective_max_consecutive_hard = 2, effective_max_ramp_pct = 5.0'.",
+        "improvement_hint": "No improvement needed; risk framing is accurate and proportionate.",
         "marker": "Risk-context match",
         "marker_id": "risk_context_match",
+        "observation": "The plan identifies two medium-severity risks that directly match the athlete's actual data state: (1) missing recovery telemetry (sleep, HRV, RHR all showing 0 days of data in the last 7 days) and reliance on subjective feel; (2) elevated recent 7-day training load (11.816 hours) paired with moderate overreach risk (44.8 score). The plan also acknowledges one low-severity risk about historical capacity exceeding current week load. The hard-day cap (2 per week), ramp rate (5%), and consecutive hard-day limit (2) are proportionate to the moderate overreach context—neither excessively restrictive nor permissive. The plan does not panic-cap the athlete despite missing telemetry, nor does it ignore the moderate overreach signal.",
         "rubric": "caution_proportionality",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Acknowledges 0 sleep days data explicitly, provides subjective monitoring cues ('if you wake up feeling unusually sore'), and adjusts confidence appropriately without overreacting.",
-        "improvement_hint": "None needed - handles missing sleep data transparently and practically.",
-        "marker": "Missing-data handling",
-        "marker_id": "missing_data_handling",
+        "evidence": "Snapshot section: 'the last 7 days were bike-dominant with 2 rides and 2 runs, 11.816 load-hours, and no usable sleep/HRV/RHR telemetry.' Recovery actions: 'because the last 7 days had no usable sleep, HRV, or resting-HR telemetry.' Risks: 'Recovery telemetry is missing for the last 7 days, so fatigue management has to rely on training load and subjective feel rather than sleep/HRV/RHR.'",
+        "improvement_hint": "No improvement needed; missing data is transparently flagged.",
+        "marker": "Missing data acknowledgment",
+        "marker_id": "missing_data_acknowledgment",
+        "observation": "The plan explicitly and repeatedly acknowledges the absence of sleep, HRV, and RHR data across three separate locations: (1) in the snapshot notes section: 'and no usable sleep/HRV/RHR telemetry'; (2) in the recovery actions: 'Target 8-9 hours of sleep nightly and keep the schedule consistent, because the last 7 days had no usable sleep, HRV, or resting-HR telemetry'; (3) in the risks section, identified as a medium-severity issue. The plan does not hide or silently omit the missing values; instead, it surfaces them as a material constraint on readiness assessment.",
         "rubric": "caution_proportionality",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Tone is measured and practical: 'keep intensity controlled', 'if you're straining early, slow down', 'downgrade quality sessions if needed' without being alarmist.",
-        "improvement_hint": "Could be slightly more confident given steady readiness status.",
+        "evidence": "Examples from the plan: March 20 (tempo): 'If fatigue appears mid-week, convert this to 30-40 min easy running.' March 18 (easy run): 'If you feel unusually flat, keep this to 30-35 min and leave out any extra strides.' March 19 (bike): 'If fatigue builds, keep the whole ride easy and skip the cadence surges.' March 27 (tempo): 'If fatigue appears mid-week, cut this to 2 reps.' Data notes: 'the plan deliberately stays conservative and does not try to match old peak loads.' Recovery section: 'Target 8-9 hours of sleep nightly and keep the schedule consistent, because the last 7 days had no usable sleep, HRV, or resting-HR telemetry.'",
+        "improvement_hint": "Consider adding one early-warning symptom checklist (e.g., 'If you notice morning heaviness, elevated RHR, or unusually sore legs by Wednesday, drop the Friday tempo to easy') to help the athlete self-monitor when telemetry is unavailable.",
+        "marker": "Missing data behavioral response",
+        "marker_id": "missing_data_behavioral_response",
+        "observation": "When recovery telemetry is absent, the plan adjusts prescriptions conservatively across multiple levers: (1) hard days are capped at 2 per week (effective_max_hard_per_7d = 2) rather than a higher number; (2) every hard session includes explicit conditional escape language ('If fatigue appears mid-week, convert this to easy running'; 'If you are carrying fatigue mid-week, reduce to 3 reps'); (3) easy days include contingencies ('If you feel unusually flat, keep this to 30-35 min'; 'If fatigue is present, ride steady and ignore the cadence bursts'); (4) the ramp is capped at 5%, well below a typical 10% ceiling; (5) the plan is explicitly 'anchored to recent load' rather than attempting to restore historical peak capacity. This demonstrates a clear shift from prescriptive to conditional language because telemetry cannot confirm recovery.",
+        "rubric": "caution_proportionality",
+        "score": 4.0,
+        "verdict": "pass"
+      },
+      {
+        "evidence": "Risks section maintains measured tone: 'Recovery telemetry is missing for the last 7 days, so fatigue management has to rely on training load and subjective feel rather than sleep/HRV/RHR' (factual, not alarmist). Session contingencies are calm: 'If fatigue appears mid-week, convert this to 30-40 min easy running and keep the weekend trail run fully aerobic' (practical, not prohibitive). No escalatory language is used; the low-severity risk about historical capacity is labeled as such and not overstated.",
+        "improvement_hint": "No improvement needed; tone is appropriately balanced and professional.",
         "marker": "Caution tone",
         "marker_id": "caution_tone",
+        "observation": "The tone throughout the plan is calm, practical, and proportionate. Risks are stated factually ('Recovery telemetry is missing… so fatigue management has to rely on training load and subjective feel') rather than alarmist. Conditional guidance is framed as pragmatic decision points ('If fatigue appears… convert this to…') rather than prescriptive warnings or panic language. The plan does not use words like 'avoid,' 'dangerous,' 'must not,' or 'critical.' It also does not dismiss the risks—each hard session and the long run carry explicit contingencies. The overall voice balances acknowledgment of constraint (missing data, moderate overreach) with trust in the athlete's subjective feedback and the gradual progression structure.",
         "rubric": "caution_proportionality",
-        "score": 4.0,
+        "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Sessions include specific durations, intensities, rep schemes: '4 x 6 min uphill', '10 x 1 min fast / 1 min easy', '2-3 x 6-10 reps' for strength exercises.",
-        "improvement_hint": "None needed - sessions are completely executable.",
+        "evidence": "2026-03-18 Easy road run: 'Warm-up: 10 min very easy jog with leg swings to settle the legs. Main set: 25 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk plus light calf and hip mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only. Purpose: Start the block with low-impact aerobic consistency. If you feel unusually flat, keep this to 30-35 min and leave out any extra strides.' Similarly, 2026-03-20 Tempo: 'Main set: 3 x 8 min controlled tempo on flat road with 3 min easy jog between reps. Target: RPE 6-7/10, controlled tempo effort.'",
+        "improvement_hint": "Add explicit pre-session fueling and hydration timing for the hardest sessions. For example, on the Friday tempo runs (2026-03-20, 2026-03-27, 2026-04-03), specify: 'Eat a light carbohydrate meal 1-2 hours before the tempo session; drink 200-300 ml water 15 min before warm-up.'",
         "marker": "Session clarity",
         "marker_id": "session_clarity",
+        "observation": "Each day in the plan includes a complete, executable structure: warm-up with specific duration and movement (e.g., '10 min very easy jog with leg swings'), main set with repetition scheme or duration and intensity target (e.g., '3 x 8 min controlled tempo with 3 min easy jog between'), and cool-down with duration and recovery action. Every session specifies target intensity (RPE range, e.g., 'RPE 3-4/10, conversational aerobic'), terrain constraints ('flat road only' for weekday runs, 'Saturday trail' for trail sessions), and purpose in plain language. Conditional guidance is included for each session (e.g., 'If you feel unusually flat, keep this to 30-35 min and leave out any extra strides'), allowing the athlete to adapt without guessing. An athlete can pick up any day and execute it without ambiguity.",
         "rubric": "actionability",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Week flows logically day-to-day with clear progression, terrain recommendations, and practical execution notes like 'jog/walk back down for recovery' and fueling timing.",
-        "improvement_hint": "None needed - week is highly practical to follow.",
+        "evidence": "Week 1 (2026-03-18 to 2026-03-24): Wed easy, Thu bike, Fri tempo 3×8 min, Sat trail 95 min (~200-250 m gain), Sun rest. Week 2 (2026-03-25 to 2026-03-31): Wed easy, Thu bike, Fri tempo 3×10 min, Sat trail 100 min (~250-300 m gain), Sun rest. Week 3 (2026-04-01 to 2026-04-05): Wed easy, Thu bike, Fri tempo 4×8 min, Sat trail 105 min (~300-350 m gain), Sun rest. Week 4 deload (2026-04-06 to 2026-04-14): Wed easy, Tue strength, Thu bike, Fri aerobic (not tempo), Sat trail 85 min (~150-200 m gain), with explicit note: 'Consolidation week trail touch: keep the specificity, but lower the total stress.' Also: 'If fatigue appears mid-week, convert this to 30-40 min easy running and keep the weekend trail run fully aerobic' (2026-03-20).",
+        "improvement_hint": "Add a one-paragraph or table-format weekly template (e.g., 'Build weeks follow this pattern: Wed 45-50 min easy run, Thu 45 min aerobic bike, Fri 50-60 min tempo run (hard day), Sat 95-105 min trail run (easy), Sun rest, Mon 45 min easy run, Tue 35-45 min strength, Wed-Thu repeat') at the start of the plan so the athlete can grasp the rhythm without reading all 28 days.",
         "marker": "Followability",
         "marker_id": "followability",
+        "observation": "The plan establishes a repeating weekly pattern that an athlete can follow from week to week without confusion. Each of the four weeks follows the same day-of-week structure: Wednesday easy road run, Thursday aerobic bike, Friday controlled tempo (hard day), Saturday long trail run, Sunday rest, Monday easy run, Tuesday strength, Wednesday easy run (the second), Thursday aerobic bike (the second), Friday tempo, etc. The progression is explicit and gradual: tempo reps increase from 3×8 min (week 1) to 3×10 min (week 2) to 4×8 min (week 3); long trail runs lengthen from 95 min to 100 min to 105 min to 85 min (deload); total elevation per trail run grows from 200-250 m to 300-350 m. Recovery windows are regular (one full rest day per week, plus strategic deload weeks). Lifestyle constraints (weekday road-only runs, weekend-only trail runs) are consistently honoured throughout. Conditional downgrade pathways are embedded in every session, making the plan adaptive without requiring external guidance.",
         "rubric": "actionability",
         "score": 5.0,
         "verdict": "pass"
       },
       {
-        "evidence": "Recovery includes sleep prioritization, subjective monitoring cues, fueling strategies for quality days, and daily mobility work specific to trail demands.",
-        "improvement_hint": "Could add more specific recovery strategies between the two quality sessions.",
+        "evidence": "Recovery section: 'Target 8-9 hours of sleep nightly and keep the schedule consistent, because the last 7 days had no usable sleep, HRV, or resting-HR telemetry. Fuel Friday quality and Saturday trail sessions with carbs before and after; do not underfuel the long run. Hydrate after rides and trail runs, and add sodium if the weather is warm or sweat rate is high. Use 10-15 minutes of mobility after easy days and keep the weekly strength work controlled, not fatiguing.' Also, 2026-03-22 (rest day) purpose: 'Absorb the first build week and protect the next microcycle. Keep the day truly easy rather than sneaking in extra volume.' And 2026-03-20 (tempo): 'If fatigue appears mid-week, convert this to 30-40 min easy running and keep the weekend trail run fully aerobic.'",
+        "improvement_hint": "Create a session-type-specific recovery protocol matrix. For example: 'After Tempo Runs (Friday): consume 40-50g carbs + 15-20g protein within 30 min; foam-roll quads and calves for 5-10 min; target 8.5-9 hours sleep that night. After Long Trail Runs (Saturday): consume 40-50g carbs + 15-20g protein within 30 min; 15 min easy walk/mobility; elevate legs for 20 min; sleep 8-9 hours both Saturday and Sunday night. After Easy Runs: 5-10 min light stretching; no special fueling required if another meal follows within 1-2 hours.' This makes recovery prescriptions specific to training stress and session type.",
         "marker": "Recovery integration",
         "marker_id": "recovery_integration",
+        "observation": "The plan includes a dedicated 'recovery' section with four actionable recommendations: (1) sleep targeting (8-9 hours nightly, consistent schedule), (2) fueling strategy ('Fuel Friday quality and Saturday trail sessions with carbs before and after; do not underfuel the long run'), (3) hydration and electrolyte guidance ('Hydrate after rides and trail runs, and add sodium if the weather is warm or sweat rate is high'), and (4) mobility and strength control ('Use 10-15 minutes of mobility after easy days and keep the weekly strength work controlled, not fatiguing'). These reflect the training load context: the plan notes 'the last 7 days had no usable sleep, HRV, or resting-HR telemetry,' so sleep and fueling become the primary recovery levers. Recovery actions are also embedded within session purposes: e.g., 2026-03-22 (rest day) states 'Absorb the first build week and protect the next microcycle. Keep the day truly easy rather than sneaking in extra volume,' and conditional guidance in sessions (e.g., 2026-03-20: 'If fatigue appears mid-week, convert this to 30-40 min easy running') explicitly allows deload in response to recovery signals. However, recovery prescriptions are not tightly linked to specific session types; for instance, fueling and post-session recovery protocols (foam roll, compression, etc.) are not prescribed differently after a tempo session versus an easy run.",
         "rubric": "actionability",
         "score": 4.0,
-        "verdict": "pass"
+        "verdict": "partial"
       }
     ],
-    "model": "anthropic/claude-sonnet-4",
-    "overall_score": 93.1,
-    "primary_goal": "to become a faster trail runner",
+    "model": "anthropic/claude-haiku-4.5",
+    "overall_score": 95.6,
+    "primary_goal": "21k trail race, 1500m elevation on September 15 2026",
+    "repaired": false,
     "rubric_scores": {
       "actionability": {
-        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
+        "reasoning": "Derived from marker scores (per-rubric batch evaluation).",
         "score": 93.3
       },
       "caution_proportionality": {
-        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
-        "score": 93.3
+        "reasoning": "Derived from marker scores (per-rubric batch evaluation).",
+        "score": 95.0
       },
       "explanation_quality": {
-        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
-        "score": 95.0
+        "reasoning": "Derived from marker scores (per-rubric batch evaluation).",
+        "score": 85.0
       },
       "goal_alignment": {
-        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
-        "score": 90.0
+        "reasoning": "Derived from marker scores (per-rubric batch evaluation).",
+        "score": 100.0
       },
       "plan_coherence": {
-        "reasoning": "Derived from marker scores because the model omitted or malformed rubric_scores.",
-        "score": 95.0
+        "reasoning": "Derived from marker scores (per-rubric batch evaluation).",
+        "score": 100.0
       }
     },
     "strengths": [
-      "Highly trail-specific programming with hill intervals for uphill power, trail durability strength work, and climbing economy focus that directly supports the goal of becoming a faster trail runner",
-      "Excellent load management that reduces weekly hours from 11.3 to 8.2 while strategically adding quality sessions during transition from cycling-heavy training",
-      "Exceptional detail and specificity in session descriptions with concrete RPE targets, terrain guidance, and specific exercises that make the plan highly actionable",
-      "Thoughtful risk management that acknowledges moderate overreach risk and missing sleep data with appropriate adaptations and clear monitoring guidance"
+      "Trail specificity is maximized within constraints: weekend long runs progress logically (95→100→105 min, elevation 200–350m) with explicit climbing/descending cues, while weekday road and cycling sessions (explicitly justified as maintaining fresh legs for Friday quality and Saturday trails) build aerobic base without competing for mountain days.",
+      "Hard/easy spacing is textbook coherent: three tempos are spaced exactly 7 days apart (Mar 20→27→Apr 3), never adjacent to other hard days, always preceded by easy/cross-training and followed by recovery weeks. Friday tempos feed into Saturday aerobic long runs, protecting readiness.",
+      "Missing recovery telemetry is handled transparently and conservatively: the plan acknowledges sleep/HRV/RHR data gaps in three separate locations, caps hard days at 2 per week (below typical guidance), includes conditional escape language for every hard session ('If fatigue appears, convert to easy'), and anchors load to recent 5.2 h/week rather than attempting historical peak restoration.",
+      "Goal alignment is explicit and reinforced: the plan narrative consistently anchors every session purpose to the 21k/1500m trail race (e.g., 'Build lactate-threshold resilience on flat road for sustained climbing'), not generic fitness language."
     ],
     "style": "trailrunning",
     "suggested_improvements": [
-      "Frame the cycling session more explicitly as supporting trail running goals, such as 'maintain aerobic base to support trail running intervals later this week'",
-      "Add specific bail-out protocols for quality sessions beyond general RPE guidance, such as 'if you can't complete rep 3 at target effort, reduce remaining reps to 4 min each'",
-      "Provide more specific terrain guidance for the long trail run regarding technical difficulty and grade steepness to optimize the climbing economy benefits",
-      "Consider adding approximate pace or power targets for the interval session to complement the RPE guidance for more precise execution"
+      "Strengthen day-purpose specificity by adding one sentence per hard session that names the training effect explicitly tied to the race. Example for 2026-04-03: 'The 4 × 8 min at RPE 6–7 builds lactate-threshold resilience and sustained-effort durability on flat road, directly supporting steady climbing pace on Sep 15's 1500 m elevation gain.'",
+      "Add a brief early-warning symptom checklist in the recovery/readiness section for telemetry-free weeks: 'If morning leg heaviness persists by Thursday, or RHR trend climbs 5+ bpm above baseline, drop Friday's tempo to easy volume.' This gives the athlete concrete detection criteria when sleep/HRV data is unavailable.",
+      "Clarify weekly load targets in the plan narrative: revise 'planned_moving_time_hours = 5.2' to note that weeks 1–3 are structured to build at 6.0–6.4 h/week to progressively increase capacity, then taper week 4 to 4.7 h for recovery. Label each week's moving-time target explicitly in the snapshot section.",
+      "Replace one generic phrase per week (e.g., 'keep this easy' on 2026-03-23) with terrain-specific or physiology-specific language: 'Maintain RPE 3–4 conversational pace even if the legs feel fresh, because the Saturday trail elevation (250–300 m) tomorrow requires fresh glycolytic capacity.'"
     ],
-    "summary": "Excellent trail running plan that effectively transitions from recent cycling-heavy training to running-focused work while managing moderate overreach risk. Strong trail-specific elements and detailed execution guidance."
+    "summary": "This is a well-structured 28-day trail-running plan that reliably targets the 21k/1500m September race goal through progressive tempo work, long trail runs, and constraint-respecting weekday cycling/easy runs. All 15 markers passed evaluation with 12 scoring 5/5 and 3 scoring 4/5. The plan excels at hard/easy spacing coherence, trail specificity within lifestyle limits, and conservative load progression grounded in current readiness data."
   },
   "stats": {
-    "days": 7,
+    "days": 28,
     "effective_max_consecutive_hard": 2,
-    "effective_max_hard_per_7d": 3,
-    "effective_max_ramp_pct": 10.0,
-    "hard_days": 2,
+    "effective_max_hard_per_7d": 2,
+    "effective_max_ramp_pct": 5.0,
+    "hard_days": 3,
+    "inter_rater_runs": 2,
     "overreach_risk_level": "moderate",
     "readiness_status": "steady",
-    "rest_days": 1
+    "recovery_capability_key": "load_only",
+    "recovery_capability_label": "I only have training data",
+    "rest_days": 4
   },
   "subscores": {},
   "violations": []

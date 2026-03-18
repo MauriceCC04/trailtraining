@@ -246,7 +246,11 @@ def _as_list(v: Any) -> list[Any]:
 
 
 def _as_str(v: Any) -> str:
-    return v.strip() if isinstance(v, str) else ""
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, date):
+        return v.isoformat()
+    return ""
 
 
 def _as_float(v: Any) -> Optional[float]:
@@ -297,6 +301,8 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
         lines.append(f"Style: {style}")
     if goal := _as_str(meta.get("primary_goal")):
         lines.append(f"Primary goal: {goal}")
+    if lifestyle := _as_str(meta.get("lifestyle_notes")):
+        lines.append(f"Lifestyle constraints: {lifestyle}")
 
     status = _as_str(readiness.get("status"))
     rationale = _as_str(readiness.get("rationale"))

@@ -1,76 +1,196 @@
 TrailTraining - Training Plan
 
-Generated: 2026-03-13
-Plan start: 2026-03-14   Days: 7
+Generated: 2026-03-18
+Plan start: 2026-03-18   Days: 28
 Style: trailrunning
-Primary goal: to become a faster trail runner
+Primary goal: 21k trail race, 1500m elevation on September 15 2026
+Lifestyle constraints: Only flat road runs or cycling allowed during the week days. Trail runs limited to Saturday or Sunday only.
 
 Readiness: steady
-Why: Deterministic readiness is steady with moderate overreach risk driven by elevated recent training load versus your recent rolling baseline. With 0 sleep days in the last 7 days, we’ll keep intensity controlled and prioritize run-specific quality (for speed on trails) while limiting long-run duration and guarding against intensity creep as you shift from cycling-dominant training to more running.
+Why: Deterministic readiness: steady (score 65.6).
 
-Weekly totals: 8.2 h • 80 km • 1600 m+
+Weekly totals: 5.2 h • 56 km • 360 m+
 
 Day-by-day
 ----------
-Sat 2026-03-14: Rest + mobility reset (REST, 0 min)
-  Intensity: Off
-  Terrain: N/A
-  Workout: No training. Optional: 15–20 min easy mobility (hips/ankles/T-spine) + 5–10 min light foam roll.
-  Purpose: Absorb the elevated recent load and create space for run-quality later in the week.
+Wed 2026-03-18: Easy road run (EASY, 45 min)
+  Intensity: RPE 3-4/10, conversational aerobic
+  Terrain: flat road
+  Workout: Warm-up: 10 min very easy jog with leg swings to settle the legs. Main set: 25 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk plus light calf and hip mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only.
+  Purpose: Start the block with low-impact aerobic consistency. If you feel unusually flat, keep this to 30-35 min and leave out any extra strides.
 
-Sun 2026-03-15: Easy run + strides (leg speed without fatigue) (EASY, 60 min)
-  Intensity: Easy conversational (RPE ~2–3/10). Finish with 6–8 x 12–15s strides (fast but relaxed), full walk-back recovery.
-  Terrain: Flat to gently rolling; smooth surface/trail
-  Workout: 10–15 min easy warm-up → 35–40 min easy (cap effort; no pushing hills) → 6–8 strides → easy cool-down.
-  Purpose: Increase run frequency and neuromuscular speed for faster trail running while keeping overall stress controlled during the bike-to-run transition.
+Thu 2026-03-19: Aerobic bike (CROSS, 45 min)
+  Intensity: RPE 3-4/10, aerobic spin
+  Terrain: flat road or stationary bike
+  Workout: Warm-up: 10 min easy spin to raise temperature and check leg freshness. Main set: 25 min steady aerobic ride with 3 x 3 min high-cadence efforts, separated by 3 min easy spin. Cool-down: 10 min very easy spin. Target: RPE 3-4/10, Zone 2 feel. Terrain/equipment: flat road or stationary bike.
+  Purpose: Add aerobic volume with minimal impact and keep the running legs fresh for Friday quality and the weekend trail run. High-cadence surges improve leg turnover and cardiac output without adding eccentric stress. If fatigue builds, keep the whole ride easy and skip the cadence surges.
 
-Mon 2026-03-16: Aerobic ride (support volume, low impact) (AEROBIC, 90 min)
-  Intensity: Mostly easy aerobic (steady, you can talk). Avoid turning it into a smash-fest.
-  Terrain: Road/gravel; keep it smooth
-  Workout: 90 min continuous aerobic. Optional: include 3 x 6 min high-cadence (95–105 rpm) with 3 min easy between.
-  Purpose: Maintain aerobic engine with low mechanical stress so your run quality can be better later this week while your legs adapt to more run-specific loading.
+Fri 2026-03-20: Controlled tempo run (TEMPO, HARD, 50 min)
+  Intensity: RPE 6-7/10, controlled comfortably hard
+  Terrain: flat road
+  Workout: Warm-up: 15 min easy jog with drills and 4 short relaxed pickups. Main set: 3 x 8 min controlled tempo on flat road with 3 min easy jog between reps. Cool-down: 10 min easy jog and light stretching. Target: RPE 6-7/10, controlled tempo effort. Terrain/equipment: flat road only.
+  Purpose: Keep one quality stimulus in the week without pushing beyond current readiness. The 3 x 8 min at RPE 6-7 lifts lactate-threshold resilience and sustained-effort durability on flat road, which translates to steadier climbing pace and less fade on the 21k/1500m course. If you wake with morning heaviness on Thursday, sore calves or quads by midweek, or easy pace feels 1 RPE harder than normal, convert this to 30-40 min easy running and keep the weekend trail run fully aerobic.
 
-Tue 2026-03-17: Trail hill strength-tempo (quality #1) (HILLS, HARD, 70 min)
-  Intensity: Controlled hard (RPE ~7/10) on the ups: strong, rhythmic, sustainable; recover fully on the downs. Stop the set if posture collapses or you can’t keep the effort smooth.
-  Terrain: Trail with a runnable climb (4–10 min) + safe descent
-  Workout: 15 min warm-up easy → 4 x 6 min uphill at strong/controlled effort (jog/walk back down for recovery) → 10–15 min cool-down. Keep total hard work = 24 min.
-  Purpose: Build uphill power + lactate management specific to faster trail running (quality stimulus without needing a huge long run).
+Sat 2026-03-21: Long trail run (LONG, 95 min)
+  Intensity: RPE 3-4/10, aerobic with relaxed climbing
+  Terrain: Saturday trail with moderate elevation
+  Workout: Warm-up: 15 min easy jog on gentle terrain to open the stride. Main set: 60 min easy trail running with smooth climbing and controlled descending, keeping effort conversational the whole time. Cool-down: 20 min very easy jog/walk plus mobility. Target: RPE 3-4/10, aerobic. Terrain/equipment: Saturday trail run, moderate rolling trail, about 200-250 m of gain.
+  Purpose: Use the weekend trail window for specificity while staying within current load. The relaxed climbing builds aerobic climbing economy and the controlled descending limits eccentric damage, so the following week starts with usable freshness rather than deep soreness. Stay conservative on descents so the next week starts fresh.
 
-Wed 2026-03-18: Easy run + trail-specific strength (durability) (STRENGTH, 65 min)
-  Intensity: Run easy (RPE ~2–3/10); strength controlled (leave 2–3 reps in reserve). Keep everything crisp—no grinding.
-  Terrain: Easy terrain; avoid steep/technical if sore
-  Workout: Run 45 min easy (include a few short hikes if you’re on trail, but keep effort capped) + 20 min strength (trail durability emphasis):
-- Rear-foot-elevated split squat or split squat (2–3 x 6–10/side)
-- Step-downs (2–3 x 6–10/side, slow eccentric)
-- Single-leg calf raises (2–3 x 8–15/side)
-- Hip hinge (RDL) (2–3 x 6–10)
-- Lateral band walks or hip airplanes (2 x 8–12/side)
-- Side plank (2 x 30–45s/side)
-Optional finisher if fresh: 2 x 20–30s single-leg balance (barefoot if safe) to reinforce ankle stability for uneven trails.
-  Purpose: Reinforce trail-specific durability (single-leg strength, stability, calf/ankle stiffness) to support climbing/descending economy without adding another hard day.
+Sun 2026-03-22: Rest day (REST, 0 min)
+  Intensity: Recovery only, RPE 1-2/10
+  Terrain: off-feet
+  Workout: Warm-up: none. Main set: none. Cool-down: optional 10-15 min easy walk and gentle mobility only if stiff. Target: full recovery, RPE 1-2/10. Terrain/equipment: off-feet.
+  Purpose: Absorb the first build week and protect the next microcycle. Keep the day truly easy rather than sneaking in extra volume.
 
-Thu 2026-03-19: Short intervals (quality #2, controlled) (INTERVALS, HARD, 55 min)
-  Intensity: Fast but controlled; finish feeling like you could do 1–2 more reps. If you’re straining early, slow the fast reps and keep them smooth.
-  Terrain: Flat or gentle grade; firm surface
-  Workout: 15 min warm-up easy + drills → 10 x 1 min fast / 1 min easy → 10–15 min cool-down easy. Keep the fast reps smooth (no sprinting).
-  Purpose: Improve speed and VO2-style stimulus that carries over to faster trail pace, while staying within a manageable weekly stress during the run-volume transition.
+Mon 2026-03-23: Easy road run (EASY, 45 min)
+  Intensity: RPE 3-4/10, conversational aerobic
+  Terrain: flat road
+  Workout: Warm-up: 10 min very easy jog and ankle mobility. Main set: 25 min relaxed flat-road run, staying smooth and light. Cool-down: 10 min easy jog/walk and brief calf work. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only.
+  Purpose: Restart the legs after the rest day and keep the volume aerobic. Maintain RPE 3-4 conversational pace even if the legs feel fresh, because the Friday tempo and Saturday trail elevation later this week need a low-fatigue setup. If the weekend trail run left you heavy, shorten by 10 min and keep it purely easy.
 
-Fri 2026-03-20: Long easy trail (endurance + climbing economy, capped duration) (LONG, 150 min)
-  Intensity: Easy aerobic all the way (RPE ~2–3/10). Effort ceiling: if you can’t speak in full sentences on climbs, hike and/or slow down. No ‘steady’ pushes today.
-  Terrain: Trail, preferably mostly runnable and non-technical. Choose steady grades; avoid highly technical descents or very steep downhill pounding to prevent intensity creep when fatigued.
-  Workout: 2:30 easy trail time-on-feet. Include continuous climb segments, but no hard surges. Plan: (1) first 20–30 min deliberately easier than you think, (2) hike steeper grades early to keep effort capped, (3) keep descents smooth and controlled (no chasing pace). Practice fueling: start at ~30 min, then every 20–30 min.
-  Purpose: Build trail-specific endurance and climbing efficiency while reducing fatigue risk (capped long-run duration) during a cycling-to-running transition week.
+Tue 2026-03-24: Strength session (STRENGTH, 35 min)
+  Intensity: RPE 5-6/10, controlled strength effort
+  Terrain: home or gym
+  Workout: Warm-up: 10 min easy spin or brisk walk with dynamic mobility. Main set: 20 min circuit of split squats, calf raises, step-ups, dead bugs, side planks, and glute bridges for 2-3 rounds with perfect control. Cool-down: 5 min easy stretching and breathing. Target: RPE 5-6/10, submax strength. Terrain/equipment: bodyweight or light load at home or gym.
+  Purpose: Maintain trail-running durability without adding much fatigue. Split squats, calf raises, step-ups, dead bugs, side planks, and glute bridges reinforce single-leg force and trunk stiffness for climbing and downhill control. If you feel worn down, cut the circuit to one lighter round and finish early.
+
+Wed 2026-03-25: Easy road run (EASY, 50 min)
+  Intensity: RPE 3-4/10, conversational aerobic
+  Terrain: flat road
+  Workout: Warm-up: 10 min very easy jog with leg swings. Main set: 30 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and light mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only.
+  Purpose: Set up the second build week with steady aerobic work. Keep the effort honest-easy so Friday quality and Saturday trail work stay sharp.
+
+Thu 2026-03-26: Aerobic bike (CROSS, 45 min)
+  Intensity: RPE 3-4/10, aerobic spin
+  Terrain: flat road or stationary bike
+  Workout: Warm-up: 10 min easy spin. Main set: 25 min steady aerobic ride with 3 x 3 min high-cadence efforts, separated by 3 min easy. Cool-down: 10 min very easy spin. Target: RPE 3-4/10, Zone 2 feel. Terrain/equipment: flat road or stationary bike.
+  Purpose: Keep the aerobic load moving without pounding the legs. If the week feels heavy, make this an uninterrupted easy spin only.
+
+Fri 2026-03-27: Controlled tempo run (TEMPO, HARD, 55 min)
+  Intensity: RPE 6-7/10, controlled comfortably hard
+  Terrain: flat road
+  Workout: Warm-up: 15 min easy jog with drills and 4 short strides. Main set: 3 x 10 min controlled tempo on flat road with 2 min easy jog between reps. Cool-down: 10 min easy jog and light stretching. Target: RPE 6-7/10, controlled tempo effort. Terrain/equipment: flat road only.
+  Purpose: Progress the quality by extending sustained work slightly while keeping effort controlled. The 3 x 10 min tempo extends time near threshold, improving fatigue resistance for long climbs without forcing race-pace strain. If you notice morning heaviness, lingering soreness by Wednesday, or breathing or stride feeling unusually effortful on the warm-up, cut this to 2 reps and keep the rest of the day easy.
+
+Sat 2026-03-28: Long trail run (LONG, 100 min)
+  Intensity: RPE 3-4/10, aerobic with relaxed climbing
+  Terrain: Saturday trail with moderate elevation
+  Workout: Warm-up: 15 min easy jog on gentle terrain. Main set: 65 min easy trail run, keeping climbs relaxed and descents smooth. Cool-down: 20 min very easy jog/walk plus mobility. Target: RPE 3-4/10, aerobic. Terrain/equipment: Saturday trail run, moderate rolling trail, about 250-300 m of gain.
+  Purpose: Add a small step in trail duration and vertical without making the weekend a race. This extends time-on-feet and low-intensity climbing tolerance while keeping enough reserve that Sunday remains a true rest day. Keep the pacing controlled enough that the next build week starts from recovered legs.
+
+Sun 2026-03-29: Rest day (REST, 0 min)
+  Intensity: Recovery only, RPE 1-2/10
+  Terrain: off-feet
+  Workout: Warm-up: none. Main set: none. Cool-down: optional 10-15 min easy walk and gentle mobility only if stiff. Target: full recovery, RPE 1-2/10. Terrain/equipment: off-feet.
+  Purpose: Absorb the build and protect the next block. Keep this completely off-feet if the Saturday trail run leaves any lingering soreness.
+
+Mon 2026-03-30: Easy road run (EASY, 45 min)
+  Intensity: RPE 3-4/10, conversational aerobic
+  Terrain: flat road
+  Workout: Warm-up: 10 min very easy jog and mobility. Main set: 25 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and calf/hip mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only.
+  Purpose: Begin the next week with comfortable volume after the rest day. If the weekend trail load lingers, stay at the easy end of the pace range.
+
+Tue 2026-03-31: Strength session (STRENGTH, 40 min)
+  Intensity: RPE 5-6/10, controlled strength effort
+  Terrain: home or gym
+  Workout: Warm-up: 10 min easy spin or brisk walk with dynamic mobility. Main set: 22 min circuit of split squats, calf raises, step-ups, dead bugs, side planks, and glute bridges for 2-3 rounds with good form. Cool-down: 8 min easy stretching and breathing. Target: RPE 5-6/10, submax strength. Terrain/equipment: bodyweight or light load at home or gym.
+  Purpose: Support tissue durability as the running workload builds. The lower-body and core circuit helps absorb climbing and descending loads without adding much impact. If you feel flat, make it a short mobility and core session only.
+
+Wed 2026-04-01: Easy road run (EASY, 50 min)
+  Intensity: RPE 3-4/10, conversational aerobic
+  Terrain: flat road
+  Workout: Warm-up: 10 min very easy jog with leg swings. Main set: 30 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and light mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only.
+  Purpose: Keep the load consistent while avoiding unnecessary strain before the Friday quality session. Stay smooth rather than trying to force pace.
+
+Thu 2026-04-02: Aerobic bike (CROSS, 45 min)
+  Intensity: RPE 3-4/10, aerobic spin
+  Terrain: flat road or stationary bike
+  Workout: Warm-up: 10 min easy spin. Main set: 25 min steady aerobic ride with 3 x 3 min high-cadence efforts, separated by 3 min easy. Cool-down: 10 min very easy spin. Target: RPE 3-4/10, Zone 2 feel. Terrain/equipment: flat road or stationary bike.
+  Purpose: Use cycling to support aerobic development while keeping impact low. If fatigue is present, ride steady and ignore the cadence bursts.
+
+Fri 2026-04-03: Controlled tempo run (TEMPO, HARD, 60 min)
+  Intensity: RPE 6-7/10, controlled comfortably hard
+  Terrain: flat road
+  Workout: Warm-up: 15 min easy jog with drills and 4 short strides. Main set: 4 x 8 min controlled tempo on flat road with 2 min easy jog between reps. Cool-down: 10 min easy jog and light stretching. Target: RPE 6-7/10, controlled tempo effort. Terrain/equipment: flat road only.
+  Purpose: This is the highest-quality run of the block, but it should still feel controlled rather than aggressive. The 4 x 8 min at RPE 6-7 builds lactate-threshold resilience and sustained-effort durability on flat road, directly supporting steady climbing pace on Sep 15's 1500 m elevation gain. If fatigue is showing as heavy legs on Thursday, easy pace drifting up, or poor snap in the first strides, reduce to 3 reps and protect the weekend trail run.
+
+Sat 2026-04-04: Long trail run (LONG, 105 min)
+  Intensity: RPE 3-4/10, aerobic with relaxed climbing
+  Terrain: Saturday trail with moderate elevation
+  Workout: Warm-up: 15 min easy jog on gentle terrain. Main set: 70 min easy trail run, keeping climbs relaxed and descents smooth. Cool-down: 20 min very easy jog/walk plus mobility. Target: RPE 3-4/10, aerobic. Terrain/equipment: Saturday trail run, moderate rolling trail, about 300-350 m of gain.
+  Purpose: Extend the weekend trail exposure a little more while still staying in base-development territory. The slightly longer duration and higher vertical deepen aerobic durability and downhill tissue tolerance without adding race-level stress. Keep the effort easy enough that Sunday rest feels like absorption, not rescue.
+
+Sun 2026-04-05: Rest day (REST, 0 min)
+  Intensity: Recovery only, RPE 1-2/10
+  Terrain: off-feet
+  Workout: Warm-up: none. Main set: none. Cool-down: optional 10-15 min easy walk and gentle mobility only if stiff. Target: full recovery, RPE 1-2/10. Terrain/equipment: off-feet.
+  Purpose: Consolidate the biggest week of the block and let the legs rebound. If soreness lingers, keep all non-essential movement light and short.
+
+Mon 2026-04-06: Easy road run (EASY, 45 min)
+  Intensity: RPE 3-4/10, conversational aerobic
+  Terrain: flat road
+  Workout: Warm-up: 10 min very easy jog and mobility. Main set: 25 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and light calf work. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only.
+  Purpose: Return to running gently after the rest day and begin the recovery/consolidation week. Keep this easy even if the legs feel good so the deload actually lowers accumulated stress and restores snap for the final trail touch next weekend.
+
+Tue 2026-04-07: Strength session (STRENGTH, 45 min)
+  Intensity: RPE 5-6/10, controlled strength effort
+  Terrain: home or gym
+  Workout: Warm-up: 10 min easy spin or brisk walk with dynamic mobility. Main set: 25 min circuit of split squats, calf raises, step-ups, dead bugs, side planks, and glute bridges for 2-3 rounds with clean form. Cool-down: 10 min easy stretching and breathing. Target: RPE 5-6/10, submax strength. Terrain/equipment: bodyweight or light load at home or gym.
+  Purpose: Maintain durability while the running volume eases slightly. Keep the strength work submaximal so it preserves leg stiffness and hip stability for the next build. If the week has already felt heavy, trim the final round and stop at fresh form.
+
+Wed 2026-04-08: Easy road run (EASY, 40 min)
+  Intensity: RPE 3-4/10, conversational aerobic
+  Terrain: flat road
+  Workout: Warm-up: 10 min very easy jog with leg swings. Main set: 20 min relaxed flat-road run at conversational pace. Cool-down: 10 min easy jog/walk and brief mobility. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only.
+  Purpose: Start the recovery week with lighter volume and fresh legs. Keep the pace relaxed and avoid the temptation to squeeze in extra work.
+
+Thu 2026-04-09: Aerobic bike (CROSS, 40 min)
+  Intensity: RPE 3-4/10, aerobic spin
+  Terrain: flat road or stationary bike
+  Workout: Warm-up: 10 min easy spin. Main set: 20 min steady aerobic ride with 2 x 3 min high-cadence efforts, separated by 3 min easy spin. Cool-down: 10 min very easy spin. Target: RPE 3-4/10, Zone 2 feel. Terrain/equipment: flat road or stationary bike.
+  Purpose: Keep aerobic support in place while the week trends down. If you feel any fatigue, make the whole ride easy and skip the cadence work.
+
+Fri 2026-04-10: Aerobic road run (AEROBIC, 45 min)
+  Intensity: RPE 3-4/10, steady aerobic
+  Terrain: flat road
+  Workout: Warm-up: 10 min easy jog and mobility. Main set: 25 min steady but conversational flat-road running, staying smooth rather than fast. Cool-down: 10 min easy jog/walk and light stretching. Target: RPE 3-4/10, aerobic support. Terrain/equipment: flat road only.
+  Purpose: A small aerobic stimulus keeps the rhythm without adding stress in the deload week. If you feel tired, make this a pure easy run and leave out the steadier middle.
+
+Sat 2026-04-11: Long trail run (LONG, 85 min)
+  Intensity: RPE 3-4/10, easy aerobic
+  Terrain: Saturday trail with moderate elevation
+  Workout: Warm-up: 15 min easy jog on gentle terrain. Main set: 50 min easy trail run with relaxed climbing and smooth descending. Cool-down: 20 min very easy jog/walk plus mobility. Target: RPE 3-4/10, aerobic. Terrain/equipment: Saturday trail run, moderate rolling trail, about 150-200 m of gain.
+  Purpose: Consolidation week trail touch: keep the specificity, but lower the total stress. The reduced duration and elevation maintain trail rhythm and uphill economy while letting the legs absorb the earlier build. This should feel like a controlled maintenance outing rather than a big effort.
+
+Sun 2026-04-12: Rest day (REST, 0 min)
+  Intensity: Recovery only, RPE 1-2/10
+  Terrain: off-feet
+  Workout: Warm-up: none. Main set: none. Cool-down: optional 10-15 min easy walk and gentle mobility only if stiff. Target: full recovery, RPE 1-2/10. Terrain/equipment: off-feet.
+  Purpose: Use the extra recovery day to absorb the down week. Keep it quiet and avoid adding hidden load through errands or extra exercise.
+
+Mon 2026-04-13: Easy road run (EASY, 35 min)
+  Intensity: RPE 3-4/10, conversational aerobic
+  Terrain: flat road
+  Workout: Warm-up: 10 min very easy jog with mobility. Main set: 15 min relaxed flat-road run, staying light and smooth. Cool-down: 10 min easy jog/walk and brief stretching. Target: RPE 3-4/10, easy aerobic. Terrain/equipment: flat road only.
+  Purpose: Keep a touch of running rhythm without rebuilding fatigue. If the trail run left your legs dull, shorten to 25 min total and keep it purely easy; the goal is to arrive at Tuesday strength with fresh calves and hips.
+
+Tue 2026-04-14: Strength session (STRENGTH, 30 min)
+  Intensity: RPE 5-6/10, controlled strength effort
+  Terrain: home or gym
+  Workout: Warm-up: 8 min easy spin or brisk walk with dynamic mobility. Main set: 17 min circuit of split squats, calf raises, step-ups, dead bugs, side planks, and glute bridges for 2 rounds with clean form. Cool-down: 5 min easy stretching and breathing. Target: RPE 5-6/10, submax strength. Terrain/equipment: bodyweight or light load at home or gym.
+  Purpose: Finish the block with a small durability dose and leave the athlete ready for the next build. A short, controlled circuit keeps the connective tissue and core engaged without carrying fatigue into the next microcycle. If you feel run down, make this mobility-only and stop early.
 
 Recovery focus
 --------------
-- Because last 7 days have 0 sleep records, prioritize consistent sleep opportunity this week; aim to match your 28-day average sleep pattern (baseline sleep is present over 28 days, but missing recently).
-- Transition-week monitoring (simple, practical): if you wake up feeling unusually sore/heavy for 2+ days, or your easy warm-up effort feels abnormally high for the pace (RPE drift), downgrade the next quality session to 30–45 min easy. Missing recent sleep data makes these subjective checks more important.
-- Fuel the two quality days: a carb-forward meal 2–4 hours pre-session; 20–30 g protein within ~1–2 hours post.
-- Long trail day: practice fueling/hydration early and consistently (don’t wait until you feel depleted). Keep descents controlled to reduce muscle damage that can blunt the next week’s run progression.
-- Daily 5–10 min ankle/calf/hip mobility to support climbing/descending economy.
+- Target 8-9 hours of sleep nightly and keep the schedule consistent, because the last 7 days had no usable sleep, HRV, or resting-HR telemetry.
+- Use a telemetry-free check on Wednesday and Thursday: if morning leg heaviness persists, easy pace feels unusually labored, or soreness is still obvious by Thursday, drop Friday's tempo to easy volume.
+- Fuel Friday tempo sessions and Saturday long trail runs with carbs before and after; do not underfuel the long run.
+- Hydrate after rides and trail runs, and add sodium if the weather is warm or sweat rate is high.
+- Use 10-15 minutes of mobility after easy days and keep the weekly strength work controlled, not fatiguing.
 
 Risks / cautions
 ---------------
-- [medium] Overreach risk is moderate and driven by elevated recent training load; keep intensity capped to 2 quality sessions and protect the long run from drifting into moderate/hard effort. Long-run duration is intentionally capped (2:30) to reduce fatigue risk this week.
-- [medium] Recovery data gap: 0 sleep days with data in the last 7 days reduces confidence in readiness; if you feel unusually flat/irritable, or your easy warm-up feels much harder than normal, downgrade quality sessions to easy aerobic and keep the long run strictly easy (hike early/often on climbs).
-- [low] Recent week is cycling-heavy; increasing run specificity supports your goal, but keep the ramp gradual. This week increases run frequency and adds two controlled quality sessions while capping long-run duration; in future weeks, progress by adding small increments (e.g., +10–15 min long run or +1–2 km easy volume) rather than adding another hard day.
+- [medium] Recovery telemetry is missing for the last 7 days, so fatigue management has to rely on training load and subjective feel rather than sleep/HRV/RHR; watch for morning heaviness, unusually sore legs by Thursday, or easy running feeling 1 RPE harder than normal.
+- [medium] Recent 7-day load is elevated versus the recent baseline and overreach risk is moderate, so a second hard day or an aggressive long run would be too much right now.
+- [low] Historical trailrunning capacity is much larger than the current week, but the plan deliberately stays conservative and does not try to match old peak loads.

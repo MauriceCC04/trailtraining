@@ -47,7 +47,6 @@ from trailtraining.llm.signals import build_retrieval_context
 from trailtraining.util.dates import _as_date
 from trailtraining.util.errors import ArtifactError, MissingArtifactError
 from trailtraining.util.state import _json_default, load_json, save_json
-from trailtraining.util.text import _safe_json_snippet
 
 log = logging.getLogger(__name__)
 
@@ -345,6 +344,23 @@ def _apply_deterministic_readiness(
     plan_obj["data_notes"] = notes
 
 
+def _lifestyle_notes_section(lifestyle_notes: str) -> list[str]:
+    """Build prompt section for lifestyle constraints. Returns empty list if none."""
+    notes = lifestyle_notes.strip() if isinstance(lifestyle_notes, str) else ""
+    if not notes:
+        return []
+    return [
+        "## Lifestyle constraints (authoritative — the athlete's real-world schedule)",
+        notes,
+        "",
+        "These constraints reflect the athlete's actual availability, not a training preference.",
+        "The plan MUST respect them. For example, if the athlete can only run on roads during",
+        "the week, weekday road runs are correct — not a failure of trail specificity.",
+        "Copy these constraints into meta.lifestyle_notes in your output.",
+        "",
+    ]
+
+
 def _build_prompt_text(
     prompt_name: str,
     personal: Any,
@@ -354,10 +370,13 @@ def _build_prompt_text(
     *,
     style: str,
     primary_goal: str,
+    lifestyle_notes: str,
     max_chars: int,
     detail_days: int,
     plan_days: int = 7,
 ) -> str:
+    from trailtraining.util.text import _safe_json_snippet
+
     retrieval_weeks = int(os.getenv("TRAILTRAINING_COACH_RETRIEVAL_WEEKS", "8"))
 
     sections: list[str] = [
@@ -371,6 +390,7 @@ def _build_prompt_text(
         "The output plan MUST target the primary goal above and copy it exactly into meta.primary_goal.",
         f"The output plan MUST contain exactly {plan_days} days in plan.days.",
         "",
+        *_lifestyle_notes_section(lifestyle_notes),
         *_race_context_section(primary_goal),
         "## Personal profile (raw JSON)",
         _safe_json_snippet(personal, max_chars=50_000),
@@ -465,6 +485,7 @@ class CoachConfig:
     style: str = "trailrunning"
     primary_goal: str = ""
     plan_days: int = 7
+    lifestyle_notes: str = ""
 
     @classmethod
     def from_env(cls) -> CoachConfig:
@@ -479,6 +500,7 @@ class CoachConfig:
         primary_goal = os.getenv("TRAILTRAINING_PRIMARY_GOAL") or default_primary_goal_for_style(
             style
         )
+        lifestyle_notes = os.getenv("TRAILTRAINING_LIFESTYLE_NOTES", "").strip()
         return cls(
             model=os.getenv("TRAILTRAINING_LLM_MODEL", cls.model),
             reasoning_effort=os.getenv("TRAILTRAINING_REASONING_EFFORT", cls.reasoning_effort),
@@ -488,7 +510,17 @@ class CoachConfig:
             style=style,
             primary_goal=primary_goal,
             plan_days=_env_int("TRAILTRAINING_PLAN_DAYS", cls.plan_days),
+            lifestyle_notes=lifestyle_notes,
         )
+
+
+def _apply_lifestyle_notes(plan_obj: dict[str, Any], lifestyle_notes: str) -> None:
+    """Set meta.lifestyle_notes on the plan object."""
+    notes = lifestyle_notes.strip() if isinstance(lifestyle_notes, str) else ""
+    meta = _as_dict(plan_obj.get("meta"))
+    if meta:
+        meta["lifestyle_notes"] = notes
+        plan_obj["meta"] = meta
 
 
 def _parse_training_plan(
@@ -540,6 +572,7 @@ def _run_training_plan(
 
     obj = _parse_training_plan(out_text, client, cfg, system_instructions)
     _apply_primary_goal(obj, resolved_goal)
+    _apply_lifestyle_notes(obj, cfg.lifestyle_notes)
     _apply_deterministic_readiness(obj, deterministic_forecast)
     apply_eval_coach_guardrails(obj, rollups if isinstance(rollups, dict) else None)
 
@@ -615,6 +648,7 @@ def run_coach_brief(
         deterministic_forecast=deterministic_forecast,
         style=cfg.style,
         primary_goal=resolved_goal,
+        lifestyle_notes=cfg.lifestyle_notes,
         max_chars=cfg.max_chars,
         detail_days=detail_days,
         plan_days=cfg.plan_days,

@@ -56,13 +56,29 @@ TRAINING_PLAN_SCHEMA: dict[str, Any] = {
             "meta": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["today", "plan_start", "plan_days", "style", "primary_goal"],
+                "required": [
+                    "today",
+                    "plan_start",
+                    "plan_days",
+                    "style",
+                    "primary_goal",
+                    "lifestyle_notes",
+                ],
                 "properties": {
                     "today": {"type": "string", "description": "YYYY-MM-DD"},
                     "plan_start": {"type": "string", "description": "YYYY-MM-DD"},
                     "plan_days": {"type": "integer", "minimum": 1, "maximum": 28},
                     "style": {"type": "string"},
                     "primary_goal": {"type": "string"},
+                    "lifestyle_notes": {
+                        "type": "string",
+                        "description": (
+                            "Athlete schedule or lifestyle constraints that affect session "
+                            "placement (e.g. weekday-only road access, weekend-only trail "
+                            "access). Copy exactly from the prompt if provided, or leave "
+                            "empty string if none."
+                        ),
+                    },
                 },
             },
             "snapshot": {
@@ -205,6 +221,8 @@ def training_plan_output_contract_text() -> str:
         "Output MUST be a single JSON object (no Markdown, no backticks) matching the training-plan schema.\n"
         "Rules:\n"
         "- meta.primary_goal MUST match the authoritative primary goal provided in the prompt.\n"
+        "- meta.lifestyle_notes MUST copy the lifestyle constraints from the prompt exactly, "
+        'or be empty string "" if none were provided.\n'
         "- meta.plan_days MUST equal the number of days in plan.days.\n"
         "- Use only signal_ids that appear in the provided Signal registry.\n"
         "- Every plan day MUST include signal_ids justifying that day.\n"

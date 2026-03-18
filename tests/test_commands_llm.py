@@ -24,6 +24,7 @@ class FakeCoachConfig:
     style: str | None = None
     primary_goal: str | None = None
     plan_days: int = 7
+    lifestyle_notes: str = ""
 
     @classmethod
     def from_env(cls):
@@ -41,12 +42,16 @@ class FakeCoachConfig:
 
 
 @dataclass
+@dataclass
 class FakeSoftEvalConfig:
     enabled: bool = False
     model: str = "soft-model"
     reasoning_effort: str = "medium"
     verbosity: str = "low"
     primary_goal: str = "consistency"
+    lifestyle_notes: str = ""
+    skip_synthesis: bool = False
+    parallel_batches: bool = True
 
     @classmethod
     def from_env(cls):
@@ -60,6 +65,7 @@ class FakeRevisePlanConfig:
     verbosity: str
     temperature: float | None = None
     primary_goal: str | None = None
+    lifestyle_notes: str = ""
 
 
 def _runtime_with_prompting_dir(path: Path):
@@ -105,6 +111,7 @@ def test_cmd_coach_builds_config_and_prints_saved_files(monkeypatch, tmp_path, c
         personal="personal.json",
         summary="summary.json",
         output=str(tmp_path / "coach_brief_training-plan.json"),
+        lifestyle_notes=None,
     )
 
     lc.cmd_coach(args)
@@ -177,6 +184,10 @@ def test_cmd_eval_coach_prints_report_and_exits_zero(monkeypatch, tmp_path, caps
         goal="race",
         output=str(tmp_path / "violations.json"),
         rollups="rollups.json",
+        lifestyle_notes=None,
+        skip_synthesis=False,
+        no_parallel_batches=False,
+        soft_eval_runs=1,
     )
 
     with pytest.raises(SystemExit) as exc:
@@ -246,6 +257,7 @@ def test_cmd_eval_coach_exits_one_for_high_severity_violation(monkeypatch, tmp_p
         goal=None,
         output=None,
         rollups=None,
+        lifestyle_notes=None,
     )
 
     with pytest.raises(SystemExit) as exc:
@@ -296,6 +308,7 @@ def test_cmd_revise_plan_prints_saved_artifacts(monkeypatch, tmp_path, capsys):
         report=None,
         output=str(revised_json),
         rollups="rollups.json",
+        lifestyle_notes=None,
     )
 
     lc.cmd_revise_plan(args)

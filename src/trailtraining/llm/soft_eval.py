@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -24,9 +25,6 @@ log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Rubric batches for decomposed evaluation
-# Each tuple is (batch_name, list_of_rubric_ids).
-# goal_alignment + plan_coherence are batched together (related load/goal logic).
-# caution_proportionality is isolated (hardest to score consistently).
 # ---------------------------------------------------------------------------
 _RUBRIC_BATCHES: list[tuple[str, list[str]]] = [
     ("goal_coherence", ["goal_alignment", "plan_coherence"]),
@@ -44,6 +42,9 @@ class SoftEvalConfig:
     verbosity: str = "medium"
     temperature: Optional[float] = None
     primary_goal: Optional[str] = None
+    lifestyle_notes: str = ""
+    skip_synthesis: bool = False
+    parallel_batches: bool = True
 
     @classmethod
     def from_env(cls) -> SoftEvalConfig:
@@ -59,6 +60,15 @@ class SoftEvalConfig:
                 cls.verbosity,
             ),
             primary_goal=os.getenv("TRAILTRAINING_PRIMARY_GOAL") or None,
+            lifestyle_notes=os.getenv("TRAILTRAINING_LIFESTYLE_NOTES", "").strip(),
+            skip_synthesis=(
+                os.getenv("TRAILTRAINING_SOFT_EVAL_SKIP_SYNTHESIS", "").strip().lower()
+                in {"1", "true", "yes", "y", "on"}
+            ),
+            parallel_batches=(
+                os.getenv("TRAILTRAINING_SOFT_EVAL_NO_PARALLEL", "").strip().lower()
+                not in {"1", "true", "yes", "y", "on"}
+            ),
         )
 
 
@@ -72,7 +82,6 @@ def _rubric_ids() -> list[str]:
 
 
 def _build_batch_marker_schema(batch_name: str) -> dict[str, Any]:
-    """Per-batch schema requiring observation before score."""
     return {
         "name": f"trailtraining_batch_{batch_name}_v1",
         "schema": {
@@ -152,7 +161,6 @@ _COMPARE_PLANS_SCHEMA: dict[str, Any] = {
     },
 }
 
-# Keep the full schema for repair-path fallbacks (observation optional here for compat)
 SOFT_EVAL_SCHEMA: dict[str, Any] = {
     "name": "trailtraining_soft_quality_assessment_v1",
     "schema": {
@@ -205,7 +213,7 @@ SOFT_EVAL_SCHEMA: dict[str, Any] = {
                         "rubric": {"type": "string"},
                         "marker_id": {"type": "string"},
                         "marker": {"type": "string"},
-                        "observation": {"type": "string"},  # optional in repair schema
+                        "observation": {"type": "string"},
                         "verdict": {
                             "type": "string",
                             "enum": ["pass", "partial", "fail"],
@@ -384,28 +392,19 @@ def _expected_markers(style: str) -> list[dict[str, str]]:
     for rubric in get_default_rubrics(style):
         for marker in rubric.markers:
             out.append(
-                {
-                    "rubric": rubric.rubric_id,
-                    "marker_id": marker.marker_id,
-                    "marker": marker.label,
-                }
+                {"rubric": rubric.rubric_id, "marker_id": marker.marker_id, "marker": marker.label}
             )
     return out
 
 
 def _expected_markers_for_rubrics(rubric_ids: list[str], style: str) -> list[dict[str, str]]:
-    """Return expected marker stubs for the given rubric_ids only."""
     out: list[dict[str, str]] = []
     for rubric in get_default_rubrics(style):
         if rubric.rubric_id not in rubric_ids:
             continue
         for marker in rubric.markers:
             out.append(
-                {
-                    "rubric": rubric.rubric_id,
-                    "marker_id": marker.marker_id,
-                    "marker": marker.label,
-                }
+                {"rubric": rubric.rubric_id, "marker_id": marker.marker_id, "marker": marker.label}
             )
     return out
 
@@ -463,10 +462,16 @@ def _normalize_rubric_scores(raw: Any, *, style: str) -> dict[str, dict[str, Any
     return out
 
 
-def _resolve_style_and_goal(
+def _resolve_style_goal_and_lifestyle(
     plan_obj: dict[str, Any],
     cfg: SoftEvalConfig,
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
+    """Extract style, primary_goal, and lifestyle_notes from plan + config.
+
+    Priority for lifestyle_notes:
+      1. cfg.lifestyle_notes (explicit CLI/env override)
+      2. plan_obj.meta.lifestyle_notes (recorded in the artifact)
+    """
     meta = plan_obj.get("meta") or {}
     style = _normalize_style(meta.get("style"))
     primary_goal = (
@@ -475,7 +480,19 @@ def _resolve_style_and_goal(
         or default_primary_goal_for_style(style)
         or DEFAULT_PRIMARY_GOAL
     )
-    return style, primary_goal
+    lifestyle_notes = (
+        str(cfg.lifestyle_notes or "").strip() or str(meta.get("lifestyle_notes") or "").strip()
+    )
+    return style, primary_goal, lifestyle_notes
+
+
+# Keep backward-compatible alias used in compare_plans
+def _resolve_style_and_goal(
+    plan_obj: dict[str, Any],
+    cfg: SoftEvalConfig,
+) -> tuple[str, str]:
+    style, goal, _ = _resolve_style_goal_and_lifestyle(plan_obj, cfg)
+    return style, goal
 
 
 def _rubric_scores_look_usable(raw: Any, *, style: str) -> bool:
@@ -504,7 +521,6 @@ def _derive_rubric_scores_from_markers(
 ) -> dict[str, dict[str, Any]]:
     rubrics = get_default_rubrics(style)
     by_rubric: dict[str, list[float]] = {rubric.rubric_id: [] for rubric in rubrics}
-
     for item in marker_results:
         rubric_id = str(item.get("rubric", "") or "").strip()
         if rubric_id not in by_rubric:
@@ -526,7 +542,6 @@ def _derive_rubric_scores_from_markers(
             rubric_score = 0.0
             reasoning = "No marker evidence available to derive a rubric score."
         out[rubric.rubric_id] = {"score": rubric_score, "reasoning": reasoning}
-
     return out
 
 
@@ -535,6 +550,40 @@ def _parse_soft_eval_json(out_text: str) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("Soft evaluator did not return a JSON object.")
     return raw
+
+
+# ---------------------------------------------------------------------------
+# Lifestyle constraints prompt section
+# ---------------------------------------------------------------------------
+
+
+def _lifestyle_context_for_eval(lifestyle_notes: str) -> list[str]:
+    """Build the evaluator-facing lifestyle constraints section.
+
+    This tells the soft evaluator how to interpret plan choices that look
+    suboptimal in isolation but are correct given the athlete's schedule.
+    """
+    notes = lifestyle_notes.strip() if isinstance(lifestyle_notes, str) else ""
+    if not notes:
+        return []
+    return [
+        "## Lifestyle constraints (IMPORTANT — affects how you score)",
+        f"The athlete has declared these schedule/lifestyle constraints: {notes}",
+        "",
+        "When scoring markers, account for these constraints:",
+        "- trail_specificity: Do NOT penalize road/flat sessions on days where the athlete's",
+        "  schedule restricts them to road-only access. Trail-specific work on the permitted",
+        "  mountain day(s) is sufficient.",
+        "- non_competing_focus: Do NOT flag cycling or cross-training sessions as 'non-running",
+        "  without rationale' if the athlete's constraints make cycling a sensible weekday option.",
+        "  The rationale IS the schedule constraint.",
+        "- workout_purpose_fit / session_type_purpose_alignment: Road-based sessions that serve",
+        "  trail-goal fitness (e.g. road tempo for lactate work, road easy runs for aerobic base)",
+        "  should be scored as purposeful, not as a failure of trail specificity.",
+        "- In general: score the plan against the BEST plan possible GIVEN these constraints,",
+        "  not against an idealized unconstrained trail plan.",
+        "",
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -550,8 +599,8 @@ def _build_batch_prompt(
     *,
     style: str,
     primary_goal: str,
+    lifestyle_notes: str,
 ) -> str:
-    """Build the prompt for a single rubric batch call."""
     has_week_coherence = "plan_coherence" in rubric_ids
     rubric_text = render_rubric_batch_for_prompt(rubric_ids, style=style, primary_goal=primary_goal)
     expected = _expected_markers_for_rubrics(rubric_ids, style)
@@ -582,6 +631,7 @@ def _build_batch_prompt(
     return "\n".join(
         [
             *instructions,
+            *_lifestyle_context_for_eval(lifestyle_notes),
             "## Rubrics to evaluate in this call",
             rubric_text,
             "",
@@ -614,8 +664,8 @@ def _build_synthesis_prompt(
     *,
     style: str,
     primary_goal: str,
+    lifestyle_notes: str,
 ) -> str:
-    """Build the synthesis prompt from all marker results."""
     return "\n".join(
         [
             "You have evaluated a training plan across all rubrics.",
@@ -623,6 +673,7 @@ def _build_synthesis_prompt(
             f"Style: {style}",
             f"Primary goal: {primary_goal}",
             "",
+            *_lifestyle_context_for_eval(lifestyle_notes),
             "## All marker results (from per-rubric evaluation)",
             _safe_json_snippet(all_marker_results, max_chars=25_000),
             "",
@@ -651,8 +702,8 @@ def _run_rubric_batch(
     *,
     style: str,
     primary_goal: str,
+    lifestyle_notes: str,
 ) -> list[dict[str, Any]]:
-    """Execute one LLM call for a rubric batch; return raw marker_results list."""
     schema = _build_batch_marker_schema(batch_name)
     prompt = _build_batch_prompt(
         rubric_ids,
@@ -661,6 +712,7 @@ def _run_rubric_batch(
         rollups,
         style=style,
         primary_goal=primary_goal,
+        lifestyle_notes=lifestyle_notes,
     )
 
     kwargs: dict[str, Any] = {
@@ -701,6 +753,7 @@ def _run_rubric_batch(
             rollups,
             style=style,
             primary_goal=primary_goal,
+            lifestyle_notes=lifestyle_notes,
             rubric_ids=rubric_ids,
         )
 
@@ -714,10 +767,15 @@ def _run_synthesis_call(
     *,
     style: str,
     primary_goal: str,
+    lifestyle_notes: str,
 ) -> dict[str, Any]:
-    """Run a synthesis call to produce summary, strengths, concerns, improvements."""
     prompt = _build_synthesis_prompt(
-        plan_obj, all_marker_results, rollups, style=style, primary_goal=primary_goal
+        plan_obj,
+        all_marker_results,
+        rollups,
+        style=style,
+        primary_goal=primary_goal,
+        lifestyle_notes=lifestyle_notes,
     )
 
     kwargs: dict[str, Any] = {
@@ -765,6 +823,7 @@ def _generate_marker_results_only(
     *,
     style: str,
     primary_goal: str,
+    lifestyle_notes: str = "",
     rubric_ids: Optional[list[str]] = None,
 ) -> list[dict[str, Any]]:
     expected = (
@@ -787,6 +846,7 @@ def _generate_marker_results_only(
                 f"Style: {style}",
                 f"Primary goal: {primary_goal}",
                 "",
+                *_lifestyle_context_for_eval(lifestyle_notes),
                 "## Expected markers",
                 _safe_json_snippet(expected, max_chars=15_000),
                 "",
@@ -843,11 +903,101 @@ def _looks_internally_broken_soft_eval(
 
 def _too_much_output_was_locally_derived(derived_fields: list[str]) -> bool:
     derived = set(derived_fields)
-    return {
-        "strengths",
-        "concerns",
-        "suggested_improvements",
-    }.issubset(derived)
+    return {"strengths", "concerns", "suggested_improvements"}.issubset(derived)
+
+
+# ---------------------------------------------------------------------------
+# Parallel / sequential batch runners
+# ---------------------------------------------------------------------------
+
+
+def _run_batches_parallel(
+    client: Any,
+    cfg: SoftEvalConfig,
+    plan_obj: dict[str, Any],
+    deterministic_report: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
+    *,
+    style: str,
+    primary_goal: str,
+    lifestyle_notes: str,
+) -> tuple[list[dict[str, Any]], bool]:
+    all_marker_results_raw: list[dict[str, Any]] = []
+    repaired = False
+    max_workers = min(len(_RUBRIC_BATCHES), int(os.getenv("TRAILTRAINING_SOFT_EVAL_WORKERS", "4")))
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_batch: dict[Any, str] = {}
+        for batch_name, rubric_ids in _RUBRIC_BATCHES:
+            future = executor.submit(
+                _run_rubric_batch,
+                client,
+                cfg,
+                rubric_ids,
+                batch_name,
+                plan_obj,
+                deterministic_report,
+                rollups,
+                style=style,
+                primary_goal=primary_goal,
+                lifestyle_notes=lifestyle_notes,
+            )
+            future_to_batch[future] = batch_name
+
+        for future in as_completed(future_to_batch):
+            batch_name = future_to_batch[future]
+            try:
+                batch_results = future.result()
+                all_marker_results_raw.extend(batch_results)
+            except Exception as exc:
+                log.warning(
+                    "Rubric batch '%s' failed entirely: %s. "
+                    "Results for these rubrics will be empty.",
+                    batch_name,
+                    exc,
+                )
+                repaired = True
+
+    return all_marker_results_raw, repaired
+
+
+def _run_batches_sequential(
+    client: Any,
+    cfg: SoftEvalConfig,
+    plan_obj: dict[str, Any],
+    deterministic_report: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
+    *,
+    style: str,
+    primary_goal: str,
+    lifestyle_notes: str,
+) -> tuple[list[dict[str, Any]], bool]:
+    all_marker_results_raw: list[dict[str, Any]] = []
+    repaired = False
+    for batch_name, rubric_ids in _RUBRIC_BATCHES:
+        try:
+            batch_results = _run_rubric_batch(
+                client,
+                cfg,
+                rubric_ids,
+                batch_name,
+                plan_obj,
+                deterministic_report,
+                rollups,
+                style=style,
+                primary_goal=primary_goal,
+                lifestyle_notes=lifestyle_notes,
+            )
+            all_marker_results_raw.extend(batch_results)
+        except Exception as exc:
+            log.warning(
+                "Rubric batch '%s' failed entirely: %s. "
+                "Results for these rubrics will be empty.",
+                batch_name,
+                exc,
+            )
+            repaired = True
+    return all_marker_results_raw, repaired
 
 
 # ---------------------------------------------------------------------------
@@ -861,45 +1011,30 @@ def evaluate_training_plan_soft(
     rollups: Optional[dict[str, Any]],
     cfg: SoftEvalConfig,
 ) -> dict[str, Any]:
-    """
-    Evaluate a training plan using a decomposed per-rubric batch architecture.
+    """Evaluate a training plan using decomposed per-rubric batch architecture.
 
-    Instead of one large prompt with all 18+ markers, we run one LLM call per
-    rubric batch to eliminate inter-marker anchoring bias.  Each batch call
-    requires `observation` before `score` to make reasoning auditable.  A final
-    synthesis call produces the summary, strengths, concerns, and improvements.
+    Lifestyle notes (from cfg or plan meta) are injected into every evaluator
+    prompt so that schedule-constrained plans are scored against the best plan
+    possible given those constraints, not against an unconstrained ideal.
     """
     if not cfg.enabled:
         raise ValueError("Soft evaluation is disabled.")
 
-    style, primary_goal = _resolve_style_and_goal(plan_obj, cfg)
+    style, primary_goal, lifestyle_notes = _resolve_style_goal_and_lifestyle(plan_obj, cfg)
     client = make_openrouter_client()
 
     # --- Per-rubric batch calls ---
-    repaired = False
-    all_marker_results_raw: list[dict[str, Any]] = []
-
-    for batch_name, rubric_ids in _RUBRIC_BATCHES:
-        try:
-            batch_results = _run_rubric_batch(
-                client,
-                cfg,
-                rubric_ids,
-                batch_name,
-                plan_obj,
-                deterministic_report,
-                rollups,
-                style=style,
-                primary_goal=primary_goal,
-            )
-            all_marker_results_raw.extend(batch_results)
-        except Exception as exc:
-            log.warning(
-                "Rubric batch '%s' failed entirely: %s. Results for these rubrics will be empty.",
-                batch_name,
-                exc,
-            )
-            repaired = True
+    batch_runner = _run_batches_parallel if cfg.parallel_batches else _run_batches_sequential
+    all_marker_results_raw, repaired = batch_runner(
+        client,
+        cfg,
+        plan_obj,
+        deterministic_report,
+        rollups,
+        style=style,
+        primary_goal=primary_goal,
+        lifestyle_notes=lifestyle_notes,
+    )
 
     if not all_marker_results_raw:
         log.warning("All batches returned empty results; falling back to single-call evaluation.")
@@ -912,13 +1047,12 @@ def evaluate_training_plan_soft(
             rollups,
             style=style,
             primary_goal=primary_goal,
+            lifestyle_notes=lifestyle_notes,
         )
 
     # --- Normalise markers and derive rubric scores ---
     marker_results = _normalize_marker_results(all_marker_results_raw, style=style)
-    # rubric_scores are always derived from markers in the batch architecture
     rubric_scores = _derive_rubric_scores_from_markers(marker_results, style=style)
-
     overall_score = weighted_score_from_rubric_scores(rubric_scores, style=style)
 
     if _looks_internally_broken_soft_eval("placeholder", rubric_scores, marker_results):
@@ -927,16 +1061,27 @@ def evaluate_training_plan_soft(
             "(non-empty narrative with all-zero scores)."
         )
 
-    # --- Synthesis call ---
-    synthesis = _run_synthesis_call(
-        client,
-        cfg,
-        plan_obj,
-        marker_results,
-        rollups,
-        style=style,
-        primary_goal=primary_goal,
-    )
+    # --- Synthesis: LLM call or local derivation ---
+    if cfg.skip_synthesis:
+        log.info("Skipping synthesis LLM call (skip_synthesis=True); deriving feedback locally.")
+        synthesis: dict[str, Any] = {
+            "summary": "",
+            "confidence": "medium",
+            "strengths": [],
+            "concerns": [],
+            "suggested_improvements": [],
+        }
+    else:
+        synthesis = _run_synthesis_call(
+            client,
+            cfg,
+            plan_obj,
+            marker_results,
+            rollups,
+            style=style,
+            primary_goal=primary_goal,
+            lifestyle_notes=lifestyle_notes,
+        )
 
     # --- Apply feedback fallbacks ---
     strengths, concerns, suggested_improvements, feedback_derived = _build_feedback_lists(
@@ -945,11 +1090,16 @@ def evaluate_training_plan_soft(
         marker_results,
     )
 
-    if _too_much_output_was_locally_derived(feedback_derived):
+    if cfg.skip_synthesis:
+        feedback_derived = sorted(set(["strengths", "concerns", "suggested_improvements"]))
+
+    if _too_much_output_was_locally_derived(feedback_derived) and not cfg.skip_synthesis:
         log.warning("Synthesis output required heavy local fallback; results may be lower quality.")
         repaired = True
 
     derived_fields = sorted(set(["rubric_scores", *feedback_derived]))
+    if cfg.skip_synthesis and "summary" not in derived_fields:
+        derived_fields = sorted(set([*derived_fields, "summary"]))
 
     payload = {
         "model": cfg.model,
@@ -982,14 +1132,6 @@ def compare_plans(
     rollups: Optional[dict[str, Any]],
     cfg: SoftEvalConfig,
 ) -> dict[str, Any]:
-    """
-    Compare two training plans and return which is better with reasoning.
-
-    Forced comparison is harder to game than absolute scoring and reveals
-    preference ordering that absolute scores can obscure.
-
-    Returns a dict with keys: preferred, reasoning, plan_a_advantages, plan_b_advantages.
-    """
     style, primary_goal = _resolve_style_and_goal(plan_a, cfg)
     client = make_openrouter_client()
 
@@ -1054,69 +1196,3 @@ def compare_plans(
         "plan_a_advantages": _clean_string_list(raw.get("plan_a_advantages", [])),
         "plan_b_advantages": _clean_string_list(raw.get("plan_b_advantages", [])),
     }
-
-
-# ---------------------------------------------------------------------------
-# Legacy soft eval prompt (kept for repair path reference)
-# ---------------------------------------------------------------------------
-
-
-def _build_soft_eval_prompt(
-    plan_obj: dict[str, Any],
-    deterministic_report: dict[str, Any],
-    rollups: Optional[dict[str, Any]],
-    *,
-    style: str,
-    primary_goal: str,
-) -> str:
-    """Single-call prompt, retained for repair paths and backwards compatibility."""
-    plan_days: int = int((plan_obj.get("meta") or {}).get("plan_days") or 7)
-    plan_weeks = plan_days // 7
-    duration_note = (
-        f"{plan_days}-day ({plan_weeks}-week) multi-week plan"
-        if plan_days > 7
-        else f"{plan_days}-day plan"
-    )
-    return "\n".join(
-        [
-            "You are the second-stage quality assessor for a generated endurance training plan.",
-            "Judge plan quality using the provided rubrics and markers.",
-            "Do not rewrite the plan. Do not invent missing data. Be concrete and non-generic.",
-            f"Evaluate this as a {style} plan and apply sport-specific standards for that style.",
-            "",
-            "## Evaluation context",
-            f"Style: {style}",
-            f"Primary goal: {primary_goal}",
-            f"Plan duration: {duration_note}",
-            *(
-                [
-                    f"This is a {plan_weeks}-week plan — evaluate periodization across all weeks.",
-                    "Hard-day and rest-day constraints apply per rolling 7-day window.",
-                ]
-                if plan_days > 7
-                else []
-            ),
-            "",
-            "## Rubrics and markers",
-            render_rubrics_for_prompt(style=style, primary_goal=primary_goal),
-            "",
-            "## Deterministic evaluation report",
-            _safe_json_snippet(deterministic_report, max_chars=25_000),
-            "",
-            "## Rollups context",
-            _safe_json_snippet(rollups or {}, max_chars=15_000),
-            "",
-            "## Training plan JSON",
-            _safe_json_snippet(plan_obj, max_chars=50_000),
-            "",
-            "## Output rules",
-            "- Return JSON only.",
-            "- Fill every rubric in rubric_scores.",
-            "- Include marker_results for every supplied marker.",
-            "- For each marker: write observation (what you see) before scoring.",
-            "- Use concrete evidence from the plan.",
-            "- strengths: 2-4 concrete strengths.",
-            "- concerns: at least 1 concrete concern.",
-            "- suggested_improvements: 2-4 specific improvements.",
-        ]
-    )

@@ -40,6 +40,7 @@ class RevisePlanConfig:
     verbosity: str = "medium"
     temperature: Optional[float] = None
     primary_goal: Optional[str] = None
+    lifestyle_notes: str = ""
 
     @classmethod
     def from_env(cls) -> RevisePlanConfig:
@@ -48,6 +49,7 @@ class RevisePlanConfig:
             reasoning_effort=os.getenv("TRAILTRAINING_REASONING_EFFORT", cls.reasoning_effort),
             verbosity=os.getenv("TRAILTRAINING_VERBOSITY", cls.verbosity),
             primary_goal=os.getenv("TRAILTRAINING_PRIMARY_GOAL") or None,
+            lifestyle_notes=os.getenv("TRAILTRAINING_LIFESTYLE_NOTES", "").strip(),
         )
 
 
@@ -115,12 +117,27 @@ def _summarize_eval_targets(report_obj: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _lifestyle_notes_for_revise(lifestyle_notes: str) -> list[str]:
+    """Build lifestyle constraints section for the revise prompt."""
+    notes = lifestyle_notes.strip() if isinstance(lifestyle_notes, str) else ""
+    if not notes:
+        return []
+    return [
+        "## Lifestyle constraints (MUST respect in revised plan)",
+        f"The athlete has these schedule constraints: {notes}",
+        "The revised plan must continue to respect these constraints.",
+        "Do not move sessions to days that violate these constraints.",
+        "",
+    ]
+
+
 def _build_revise_prompt(
     plan_obj: dict[str, Any],
     report_obj: dict[str, Any],
     *,
     style: str,
     primary_goal: str,
+    lifestyle_notes: str,
 ) -> str:
     plan_days: int = int((plan_obj.get("meta") or {}).get("plan_days") or 7)
 
@@ -156,7 +173,9 @@ def _build_revise_prompt(
             "- weekly_totals must match week 1 of the revised day list.",
             "- If the evaluator identified concerns or improvements, address them concretely.",
             "- Preserve strong sessions and useful explanations when they are already good.",
+            "- Preserve meta.lifestyle_notes from the original plan.",
             "",
+            *_lifestyle_notes_for_revise(lifestyle_notes),
             *multiweek_note,
             *_summarize_eval_targets(report_obj),
             "## Original training plan JSON",
@@ -171,6 +190,15 @@ def _build_revise_prompt(
     )
 
 
+def _apply_lifestyle_notes(plan_obj: dict[str, Any], lifestyle_notes: str) -> None:
+    """Set meta.lifestyle_notes on the plan object."""
+    notes = lifestyle_notes.strip() if isinstance(lifestyle_notes, str) else ""
+    meta = plan_obj.get("meta")
+    if isinstance(meta, dict):
+        meta["lifestyle_notes"] = notes
+        plan_obj["meta"] = meta
+
+
 def run_revise_plan(
     *,
     cfg: RevisePlanConfig,
@@ -181,14 +209,6 @@ def run_revise_plan(
     runtime: Optional[config.RuntimeConfig] = None,
     auto_reeval: bool = False,
 ) -> tuple[str, str]:
-    """
-    Revise a training plan using evaluator feedback.
-
-    When auto_reeval=True, the revised plan is immediately re-evaluated with
-    the deterministic constraint engine and the delta_score is written to a
-    companion file ``<stem>-reeval.json`` next to the revised plan.
-    A warning is logged and printed if the revision degraded the score.
-    """
     runtime = runtime or config.current()
     config.ensure_directories(runtime)
     paths = runtime.paths
@@ -208,6 +228,11 @@ def run_revise_plan(
         or str((plan_obj.get("meta") or {}).get("primary_goal") or "").strip()
         or default_primary_goal_for_style(style)
     )
+    # Resolve lifestyle_notes: explicit config > plan artifact
+    lifestyle_notes = (
+        str(cfg.lifestyle_notes or "").strip()
+        or str((plan_obj.get("meta") or {}).get("lifestyle_notes") or "").strip()
+    )
 
     client = _make_openrouter_client()
     prompt_text = _build_revise_prompt(
@@ -215,6 +240,7 @@ def run_revise_plan(
         report_obj,
         style=style,
         primary_goal=primary_goal,
+        lifestyle_notes=lifestyle_notes,
     )
 
     kwargs: dict[str, Any] = {
@@ -257,6 +283,7 @@ def run_revise_plan(
         recompute_planned_hours(obj)
 
     apply_primary_goal(obj, primary_goal)
+    _apply_lifestyle_notes(obj, lifestyle_notes)
 
     rollups = _load_rollups_near(plan_p, rollups_path)
     if isinstance(rollups, dict):
@@ -275,7 +302,6 @@ def run_revise_plan(
     txt_p = out_p.parent / f"{out_p.stem}.txt"
     txt_p.write_text(training_plan_to_text(final_obj), encoding="utf-8")
 
-    # --- Optional auto-reeval ---
     if auto_reeval:
         _run_auto_reeval(
             revised_plan_path=out_p,
@@ -292,12 +318,6 @@ def _run_auto_reeval(
     original_report_obj: dict[str, Any],
     rollups_path: Optional[str],
 ) -> None:
-    """
-    Re-evaluate the revised plan with the deterministic constraint engine and
-    write a delta report to ``<stem>-reeval.json``.
-
-    Logs and prints a warning if the revision degraded the deterministic score.
-    """
     from trailtraining.llm.eval import evaluate_training_plan_quality_file
 
     original_score = float(original_report_obj.get("score", 0))
@@ -338,6 +358,4 @@ def _run_auto_reeval(
         log.warning(msg)
         print(msg)
     else:
-        print(
-            f"✅ Auto-reeval: score {original_score:.0f} → {revised_score:.0f} " f"({delta:+.1f})."
-        )
+        print(f"✅ Auto-reeval: score {original_score:.0f} → {revised_score:.0f} ({delta:+.1f}).")

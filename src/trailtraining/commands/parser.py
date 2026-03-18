@@ -22,24 +22,15 @@ from trailtraining.commands.pipeline_commands import (
     cmd_run_all_intervals,
 )
 
-# ---------------------------------------------------------------------------
-# Shared argument-group helpers
-# ---------------------------------------------------------------------------
-
 
 def _add_llm_model_args(parser: argparse.ArgumentParser) -> None:
-    """Add the common --model / --reasoning-effort / --verbosity / --temperature group."""
     parser.add_argument("--model", default=None)
     parser.add_argument(
         "--reasoning-effort",
         default=None,
         choices=["none", "low", "medium", "high", "xhigh"],
     )
-    parser.add_argument(
-        "--verbosity",
-        default=None,
-        choices=["low", "medium", "high"],
-    )
+    parser.add_argument("--verbosity", default=None, choices=["low", "medium", "high"])
     parser.add_argument(
         "--temperature",
         type=float,
@@ -49,7 +40,6 @@ def _add_llm_model_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_goal_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the common --goal argument."""
     parser.add_argument(
         "--goal",
         default=None,
@@ -57,8 +47,23 @@ def _add_goal_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_lifestyle_notes_arg(parser: argparse.ArgumentParser) -> None:
+    """Add --lifestyle-notes to a subparser."""
+    parser.add_argument(
+        "--lifestyle-notes",
+        default=None,
+        dest="lifestyle_notes",
+        help=(
+            "Schedule or lifestyle constraints that affect session placement "
+            "(e.g. 'Weekdays: road runs or cycling only. One long mountain day "
+            "on Saturday or Sunday.'). Overrides TRAILTRAINING_LIFESTYLE_NOTES env var. "
+            "Stored in meta.lifestyle_notes and used by the soft evaluator to avoid "
+            "penalizing schedule-constrained choices."
+        ),
+    )
+
+
 def _add_clean_args(parser: argparse.ArgumentParser) -> None:
-    """Add the common --clean / --clean-processing / --clean-prompting group."""
     parser.add_argument(
         "--clean",
         action="store_true",
@@ -70,9 +75,7 @@ def _add_clean_args(parser: argparse.ArgumentParser) -> None:
         help="Delete files in processing/ before running.",
     )
     parser.add_argument(
-        "--clean-prompting",
-        action="store_true",
-        help="Delete files in prompting/ before running.",
+        "--clean-prompting", action="store_true", help="Delete files in prompting/ before running."
     )
 
 
@@ -84,16 +87,10 @@ def _add_input_output_args(
     add_input: bool = True,
     add_output: bool = True,
 ) -> None:
-    """Add common --input / --output arguments."""
     if add_input:
         parser.add_argument("--input", default=None, help=input_help)
     if add_output:
         parser.add_argument("--output", default=None, help=output_help)
-
-
-# ---------------------------------------------------------------------------
-# Parser construction
-# ---------------------------------------------------------------------------
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -120,9 +117,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     auth_p = sub.add_parser("auth-strava", help="Run Strava auth flow (opens local server)")
     auth_p.add_argument(
-        "--force",
-        action="store_true",
-        help="Force reauthorization even if a token exists.",
+        "--force", action="store_true", help="Force reauthorization even if a token exists."
     )
     auth_p.set_defaults(func=cmd_auth_strava)
 
@@ -136,8 +131,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- run-all ----
     run_all_p = sub.add_parser(
-        "run-all",
-        help="Run full pipeline (auto: Garmin OR Intervals → Strava → Combine)",
+        "run-all", help="Run full pipeline (auto: Garmin OR Intervals → Strava → Combine)"
     )
     _add_clean_args(run_all_p)
     run_all_p.add_argument(
@@ -150,8 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- coach ----
     coach_p = sub.add_parser(
-        "coach",
-        help="LLM coach analysis on combined_summary.json + formatted_personal_data.json",
+        "coach", help="LLM coach analysis on combined_summary.json + formatted_personal_data.json"
     )
     coach_p.add_argument(
         "--prompt",
@@ -170,6 +163,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     coach_p.add_argument("--max-chars", type=int, default=None)
     _add_goal_arg(coach_p)
+    _add_lifestyle_notes_arg(coach_p)
     _add_input_output_args(
         coach_p,
         input_help="Directory containing the two JSON files. Default: prompting directory",
@@ -181,9 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Explicit path to formatted_personal_data.json (overrides --input)",
     )
     coach_p.add_argument(
-        "--summary",
-        default=None,
-        help="Explicit path to combined_summary.json (overrides --input)",
+        "--summary", default=None, help="Explicit path to combined_summary.json (overrides --input)"
     )
     coach_p.add_argument(
         "--style",
@@ -195,23 +187,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- eval-coach ----
     eval_p = sub.add_parser(
-        "eval-coach",
-        help="Evaluate coach training-plan JSON output against constraints",
+        "eval-coach", help="Evaluate coach training-plan JSON output against constraints"
     )
     _add_input_output_args(
         eval_p,
         input_help="Path to coach_brief_training-plan.json",
         output_help="Optional path to write violations JSON",
     )
+    eval_p.add_argument("--rollups", default=None, help="Optional path to combined_rollups.json")
     eval_p.add_argument(
-        "--rollups",
-        default=None,
-        help="Optional path to combined_rollups.json",
-    )
-    eval_p.add_argument(
-        "--max-ramp-pct",
-        type=float,
-        default=float(os.getenv("TRAILTRAINING_MAX_RAMP_PCT", "10")),
+        "--max-ramp-pct", type=float, default=float(os.getenv("TRAILTRAINING_MAX_RAMP_PCT", "10"))
     )
     eval_p.add_argument(
         "--max-consecutive-hard",
@@ -219,9 +204,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=int(os.getenv("TRAILTRAINING_MAX_CONSEC_HARD", "2")),
     )
     eval_p.add_argument(
-        "--report",
-        default=None,
-        help="Optional path to write full scoring report JSON",
+        "--report", default=None, help="Optional path to write full scoring report JSON"
     )
     eval_p.add_argument("--soft-eval", action="store_true", help="Run rubric-based soft evaluation")
     eval_p.add_argument(
@@ -233,64 +216,55 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         dest="soft_eval_runs",
         metavar="N",
-        help=(
-            "Run the soft evaluator N times and report per-marker score variance. "
-            "Values > 1 measure inter-rater reliability. "
-            "Requires temperature variance (temperature > 0 used automatically). "
-            "Markers with std > 0.5 on a 1-5 scale are flagged as potentially ambiguous."
-        ),
+        help="Run the soft evaluator N times and report per-marker score variance.",
     )
     _add_goal_arg(eval_p)
+    _add_lifestyle_notes_arg(eval_p)
     eval_p.add_argument(
         "--soft-eval-reasoning-effort",
         default=None,
         choices=["none", "low", "medium", "high", "xhigh"],
     )
+    eval_p.add_argument("--soft-eval-verbosity", default=None, choices=["low", "medium", "high"])
     eval_p.add_argument(
-        "--soft-eval-verbosity",
-        default=None,
-        choices=["low", "medium", "high"],
+        "--skip-synthesis",
+        action="store_true",
+        dest="skip_synthesis",
+        help="Skip the synthesis LLM call during soft evaluation.",
+    )
+    eval_p.add_argument(
+        "--no-parallel-batches",
+        action="store_true",
+        dest="no_parallel_batches",
+        help="Run soft-eval rubric batches sequentially instead of in parallel.",
     )
     eval_p.set_defaults(func=cmd_eval_coach)
 
     # ---- revise-plan ----
     revise_p = sub.add_parser(
-        "revise-plan",
-        help="Revise coach_brief_training-plan.json using eval_report.json",
+        "revise-plan", help="Revise coach_brief_training-plan.json using eval_report.json"
     )
     _add_input_output_args(
         revise_p,
         input_help="Path to original coach_brief_training-plan.json",
         output_help="Output JSON path (default: <prompting_dir>/revised-plan.json)",
     )
-    revise_p.add_argument(
-        "--report",
-        default=None,
-        help="Path to eval_report.json",
-    )
-    revise_p.add_argument(
-        "--rollups",
-        default=None,
-        help="Optional path to combined_rollups.json",
-    )
+    revise_p.add_argument("--report", default=None, help="Path to eval_report.json")
+    revise_p.add_argument("--rollups", default=None, help="Optional path to combined_rollups.json")
     revise_p.add_argument(
         "--auto-reeval",
         action="store_true",
         dest="auto_reeval",
-        help=(
-            "After revising, immediately re-evaluate the revised plan with the deterministic "
-            "constraint engine and write a delta report to <stem>-reeval.json. "
-            "A warning is printed if the revision degraded the score."
-        ),
+        help="After revising, immediately re-evaluate the revised plan.",
     )
     _add_llm_model_args(revise_p)
     _add_goal_arg(revise_p)
+    _add_lifestyle_notes_arg(revise_p)
     revise_p.set_defaults(func=cmd_revise_plan)
 
     # ---- fetch-intervals ----
     intervals_p = sub.add_parser(
-        "fetch-intervals",
-        help="Fetch sleep + resting HR from Intervals.icu",
+        "fetch-intervals", help="Fetch sleep + resting HR from Intervals.icu"
     )
     intervals_p.add_argument("--oldest", default=None, help="YYYY-MM-DD (default: lookback window)")
     intervals_p.add_argument("--newest", default=None, help="YYYY-MM-DD (default: today)")
@@ -298,16 +272,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- run-all-intervals ----
     run_all_int_p = sub.add_parser(
-        "run-all-intervals",
-        help="Run full pipeline (Intervals → Strava → Combine)",
+        "run-all-intervals", help="Run full pipeline (Intervals → Strava → Combine)"
     )
     _add_clean_args(run_all_int_p)
     run_all_int_p.set_defaults(func=cmd_run_all_intervals)
 
     # ---- forecast ----
     forecast_p = sub.add_parser(
-        "forecast",
-        help="Readiness forecast + overreach risk (from combined_summary.json)",
+        "forecast", help="Readiness forecast + overreach risk (from combined_summary.json)"
     )
     _add_input_output_args(
         forecast_p,
@@ -318,8 +290,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- plan-to-ics ----
     ics_p = sub.add_parser(
-        "plan-to-ics",
-        help="Export most recent training plan to a .ics calendar file",
+        "plan-to-ics", help="Export most recent training plan to a .ics calendar file"
     )
     _add_input_output_args(
         ics_p,

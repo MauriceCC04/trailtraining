@@ -47,6 +47,7 @@ class TrainingMeta(StrictModel):
     plan_days: int = Field(ge=1, le=28)
     style: str
     primary_goal: str = "to become a faster endurance athlete"
+    lifestyle_notes: str = ""
 
     @field_validator("today", "plan_start", mode="before")
     @classmethod
