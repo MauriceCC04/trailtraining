@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Optional
 
 
 def _env(name: str, default: str = "") -> str:
@@ -154,33 +154,3 @@ def ensure_directories(runtime: Optional[RuntimeConfig] = None) -> None:
         cfg.paths.prompting_directory,
     ]:
         path.mkdir(parents=True, exist_ok=True)
-
-
-# Legacy shim for untouched modules. New code should use config.current().
-_LEGACY_ATTR_GETTERS: dict[str, Callable[[RuntimeConfig], Any]] = {
-    "BASE_DIR_PATH": lambda cfg: cfg.paths.base_dir,
-    "BASE_DIR": lambda cfg: str(cfg.paths.base_dir),
-    "RHR_DIRECTORY": lambda cfg: str(cfg.paths.rhr_directory),
-    "SLEEP_DIRECTORY": lambda cfg: str(cfg.paths.sleep_directory),
-    "FIT_DIRECTORY": lambda cfg: str(cfg.paths.fit_directory),
-    "PROCESSING_DIRECTORY": lambda cfg: str(cfg.paths.processing_directory),
-    "PROMPTING_DIRECTORY": lambda cfg: str(cfg.paths.prompting_directory),
-    "STRAVA_ID": lambda cfg: cfg.strava_id,
-    "STRAVA_SECRET": lambda cfg: cfg.strava_secret,
-    "STRAVA_REDIRECT_URI": lambda cfg: cfg.strava_redirect_uri,
-    "GARMIN_EMAIL": lambda cfg: cfg.garmin_email,
-    "GARMIN_PASSWORD": lambda cfg: cfg.garmin_password,
-    "INTERVALS_API_KEY": lambda cfg: cfg.intervals_api_key,
-    "INTERVALS_ATHLETE_ID": lambda cfg: cfg.intervals_athlete_id,
-    "INTERVALS_CLIENT_ID": lambda cfg: cfg.intervals_client_id,
-    "INTERVALS_CLIENT_SECRET": lambda cfg: cfg.intervals_client_secret,
-    "INTERVALS_REDIRECT_URI": lambda cfg: cfg.intervals_redirect_uri,
-    "WELLNESS_PROVIDER": lambda cfg: cfg.wellness_provider,
-}
-
-
-def __getattr__(name: str) -> Any:
-    getter = _LEGACY_ATTR_GETTERS.get(name)
-    if getter is not None:
-        return getter(current())
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -36,9 +36,6 @@ htmlcov/
 /processing/
 .env.local
 
-# Generated source (not checked in)
-/src/trailtraining/features/
-
 # Per-user profiles (sensitive)
 profiles/me.env
 profiles/mom.env

@@ -67,9 +67,9 @@ def write_config(active_home: Optional[Path] = None) -> None:
         "db": {"type": "sqlite"},
         "garmin": {"domain": "garmin.com"},
         "credentials": {
-            "user": config.GARMIN_EMAIL,
+            "user": config.garmin_email(),
             "secure_password": False,
-            "password": config.GARMIN_PASSWORD,  # Do not hardcode passwords
+            "password": config.garmin_password(),
             "password_file": None,
         },
         "data": {
@@ -82,7 +82,7 @@ def write_config(active_home: Optional[Path] = None) -> None:
         },
         "directories": {
             "relative_to_home": False,
-            "base_dir": config.BASE_DIR,
+            "base_dir": config.base_dir(),
             "mount_dir": "/Volumes/GARMIN",
         },
         "enabled_stats": {

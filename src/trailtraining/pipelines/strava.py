@@ -31,15 +31,6 @@ from trailtraining.web.auth_server import start_auth_server, wait_for_code
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
 ACTIVITIES_PATH = "/athlete/activities"
 
-
-def ACTIVITIES_JSON() -> str:
-    return os.path.join(config.PROCESSING_DIRECTORY, "strava_activities.json")
-
-
-def META_JSON() -> str:
-    return os.path.join(config.PROCESSING_DIRECTORY, "strava_meta.json")
-
-
 DEFAULT_LOOKBACK_DAYS = int(os.getenv("TRAILTRAINING_STRAVA_LOOKBACK_DAYS", "365"))
 MAX_PAGES = int(os.getenv("TRAILTRAINING_STRAVA_MAX_PAGES", "0"))
 HARD_MAX_PAGES = int(os.getenv("TRAILTRAINING_STRAVA_HARD_MAX_PAGES", "1000"))
@@ -256,7 +247,12 @@ def _merge_by_id(
 
 def main() -> None:
     print("Fetching Strava data...")
-    config.ensure_directories()
+    runtime = config.current()
+    config.ensure_directories(runtime)
+    processing_dir = runtime.paths.processing_directory
+
+    activities_path = str(processing_dir / "strava_activities.json")
+    meta_path = str(processing_dir / "strava_meta.json")
 
     cfg = StravaOAuthConfig.from_env()
     token = _get_or_auth_token(cfg)
@@ -265,8 +261,8 @@ def main() -> None:
     if not access_token:
         raise RuntimeError("Strava token did not include access_token.")
 
-    existing: list[dict[str, Any]] = load_json(ACTIVITIES_JSON(), default=[]) or []
-    meta: dict[str, Any] = load_json(META_JSON(), default={}) or {}
+    existing: list[dict[str, Any]] = load_json(activities_path, default=[]) or []
+    meta: dict[str, Any] = load_json(meta_path, default={}) or {}
 
     after_unix = _compute_after_unix(existing, meta)
 
@@ -297,10 +293,10 @@ def main() -> None:
         "pagination": page_info,
     }
 
-    save_json(ACTIVITIES_JSON(), merged, compact=True)
-    save_json(META_JSON(), meta_out, compact=True)
+    save_json(activities_path, merged, compact=True)
+    save_json(meta_path, meta_out, compact=True)
 
-    print(f"Saved {len(merged)} activities -> {ACTIVITIES_JSON()}")
+    print(f"Saved {len(merged)} activities -> {activities_path}")
     if slim_new:
         print(f"(Fetched {len(slim_new)} new/updated since after={after_unix})")
 

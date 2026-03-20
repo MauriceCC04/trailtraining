@@ -91,7 +91,35 @@ jobs:
             --cov-report=term-missing \
             --cov-report=xml \
             --junitxml=pytest-${{ matrix.python-version }}.xml \
-            --cov-fail-under=40
+      - name: Coverage gate (data pipeline)
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m pytest -q tests \
+            --cov=trailtraining.data.combine \
+            --cov=trailtraining.data.garmin \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage-data-pipeline.xml \
+            --cov-fail-under=81
+
+      - name: Coverage gate (llm signals and prompting)
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m pytest -q tests \
+            --cov=trailtraining.llm.signals \
+            --cov=trailtraining.llm.coach_prompting \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage-llm.xml \
+            --cov-fail-under=87
+
+      - name: Coverage gate (pipelines)
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m pytest -q tests \
+            --cov=trailtraining.pipelines.intervals \
+            --cov=trailtraining.pipelines.strava \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage-pipelines.xml \
+            --cov-fail-under=77
 
       - name: Coverage gate (constraints core)
         if: matrix.python-version == '3.11'
@@ -101,7 +129,6 @@ jobs:
             --cov-report=term-missing \
             --cov-report=xml:coverage-constraints.xml \
             --cov-fail-under=90
-
       - name: Upload coverage artifact
         if: matrix.python-version == '3.11'
         uses: actions/upload-artifact@v4
@@ -110,6 +137,9 @@ jobs:
           path: |
             coverage.xml
             coverage-constraints.xml
+            coverage-data-pipeline.xml
+            coverage-llm.xml
+            coverage-pipelines.xml
             pytest-${{ matrix.python-version }}.xml
           if-no-files-found: error
 
