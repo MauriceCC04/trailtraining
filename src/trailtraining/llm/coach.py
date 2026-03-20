@@ -18,10 +18,22 @@ from trailtraining.llm.coach_io import (
     save_markdown_output,
     save_training_plan_output,
 )
+from trailtraining.llm.constraints import (
+    EffectiveConstraintContext,
+    constraint_config_from_env,
+    derive_effective_constraints,
+)
 from trailtraining.llm.guardrails import apply_eval_coach_guardrails
 from trailtraining.llm.presets import get_system_prompt
 from trailtraining.llm.rubrics import default_primary_goal_for_style
-from trailtraining.llm.schemas import TRAINING_PLAN_SCHEMA, ensure_training_plan_shape
+from trailtraining.llm.schemas import (
+    MACHINE_PLAN_SCHEMA,
+    PLAN_EXPLANATION_SCHEMA,
+    TRAINING_PLAN_SCHEMA,
+    ensure_machine_plan_shape,
+    ensure_plan_explanation_shape,
+    ensure_training_plan_shape,
+)
 from trailtraining.llm.shared import apply_primary_goal as _apply_primary_goal
 from trailtraining.llm.shared import call_with_param_fallback as _call_with_param_fallback
 from trailtraining.llm.shared import call_with_schema as _call_with_schema
@@ -32,6 +44,19 @@ from trailtraining.util.errors import MissingArtifactError
 from trailtraining.util.state import _json_default
 
 log = logging.getLogger(__name__)
+
+
+def _apply_eval_coach_guardrails_compat(
+    plan_obj: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
+    effective: Optional[EffectiveConstraintContext],
+) -> None:
+    try:
+        apply_eval_coach_guardrails(plan_obj, rollups, effective=effective)
+    except TypeError as exc:
+        if "unexpected keyword argument 'effective'" not in str(exc):
+            raise
+        apply_eval_coach_guardrails(plan_obj, rollups)
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -63,6 +88,7 @@ def _build_prompt_text(
     max_chars: int,
     detail_days: int,
     plan_days: int = 7,
+    effective_constraints: Optional[EffectiveConstraintContext] = None,
 ) -> str:
     return _coach_prompting.build_prompt_text(
         prompt_name=prompt_name,
@@ -76,6 +102,7 @@ def _build_prompt_text(
         max_chars=max_chars,
         detail_days=detail_days,
         plan_days=plan_days,
+        effective_constraints=effective_constraints,
     )
 
 
@@ -198,7 +225,159 @@ def _parse_training_plan(
     return obj
 
 
-def _run_training_plan(
+def _parse_machine_plan(
+    out_text: str,
+    client: OpenAI,
+    cfg: CoachConfig,
+    system_instructions: str,
+) -> dict[str, Any]:
+    try:
+        return ensure_machine_plan_shape(json.loads(_extract_json_object(out_text)))
+    except Exception as exc:
+        log.warning("Machine-plan JSON parse/shape failed; attempting repair: %s", exc)
+
+    repair_resp = _call_with_param_fallback(
+        client,
+        {
+            "model": cfg.model,
+            "instructions": system_instructions,
+            "input": (
+                f"Return ONLY valid JSON matching this schema:\n{MACHINE_PLAN_SCHEMA.get('schema')}\n\n"
+                f"Your previous output was invalid. Fix it:\n{out_text}\n"
+            ),
+            "reasoning": {"effort": "none"},
+            "text": {"verbosity": "low"},
+        },
+    )
+    repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
+    return ensure_machine_plan_shape(json.loads(_extract_json_object(repaired)))
+
+
+def _parse_plan_explanation(
+    out_text: str,
+    client: OpenAI,
+    cfg: CoachConfig,
+    system_instructions: str,
+) -> dict[str, Any]:
+    try:
+        return ensure_plan_explanation_shape(json.loads(_extract_json_object(out_text)))
+    except Exception as exc:
+        log.warning("Plan-explanation JSON parse/shape failed; attempting repair: %s", exc)
+
+    repair_resp = _call_with_param_fallback(
+        client,
+        {
+            "model": cfg.model,
+            "instructions": system_instructions,
+            "input": (
+                f"Return ONLY valid JSON matching this schema:\n{PLAN_EXPLANATION_SCHEMA.get('schema')}\n\n"
+                f"Your previous output was invalid. Fix it:\n{out_text}\n"
+            ),
+            "reasoning": {"effort": "none"},
+            "text": {"verbosity": "low"},
+        },
+    )
+    repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
+    return ensure_plan_explanation_shape(json.loads(_extract_json_object(repaired)))
+
+
+def _serialize_effective_constraints(
+    effective: Optional[EffectiveConstraintContext],
+) -> Optional[dict[str, Any]]:
+    if effective is None:
+        return None
+    return {
+        "allowed_week1_hours": effective.allowed_week1_hours,
+        "effective_max_ramp_pct": effective.effective_max_ramp_pct,
+        "effective_max_hard_per_7d": effective.effective_max_hard_per_7d,
+        "effective_max_consecutive_hard": effective.effective_max_consecutive_hard,
+        "min_rest_per_7d": effective.min_rest_per_7d,
+        "readiness_status": effective.readiness_status,
+        "overreach_risk_level": effective.overreach_risk_level,
+        "recovery_capability_key": effective.recovery_capability_key,
+        "lifestyle_notes": effective.lifestyle_notes,
+        "reasons": list(effective.reasons),
+    }
+
+
+def _merge_machine_plan_and_explanations(
+    machine_obj: dict[str, Any],
+    explanation_obj: dict[str, Any],
+    *,
+    resolved_goal: str,
+    lifestyle_notes: str,
+    deterministic_forecast: Optional[dict[str, Any]],
+    effective: Optional[EffectiveConstraintContext],
+) -> dict[str, Any]:
+    day_explanations = {
+        str(item.get("date")): item
+        for item in explanation_obj.get("day_explanations", [])
+        if isinstance(item, dict)
+    }
+
+    merged_days: list[dict[str, Any]] = []
+    for idx, day in enumerate((_as_dict(machine_obj.get("plan"))).get("days", [])):
+        if not isinstance(day, dict):
+            continue
+        key = str(day.get("date"))
+        expl = _as_dict(day_explanations.get(key))
+        merged_days.append(
+            {
+                "date": day.get("date"),
+                "title": _as_str(expl.get("title")) or f"Day {idx + 1}",
+                "session_type": day.get("session_type"),
+                "is_rest_day": bool(day.get("is_rest_day")),
+                "is_hard_day": bool(day.get("is_hard_day")),
+                "duration_minutes": int(day.get("duration_minutes", 0)),
+                "target_intensity": _as_str(day.get("target_intensity")),
+                "terrain": _as_str(day.get("terrain")),
+                "workout": _as_str(day.get("workout")),
+                "purpose": _as_str(expl.get("purpose")),
+                "signal_ids": [
+                    str(s).strip()
+                    for s in expl.get("signal_ids", [])
+                    if isinstance(s, str) and str(s).strip()
+                ],
+            }
+        )
+
+    merged: dict[str, Any] = {
+        "meta": dict(_as_dict(machine_obj.get("meta"))),
+        "snapshot": _as_dict(explanation_obj.get("snapshot")),
+        "readiness": {
+            "status": _as_str((_as_dict(machine_obj.get("readiness"))).get("status")) or "steady",
+            "rationale": _as_str(explanation_obj.get("readiness_rationale")),
+            "signal_ids": [
+                str(s).strip()
+                for s in explanation_obj.get("readiness_signal_ids", [])
+                if isinstance(s, str) and str(s).strip()
+            ],
+        },
+        "plan": {
+            "weekly_totals": dict((_as_dict(machine_obj.get("plan"))).get("weekly_totals") or {}),
+            "days": merged_days,
+        },
+        "recovery": _as_dict(explanation_obj.get("recovery")),
+        "risks": [r for r in explanation_obj.get("risks", []) if isinstance(r, dict)],
+        "data_notes": [
+            str(note).strip()
+            for note in explanation_obj.get("data_notes", [])
+            if isinstance(note, str) and str(note).strip()
+        ],
+        "citations": [c for c in explanation_obj.get("citations", []) if isinstance(c, dict)],
+        "claim_attributions": [
+            c for c in explanation_obj.get("claim_attributions", []) if isinstance(c, dict)
+        ],
+        "effective_constraints": _serialize_effective_constraints(effective),
+    }
+
+    _apply_primary_goal(merged, resolved_goal)
+    _apply_lifestyle_notes(merged, lifestyle_notes)
+    _apply_deterministic_readiness(merged, deterministic_forecast)
+    return ensure_training_plan_shape(merged)
+
+
+def _run_training_plan_legacy(
     client: OpenAI,
     api_kwargs: dict[str, Any],
     cfg: CoachConfig,
@@ -208,6 +387,7 @@ def _run_training_plan(
     output_path: Optional[str],
     *,
     prompting_dir: Path,
+    effective: Optional[EffectiveConstraintContext] = None,
 ) -> tuple[str, str]:
     system_instructions = str(api_kwargs.get("instructions") or "")
     resp = _call_with_schema(client, api_kwargs, TRAINING_PLAN_SCHEMA)
@@ -217,7 +397,164 @@ def _run_training_plan(
     _apply_primary_goal(obj, resolved_goal)
     _apply_lifestyle_notes(obj, cfg.lifestyle_notes)
     _apply_deterministic_readiness(obj, deterministic_forecast)
-    apply_eval_coach_guardrails(obj, rollups)
+    if "effective_constraints" not in obj:
+        obj["effective_constraints"] = _serialize_effective_constraints(effective)
+    _apply_eval_coach_guardrails_compat(obj, rollups, effective)
+
+    out_path = save_training_plan_output(
+        output_path,
+        prompting_dir=prompting_dir,
+        plan_obj=obj,
+    )
+    return json.dumps(obj, indent=2, ensure_ascii=False, default=_json_default), str(out_path)
+
+
+def _run_training_plan_pipeline(
+    client: OpenAI,
+    cfg: CoachConfig,
+    resolved_goal: str,
+    effective: Optional[EffectiveConstraintContext],
+    source_data: Any,
+    deterministic_forecast: Optional[dict[str, Any]],
+    detail_days: int,
+    output_path: Optional[str],
+    *,
+    prompting_dir: Path,
+) -> tuple[str, str]:
+    machine_prompt = _coach_prompting.build_machine_plan_prompt_text(
+        personal=source_data.personal,
+        rollups=source_data.rollups,
+        combined=source_data.combined,
+        deterministic_forecast=deterministic_forecast,
+        style=cfg.style,
+        primary_goal=resolved_goal,
+        lifestyle_notes=cfg.lifestyle_notes,
+        max_chars=cfg.max_chars,
+        detail_days=detail_days,
+        plan_days=cfg.plan_days,
+        effective_constraints=effective,
+    )
+
+    machine_kwargs: dict[str, Any] = {
+        "model": cfg.model,
+        "instructions": get_system_prompt(cfg.style),
+        "input": machine_prompt,
+        "reasoning": {"effort": cfg.reasoning_effort},
+        "text": {"verbosity": cfg.verbosity},
+    }
+    if cfg.reasoning_effort == "none" and cfg.temperature is not None:
+        machine_kwargs["temperature"] = cfg.temperature
+
+    machine_resp = _call_with_schema(client, machine_kwargs, MACHINE_PLAN_SCHEMA)
+    machine_text = getattr(machine_resp, "output_text", None) or str(machine_resp)
+    machine_obj = _parse_machine_plan(
+        machine_text,
+        client,
+        cfg,
+        str(machine_kwargs.get("instructions") or ""),
+    )
+
+    guarded_stub: dict[str, Any] = {
+        "meta": dict(_as_dict(machine_obj.get("meta"))),
+        "snapshot": {
+            "last7": {
+                "distance_km": "",
+                "moving_time_hours": "",
+                "elevation_m": "",
+                "activity_count": "",
+                "sleep_hours_mean": "",
+                "hrv_mean": "",
+                "rhr_mean": "",
+            },
+            "baseline28": {
+                "distance_km": "",
+                "moving_time_hours": "",
+                "elevation_m": "",
+                "activity_count": "",
+                "sleep_hours_mean": "",
+                "hrv_mean": "",
+                "rhr_mean": "",
+            },
+            "notes": "",
+        },
+        "readiness": {
+            "status": _as_str((_as_dict(machine_obj.get("readiness"))).get("status")) or "steady",
+            "rationale": "",
+            "signal_ids": [],
+        },
+        "plan": {
+            "weekly_totals": dict((_as_dict(machine_obj.get("plan"))).get("weekly_totals") or {}),
+            "days": [
+                {
+                    "date": d.get("date"),
+                    "title": "",
+                    "session_type": d.get("session_type"),
+                    "is_rest_day": d.get("is_rest_day"),
+                    "is_hard_day": d.get("is_hard_day"),
+                    "duration_minutes": d.get("duration_minutes"),
+                    "target_intensity": d.get("target_intensity"),
+                    "terrain": d.get("terrain"),
+                    "workout": d.get("workout"),
+                    "purpose": "",
+                    "signal_ids": [],
+                }
+                for d in (_as_dict(machine_obj.get("plan"))).get("days", [])
+                if isinstance(d, dict)
+            ],
+        },
+        "recovery": {"actions": [], "signal_ids": []},
+        "risks": [],
+        "data_notes": [],
+        "citations": [],
+        "claim_attributions": [],
+        "effective_constraints": _serialize_effective_constraints(effective),
+    }
+    _apply_eval_coach_guardrails_compat(guarded_stub, source_data.rollups, effective=effective)
+    machine_obj["plan"] = guarded_stub["plan"]
+
+    explainer_prompt = _coach_prompting.build_explainer_prompt_text(
+        machine_plan=machine_obj,
+        personal=source_data.personal,
+        rollups=source_data.rollups,
+        combined=source_data.combined,
+        deterministic_forecast=deterministic_forecast,
+        style=cfg.style,
+        primary_goal=resolved_goal,
+        lifestyle_notes=cfg.lifestyle_notes,
+        max_chars=cfg.max_chars,
+        detail_days=detail_days,
+        effective_constraints=effective,
+    )
+
+    explain_kwargs: dict[str, Any] = {
+        "model": cfg.model,
+        "instructions": get_system_prompt(cfg.style),
+        "input": explainer_prompt,
+        "reasoning": {"effort": cfg.reasoning_effort},
+        "text": {"verbosity": cfg.verbosity},
+    }
+    if cfg.reasoning_effort == "none" and cfg.temperature is not None:
+        explain_kwargs["temperature"] = cfg.temperature
+
+    explain_resp = _call_with_schema(client, explain_kwargs, PLAN_EXPLANATION_SCHEMA)
+    explain_text = getattr(explain_resp, "output_text", None) or str(explain_resp)
+    explanation_obj = _parse_plan_explanation(
+        explain_text,
+        client,
+        cfg,
+        str(explain_kwargs.get("instructions") or ""),
+    )
+
+    obj = _merge_machine_plan_and_explanations(
+        machine_obj,
+        explanation_obj,
+        resolved_goal=resolved_goal,
+        lifestyle_notes=cfg.lifestyle_notes,
+        deterministic_forecast=deterministic_forecast,
+        effective=effective,
+    )
+    _recompute_planned_hours(obj)
+    _apply_eval_coach_guardrails_compat(obj, source_data.rollups, effective=effective)
 
     out_path = save_training_plan_output(
         output_path,
@@ -273,6 +610,35 @@ def run_coach_brief(
     )
     resolved_goal = (cfg.primary_goal or "").strip() or default_primary_goal_for_style(cfg.style)
 
+    effective = derive_effective_constraints(
+        det_forecast=deterministic_forecast,
+        rollups=source_data.rollups,
+        cfg=constraint_config_from_env(),
+        lifestyle_notes=cfg.lifestyle_notes,
+    )
+
+    client = _make_openrouter_client()
+    use_two_stage = os.getenv("TRAILTRAINING_TWO_STAGE_PLAN", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "y",
+        "on",
+    }
+
+    if prompt == "training-plan" and use_two_stage:
+        return _run_training_plan_pipeline(
+            client,
+            cfg,
+            resolved_goal,
+            effective,
+            source_data,
+            deterministic_forecast,
+            detail_days,
+            output_path,
+            prompting_dir=paths.prompting_directory,
+        )
+
     prompt_text = _build_prompt_text(
         prompt_name=prompt,
         personal=source_data.personal,
@@ -282,12 +648,11 @@ def run_coach_brief(
         style=cfg.style,
         primary_goal=resolved_goal,
         lifestyle_notes=cfg.lifestyle_notes,
+        effective_constraints=effective,
         max_chars=cfg.max_chars,
         detail_days=detail_days,
         plan_days=cfg.plan_days,
     )
-
-    client = _make_openrouter_client()
     api_kwargs: dict[str, Any] = {
         "model": cfg.model,
         "instructions": get_system_prompt(cfg.style),
@@ -299,7 +664,7 @@ def run_coach_brief(
         api_kwargs["temperature"] = cfg.temperature
 
     if prompt == "training-plan":
-        return _run_training_plan(
+        return _run_training_plan_legacy(
             client,
             api_kwargs,
             cfg,
@@ -308,6 +673,7 @@ def run_coach_brief(
             source_data.rollups,
             output_path,
             prompting_dir=paths.prompting_directory,
+            effective=effective,
         )
 
     resp = _call_with_param_fallback(client, api_kwargs)

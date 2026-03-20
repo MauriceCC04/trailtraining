@@ -1,9 +1,12 @@
-# src/trailtraining/llm/schemas.py
 from __future__ import annotations
 
 from typing import Any
 
-from trailtraining.contracts import TrainingPlanArtifact
+from trailtraining.contracts import (
+    MachinePlanArtifact,
+    PlanExplanationArtifact,
+    TrainingPlanArtifact,
+)
 
 _SNAPSHOT_KEYS = [
     "distance_km",
@@ -18,6 +21,14 @@ _SNAPSHOT_KEYS = [
 
 def ensure_training_plan_shape(obj: Any) -> dict[str, Any]:
     return TrainingPlanArtifact.model_validate(obj).model_dump(mode="python")
+
+
+def ensure_machine_plan_shape(obj: Any) -> dict[str, Any]:
+    return MachinePlanArtifact.model_validate(obj).model_dump(mode="python")
+
+
+def ensure_plan_explanation_shape(obj: Any) -> dict[str, Any]:
+    return PlanExplanationArtifact.model_validate(obj).model_dump(mode="python")
 
 
 def _snapshot_obj_schema() -> dict[str, Any]:
@@ -37,8 +48,254 @@ def _snapshot_obj_schema() -> dict[str, Any]:
     }
 
 
+_EFFECTIVE_CONSTRAINTS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "allowed_week1_hours",
+        "effective_max_ramp_pct",
+        "effective_max_hard_per_7d",
+        "effective_max_consecutive_hard",
+        "min_rest_per_7d",
+        "readiness_status",
+        "overreach_risk_level",
+        "recovery_capability_key",
+        "lifestyle_notes",
+        "reasons",
+    ],
+    "properties": {
+        "allowed_week1_hours": {"type": ["number", "null"]},
+        "effective_max_ramp_pct": {"type": "number"},
+        "effective_max_hard_per_7d": {"type": "integer"},
+        "effective_max_consecutive_hard": {"type": "integer"},
+        "min_rest_per_7d": {"type": "integer"},
+        "readiness_status": {"type": ["string", "null"]},
+        "overreach_risk_level": {"type": ["string", "null"]},
+        "recovery_capability_key": {"type": ["string", "null"]},
+        "lifestyle_notes": {"type": "string"},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+    },
+}
+_CITATION_ITEM_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["citation_id", "signal_id", "source", "date_range", "value"],
+    "properties": {
+        "citation_id": {"type": "string"},
+        "signal_id": {"type": "string"},
+        "source": {"type": "string"},
+        "date_range": {"type": "string"},
+        "value": {"type": "string"},
+    },
+}
+
+_CLAIM_ATTRIBUTION_ITEM_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "claim_id",
+        "field_path",
+        "claim_text",
+        "signal_ids",
+        "citation_ids",
+        "support_level",
+    ],
+    "properties": {
+        "claim_id": {"type": "string"},
+        "field_path": {"type": "string"},
+        "claim_text": {"type": "string"},
+        "signal_ids": {"type": "array", "items": {"type": "string"}},
+        "citation_ids": {"type": "array", "items": {"type": "string"}},
+        "support_level": {
+            "type": "string",
+            "enum": ["supported", "weak", "unsupported"],
+        },
+    },
+}
+
+MACHINE_PLAN_SCHEMA: dict[str, Any] = {
+    "name": "trailtraining_machine_plan_v1",
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["meta", "readiness", "plan"],
+        "properties": {
+            "meta": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "today",
+                    "plan_start",
+                    "plan_days",
+                    "style",
+                    "primary_goal",
+                    "lifestyle_notes",
+                ],
+                "properties": {
+                    "today": {"type": "string"},
+                    "plan_start": {"type": "string"},
+                    "plan_days": {"type": "integer", "minimum": 1, "maximum": 28},
+                    "style": {"type": "string"},
+                    "primary_goal": {"type": "string"},
+                    "lifestyle_notes": {"type": "string"},
+                },
+            },
+            "readiness": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["status"],
+                "properties": {
+                    "status": {"type": "string", "enum": ["primed", "steady", "fatigued"]},
+                },
+            },
+            "plan": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["days", "weekly_totals"],
+                "properties": {
+                    "weekly_totals": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": [
+                            "planned_distance_km",
+                            "planned_moving_time_hours",
+                            "planned_elevation_m",
+                        ],
+                        "properties": {
+                            "planned_distance_km": {"type": "number", "minimum": 0},
+                            "planned_moving_time_hours": {"type": "number", "minimum": 0},
+                            "planned_elevation_m": {"type": "number", "minimum": 0},
+                        },
+                    },
+                    "days": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 28,
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": [
+                                "date",
+                                "session_type",
+                                "is_rest_day",
+                                "is_hard_day",
+                                "duration_minutes",
+                                "target_intensity",
+                                "terrain",
+                                "workout",
+                            ],
+                            "properties": {
+                                "date": {"type": "string"},
+                                "session_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "rest",
+                                        "easy",
+                                        "aerobic",
+                                        "long",
+                                        "tempo",
+                                        "intervals",
+                                        "hills",
+                                        "strength",
+                                        "cross",
+                                    ],
+                                },
+                                "is_rest_day": {"type": "boolean"},
+                                "is_hard_day": {"type": "boolean"},
+                                "duration_minutes": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 420,
+                                },
+                                "target_intensity": {"type": "string"},
+                                "terrain": {"type": "string"},
+                                "workout": {"type": "string"},
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+}
+
+PLAN_EXPLANATION_SCHEMA: dict[str, Any] = {
+    "name": "trailtraining_plan_explanation_v1",
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "snapshot",
+            "readiness_rationale",
+            "readiness_signal_ids",
+            "day_explanations",
+            "recovery",
+            "risks",
+            "data_notes",
+            "citations",
+            "claim_attributions",
+        ],
+        "properties": {
+            "snapshot": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["last7", "baseline28", "notes"],
+                "properties": {
+                    "last7": _snapshot_obj_schema(),
+                    "baseline28": _snapshot_obj_schema(),
+                    "notes": {"type": "string"},
+                },
+            },
+            "readiness_rationale": {"type": "string"},
+            "readiness_signal_ids": {"type": "array", "items": {"type": "string"}},
+            "day_explanations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["date", "title", "purpose", "signal_ids"],
+                    "properties": {
+                        "date": {"type": "string"},
+                        "title": {"type": "string"},
+                        "purpose": {"type": "string"},
+                        "signal_ids": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            },
+            "recovery": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["actions", "signal_ids"],
+                "properties": {
+                    "actions": {"type": "array", "items": {"type": "string"}},
+                    "signal_ids": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+            "risks": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["severity", "message", "signal_ids"],
+                    "properties": {
+                        "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+                        "message": {"type": "string"},
+                        "signal_ids": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            },
+            "data_notes": {"type": "array", "items": {"type": "string"}},
+            "citations": {"type": "array", "items": _CITATION_ITEM_SCHEMA},
+            "claim_attributions": {
+                "type": "array",
+                "items": _CLAIM_ATTRIBUTION_ITEM_SCHEMA,
+            },
+        },
+    },
+}
+
 TRAINING_PLAN_SCHEMA: dict[str, Any] = {
-    "name": "trailtraining_training_plan_v2",
+    "name": "trailtraining_training_plan_v3",
     "schema": {
         "type": "object",
         "additionalProperties": False,
@@ -51,6 +308,8 @@ TRAINING_PLAN_SCHEMA: dict[str, Any] = {
             "risks",
             "data_notes",
             "citations",
+            "claim_attributions",
+            "effective_constraints",
         ],
         "properties": {
             "meta": {
@@ -74,9 +333,7 @@ TRAINING_PLAN_SCHEMA: dict[str, Any] = {
                         "type": "string",
                         "description": (
                             "Athlete schedule or lifestyle constraints that affect session "
-                            "placement (e.g. weekday-only road access, weekend-only trail "
-                            "access). Copy exactly from the prompt if provided, or leave "
-                            "empty string if none."
+                            "placement. Copy exactly from the prompt if provided, or empty."
                         ),
                     },
                 },
@@ -197,20 +454,12 @@ TRAINING_PLAN_SCHEMA: dict[str, Any] = {
                 },
             },
             "data_notes": {"type": "array", "items": {"type": "string"}},
-            "citations": {
+            "citations": {"type": "array", "items": _CITATION_ITEM_SCHEMA},
+            "claim_attributions": {
                 "type": "array",
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["signal_id", "source", "date_range", "value"],
-                    "properties": {
-                        "signal_id": {"type": "string"},
-                        "source": {"type": "string"},
-                        "date_range": {"type": "string"},
-                        "value": {"type": "string"},
-                    },
-                },
+                "items": _CLAIM_ATTRIBUTION_ITEM_SCHEMA,
             },
+            "effective_constraints": _EFFECTIVE_CONSTRAINTS_SCHEMA,
         },
     },
 }
@@ -228,9 +477,32 @@ def training_plan_output_contract_text() -> str:
         "- Every plan day MUST include signal_ids justifying that day.\n"
         "- readiness.signal_ids MUST justify readiness.\n"
         "- citations MUST list the signal_ids you used (dedup ok).\n"
-        "- citations[].value MUST be a STRING.\n"
+        "- citations[].citation_id MUST be present and unique within the artifact.\n"
         '- snapshot.last7 and snapshot.baseline28 MUST include all keys; use empty string "" if unknown.\n'
         "- If data is missing, write it in data_notes; do NOT fabricate.\n"
-        "- weekly_totals MUST reflect WEEK 1 values only (first 7 days). "
-        "For multi-week plans this is NOT the full-period total.\n"
+        "- weekly_totals MUST reflect WEEK 1 values only (first 7 days).\n"
+    )
+
+
+def machine_plan_output_contract_text() -> str:
+    return (
+        "Output MUST be a single JSON object matching the machine-plan schema.\n"
+        "This pass is planning only.\n"
+        "- meta.primary_goal MUST match the prompt.\n"
+        "- meta.lifestyle_notes MUST copy the prompt value exactly.\n"
+        "- meta.plan_days MUST equal the number of days in plan.days.\n"
+        "- Satisfy all hard constraints numerically.\n"
+        "- weekly_totals MUST reflect week 1 only.\n"
+    )
+
+
+def plan_explanation_output_contract_text() -> str:
+    return (
+        "Output MUST be a single JSON object matching the plan-explanation schema.\n"
+        "This pass is explanation only.\n"
+        "- Do not change the locked machine plan.\n"
+        "- Every textual explanation claim must have claim-level attribution.\n"
+        "- citations must reference only provided signal_ids.\n"
+        "- If support is weak or missing, say so explicitly.\n"
+        "- Every citation MUST include citation_id.\n"
     )

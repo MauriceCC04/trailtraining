@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from trailtraining.llm.constraints import ConstraintConfig, constraint_config_from_env
+from trailtraining.llm.constraints import (
+    ConstraintConfig,
+    EffectiveConstraintContext,
+    constraint_config_from_env,
+    derive_effective_constraints,
+)
 from trailtraining.llm.windowing import extract_last7_hours, normalize_plan_days, rolling_windows
 
 
@@ -157,7 +162,6 @@ def _enforce_max_hard_per_7d(days: list[dict[str, Any]], max_hard: int) -> list[
 
 
 def _rest_convert_score(d: dict[str, Any]) -> int:
-    """Lower score = prefer converting this day to rest first."""
     st = str(d.get("session_type") or "")
     if st in ("easy", "aerobic"):
         return 1
@@ -171,11 +175,6 @@ def _rest_convert_score(d: dict[str, Any]) -> int:
 
 
 def _enforce_min_rest_per_rolling7d(days: list[dict[str, Any]], min_rest: int) -> list[str]:
-    """Convert days to rest until every rolling 7-day window has >= min_rest rest days.
-
-    Uses the same rolling-window logic as the eval so guardrails catch exactly
-    what the evaluator would flag.
-    """
     changed: list[str] = []
     if min_rest <= 0:
         return changed
@@ -229,46 +228,63 @@ def _enforce_max_consecutive_hard(days: list[dict[str, Any]], max_consec: int) -
     return changed
 
 
-def build_eval_constraints_block(rollups: Optional[dict[str, Any]]) -> str:
+def build_eval_constraints_block(
+    rollups: Optional[dict[str, Any]],
+    effective: Optional[EffectiveConstraintContext] = None,
+) -> str:
     cfg = _get_cfg()
-    last7 = extract_last7_hours(rollups)
-    allowed = (
-        (last7 * (1.0 + cfg.max_ramp_pct / 100.0)) if isinstance(last7, (int, float)) else None
+    ctx = effective or derive_effective_constraints(
+        det_forecast=None,
+        rollups=rollups,
+        cfg=cfg,
+        lifestyle_notes="",
     )
 
-    lines = []
-    if allowed is not None:
+    lines: list[str] = []
+    if ctx.allowed_week1_hours is not None:
         lines.append(
-            f"- MAX_RAMP_PCT: planned_moving_time_hours MUST be <= {allowed:.2f}h "
-            f"(last7={last7:.2f}h, max_ramp_pct={cfg.max_ramp_pct:.1f}%)."
+            f"- MAX_RAMP_PCT: planned_moving_time_hours MUST be <= {ctx.allowed_week1_hours:.2f}h "
+            f"(effective_max_ramp_pct={ctx.effective_max_ramp_pct:.1f}%)."
         )
     else:
         lines.append(
-            f"- MAX_RAMP_PCT: max_ramp_pct={cfg.max_ramp_pct:.1f}% (rollups last7 hours unavailable; be conservative)."
+            f"- MAX_RAMP_PCT: effective_max_ramp_pct={ctx.effective_max_ramp_pct:.1f}% "
+            "(rollups last7 hours unavailable; be conservative)."
         )
 
     lines.append(
-        f"- TOO_MANY_CONSEC_HARD: NEVER exceed {cfg.max_consecutive_hard} consecutive hard days."
+        f"- TOO_MANY_CONSEC_HARD: NEVER exceed {ctx.effective_max_consecutive_hard} consecutive hard days."
     )
     lines.append(
-        f"- TOO_MANY_HARD_PER_WEEK: hard days in any 7-day chunk MUST be <= {cfg.max_hard_per_7d}."
+        f"- TOO_MANY_HARD_PER_WEEK: hard days in any 7-day chunk MUST be <= {ctx.effective_max_hard_per_7d}."
     )
     lines.append(
-        f"- NOT_ENOUGH_REST: rest days in any 7-day chunk MUST be >= {cfg.min_rest_per_7d}."
+        f"- NOT_ENOUGH_REST: rest days in any 7-day chunk MUST be >= {ctx.min_rest_per_7d}."
     )
     lines.append(
         "- Definition: set is_hard_day=true ONLY for high-intensity sessions (intervals/tempo/hills). Long EASY aerobic should usually be is_hard_day=false."
     )
+    if ctx.reasons:
+        lines.append(f"- These stricter limits apply because: {'; '.join(ctx.reasons)}.")
     return "\n".join(lines)
 
 
 def apply_eval_coach_guardrails(
-    plan_obj: dict[str, Any], rollups: Optional[dict[str, Any]]
+    plan_obj: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
+    *,
+    effective: Optional[EffectiveConstraintContext] = None,
 ) -> None:
     if not isinstance(plan_obj, dict):
         return
 
     cfg = _get_cfg()
+    ctx = effective or derive_effective_constraints(
+        det_forecast=None,
+        rollups=rollups,
+        cfg=cfg,
+        lifestyle_notes=str(((plan_obj.get("meta") or {}).get("lifestyle_notes")) or ""),
+    )
     days = normalize_plan_days(plan_obj)
 
     for d in days:
@@ -278,17 +294,14 @@ def apply_eval_coach_guardrails(
             if isinstance(m, (int, float)) and float(m) > cfg.rest_day_max_minutes:
                 d["duration_minutes"] = int(cfg.rest_day_max_minutes)
 
-    changed_hard_week = _enforce_max_hard_per_7d(days, cfg.max_hard_per_7d)
-    changed_hard_consec = _enforce_max_consecutive_hard(days, cfg.max_consecutive_hard)
-    changed_rest = _enforce_min_rest_per_rolling7d(days, cfg.min_rest_per_7d)
+    changed_hard_week = _enforce_max_hard_per_7d(days, ctx.effective_max_hard_per_7d)
+    changed_hard_consec = _enforce_max_consecutive_hard(days, ctx.effective_max_consecutive_hard)
+    changed_rest = _enforce_min_rest_per_rolling7d(days, ctx.min_rest_per_7d)
 
-    last7 = extract_last7_hours(rollups)
-    if isinstance(last7, (int, float)) and last7 > 0:
-        allowed_hours = float(last7) * (1.0 + cfg.max_ramp_pct / 100.0)
-
+    if ctx.allowed_week1_hours is not None and ctx.allowed_week1_hours > 0:
         wk = days[: min(7, len(days))]
         cur_min = _sum_minutes(wk)
-        allowed_min = int(round(allowed_hours * 60.0))
+        allowed_min = int(round(ctx.allowed_week1_hours * 60.0))
         excess = cur_min - allowed_min
 
         if excess > 0:
@@ -305,7 +318,6 @@ def apply_eval_coach_guardrails(
                     longest = max(non_rest, key=lambda d: float(d.get("duration_minutes", 0)))
                     min_i = _min_minutes_for_day(longest)
                     longest["duration_minutes"] = int(min_i)
-                    leftover = 0
 
             _set_weekly_hours(plan_obj)
 
@@ -320,29 +332,36 @@ def apply_eval_coach_guardrails(
                         if isinstance(v, (int, float)):
                             wt[k] = round(float(v) * ratio, 1)
 
+    last7 = extract_last7_hours(rollups)
+
     notes = plan_obj.get("data_notes")
     if isinstance(notes, list):
         if changed_hard_week:
             notes.append(
-                f"Guardrails: set is_hard_day=false on {changed_hard_week} to satisfy max_hard_per_7d={cfg.max_hard_per_7d}."
+                f"Guardrails: set is_hard_day=false on {changed_hard_week} to satisfy max_hard_per_7d={ctx.effective_max_hard_per_7d}."
             )
         if changed_hard_consec:
             notes.append(
-                f"Guardrails: adjusted hard-day streak on {changed_hard_consec} to satisfy max_consecutive_hard={cfg.max_consecutive_hard}."
+                f"Guardrails: adjusted hard-day streak on {changed_hard_consec} to satisfy max_consecutive_hard={ctx.effective_max_consecutive_hard}."
             )
         if changed_rest:
             notes.append(
-                f"Guardrails: converted {changed_rest} to rest days to satisfy min_rest_per_7d={cfg.min_rest_per_7d} (rolling window)."
+                f"Guardrails: converted {changed_rest} to rest days to satisfy min_rest_per_7d={ctx.min_rest_per_7d} (rolling window)."
             )
 
-        if isinstance(last7, (int, float)) and last7 > 0:
-            allowed = float(last7) * (1.0 + cfg.max_ramp_pct / 100.0)
+        if ctx.allowed_week1_hours is not None:
             planned = _planned_hours_from_obj(plan_obj)
             if planned is not None:
-                notes.append(
-                    f"Guardrails: enforced ramp rate (max_ramp_pct={cfg.max_ramp_pct:.1f}%). "
-                    f"last7_hours={float(last7):.3f}, allowed_hours={allowed:.3f}, planned_hours={planned:.3f}."
-                )
+                if isinstance(last7, (int, float)) and float(last7) > 0:
+                    notes.append(
+                        f"Guardrails: enforced ramp rate (max_ramp_pct={ctx.effective_max_ramp_pct:.1f}%). "
+                        f"last7_hours={float(last7):.3f}, allowed_hours={ctx.allowed_week1_hours:.3f}, planned_hours={planned:.3f}."
+                    )
+                else:
+                    notes.append(
+                        f"Guardrails: enforced ramp rate (max_ramp_pct={ctx.effective_max_ramp_pct:.1f}%). "
+                        f"allowed_hours={ctx.allowed_week1_hours:.3f}, planned_hours={planned:.3f}."
+                    )
 
 
 def _planned_hours_from_obj(plan_obj: dict[str, Any]) -> Optional[float]:

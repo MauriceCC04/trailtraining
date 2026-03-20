@@ -3,9 +3,18 @@ from __future__ import annotations
 import os
 from typing import Any, Optional
 
+from trailtraining.llm.constraints import (
+    EffectiveConstraintContext,
+    constraint_config_from_env,
+    derive_effective_constraints,
+)
 from trailtraining.llm.guardrails import build_eval_constraints_block
 from trailtraining.llm.presets import get_task_prompt
-from trailtraining.llm.schemas import training_plan_output_contract_text
+from trailtraining.llm.schemas import (
+    machine_plan_output_contract_text,
+    plan_explanation_output_contract_text,
+    training_plan_output_contract_text,
+)
 from trailtraining.llm.shared import race_context_section as _race_context_section
 from trailtraining.llm.signals import build_retrieval_context
 from trailtraining.util.text import _safe_json_snippet
@@ -154,20 +163,26 @@ def _summarize_day(day: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def build_prompt_text(
+def _build_common_sections(
+    *,
     prompt_name: str,
     personal: dict[str, Any],
     rollups: Optional[dict[str, Any]],
     combined: list[dict[str, Any]],
     deterministic_forecast: Optional[dict[str, Any]],
-    *,
     style: str,
     primary_goal: str,
     lifestyle_notes: str,
-    max_chars: int,
-    detail_days: int,
-    plan_days: int = 7,
-) -> str:
+    effective_constraints: Optional[EffectiveConstraintContext],
+) -> list[str]:
+    cfg = constraint_config_from_env()
+    effective = effective_constraints or derive_effective_constraints(
+        det_forecast=deterministic_forecast if isinstance(deterministic_forecast, dict) else None,
+        rollups=rollups,
+        cfg=cfg,
+        lifestyle_notes=lifestyle_notes,
+    )
+
     retrieval_weeks = int(os.getenv("TRAILTRAINING_COACH_RETRIEVAL_WEEKS", "8"))
 
     sections: list[str] = [
@@ -176,13 +191,12 @@ def build_prompt_text(
         "## Evaluation context",
         f"Style: {style}",
         f"Primary goal (authoritative): {primary_goal}",
-        f"Plan duration: {plan_days} days",
-        "",
-        "The output plan MUST target the primary goal above and copy it exactly into meta.primary_goal.",
-        f"The output plan MUST contain exactly {plan_days} days in plan.days.",
         "",
         *_lifestyle_notes_section(lifestyle_notes),
         *_race_context_section(primary_goal),
+        "## Eval-coach constraints (MUST satisfy)",
+        build_eval_constraints_block(rollups, effective),
+        "",
         "## Personal profile (raw JSON)",
         _safe_json_snippet(personal, max_chars=50_000),
         "",
@@ -196,14 +210,6 @@ def build_prompt_text(
                 "",
             ]
         )
-
-    sections.extend(
-        [
-            "## Eval-coach constraints (MUST satisfy)",
-            build_eval_constraints_block(rollups),
-            "",
-        ]
-    )
 
     if deterministic_forecast is not None:
         sections.extend(_forecast_capability_block(deterministic_forecast))
@@ -233,6 +239,44 @@ def build_prompt_text(
             "",
         ]
     )
+    return sections
+
+
+def build_prompt_text(
+    prompt_name: str,
+    personal: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
+    combined: list[dict[str, Any]],
+    deterministic_forecast: Optional[dict[str, Any]],
+    *,
+    style: str,
+    primary_goal: str,
+    lifestyle_notes: str,
+    max_chars: int,
+    detail_days: int,
+    plan_days: int = 7,
+    effective_constraints: Optional[EffectiveConstraintContext] = None,
+) -> str:
+    sections = _build_common_sections(
+        prompt_name=prompt_name,
+        personal=personal,
+        rollups=rollups,
+        combined=combined,
+        deterministic_forecast=deterministic_forecast,
+        style=style,
+        primary_goal=primary_goal,
+        lifestyle_notes=lifestyle_notes,
+        effective_constraints=effective_constraints,
+    )
+    sections[
+        sections.index("## Evaluation context") + 3 : sections.index("## Evaluation context") + 3
+    ] = [
+        f"Plan duration: {plan_days} days",
+        "",
+        "The output plan MUST target the primary goal above and copy it exactly into meta.primary_goal.",
+        f"The output plan MUST contain exactly {plan_days} days in plan.days.",
+        "",
+    ]
 
     budget = max_chars if max_chars > 0 else 200_000
     base = "\n".join(sections)
@@ -267,5 +311,111 @@ def build_prompt_text(
         contract = "\n## Output Contract (STRICT)\n" + training_plan_output_contract_text() + "\n"
         if used + len(contract) <= budget:
             parts.append(contract)
+
+    return "\n".join(parts)
+
+
+def build_machine_plan_prompt_text(
+    personal: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
+    combined: list[dict[str, Any]],
+    deterministic_forecast: Optional[dict[str, Any]],
+    *,
+    style: str,
+    primary_goal: str,
+    lifestyle_notes: str,
+    max_chars: int,
+    detail_days: int,
+    plan_days: int = 7,
+    effective_constraints: Optional[EffectiveConstraintContext] = None,
+) -> str:
+    prompt = build_prompt_text(
+        prompt_name="training-plan",
+        personal=personal,
+        rollups=rollups,
+        combined=combined,
+        deterministic_forecast=deterministic_forecast,
+        style=style,
+        primary_goal=primary_goal,
+        lifestyle_notes=lifestyle_notes,
+        max_chars=max_chars,
+        detail_days=detail_days,
+        plan_days=plan_days,
+        effective_constraints=effective_constraints,
+    )
+    return (
+        prompt
+        + "\n## Stage\n"
+        + "This is STAGE A: produce ONLY the compact machine plan.\n"
+        + "\n## Output Contract (STRICT)\n"
+        + machine_plan_output_contract_text()
+        + "\n"
+    )
+
+
+def build_explainer_prompt_text(
+    machine_plan: dict[str, Any],
+    personal: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
+    combined: list[dict[str, Any]],
+    deterministic_forecast: Optional[dict[str, Any]],
+    *,
+    style: str,
+    primary_goal: str,
+    lifestyle_notes: str,
+    max_chars: int,
+    detail_days: int,
+    effective_constraints: Optional[EffectiveConstraintContext] = None,
+) -> str:
+    sections = _build_common_sections(
+        prompt_name="training-plan-explainer",
+        personal=personal,
+        rollups=rollups,
+        combined=combined,
+        deterministic_forecast=deterministic_forecast,
+        style=style,
+        primary_goal=primary_goal,
+        lifestyle_notes=lifestyle_notes,
+        effective_constraints=effective_constraints,
+    )
+
+    sections.extend(
+        [
+            "## Locked machine plan (DO NOT CHANGE)",
+            _safe_json_snippet(machine_plan, max_chars=30_000),
+            "",
+            "## Task",
+            "Write explanations, purposes, citations, risks, recovery actions, and claim-level attributions against the locked plan.",
+            "Do not change dates, durations, session_type, is_rest_day, is_hard_day, target_intensity, terrain, workout, or weekly_totals.",
+            "",
+            "## Output Contract (STRICT)",
+            plan_explanation_output_contract_text(),
+            "",
+        ]
+    )
+
+    budget = max_chars if max_chars > 0 else 200_000
+    base = "\n".join(sections)
+    parts = [base]
+    used = len(base)
+
+    combined_detail = (
+        combined[-detail_days:] if detail_days > 0 and len(combined) > detail_days else combined
+    )
+    older_count = len(combined) - len(combined_detail)
+    if older_count:
+        note = (
+            f"## Older days in window: {older_count} "
+            "(details omitted; rely on rollups + recent detail)\n"
+        )
+        parts.append(note)
+        used += len(note)
+
+    for day in reversed(combined_detail):
+        block = _summarize_day(day)
+        if used + len(block) > budget:
+            break
+        parts.append(block)
+        used += len(block)
 
     return "\n".join(parts)

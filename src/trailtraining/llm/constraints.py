@@ -32,6 +32,20 @@ class ConstraintConfig:
     sparse_data_max_ramp_pct: float = 5.0
 
 
+@dataclass(frozen=True)
+class EffectiveConstraintContext:
+    allowed_week1_hours: Optional[float]
+    effective_max_ramp_pct: float
+    effective_max_hard_per_7d: int
+    effective_max_consecutive_hard: int
+    min_rest_per_7d: int
+    readiness_status: Optional[str]
+    overreach_risk_level: Optional[str]
+    recovery_capability_key: Optional[str]
+    lifestyle_notes: str
+    reasons: list[str]
+
+
 def _env_float(name: str, default: float) -> float:
     raw = os.getenv(name)
     if raw is None or not raw.strip():
@@ -165,7 +179,7 @@ def _citation_value(plan_obj: dict[str, Any], signal_id: str) -> Any:
     return None
 
 
-def _extract_forecast_context(plan_obj: dict[str, Any]) -> dict[str, Optional[str]]:
+def _extract_forecast_context_from_citations(plan_obj: dict[str, Any]) -> dict[str, Optional[str]]:
     readiness = _as_clean_str(_citation_value(plan_obj, "forecast.readiness.status"))
     overreach = _as_clean_str(_citation_value(plan_obj, "forecast.overreach_risk.level"))
     capability_key = _as_clean_str(_citation_value(plan_obj, "forecast.recovery_capability.key"))
@@ -179,6 +193,81 @@ def _extract_forecast_context(plan_obj: dict[str, Any]) -> dict[str, Optional[st
         "recovery_capability_key": capability_key.lower() if capability_key else None,
         "recovery_capability_label": capability_label,
     }
+
+
+def _extract_effective_constraints(
+    plan_obj: dict[str, Any],
+) -> Optional[EffectiveConstraintContext]:
+    raw = plan_obj.get("effective_constraints")
+    if not isinstance(raw, dict):
+        return None
+
+    def _float(name: str, default: float) -> float:
+        value = raw.get(name, default)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _int(name: str, default: int) -> int:
+        value = raw.get(name, default)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    allowed_raw = raw.get("allowed_week1_hours")
+    try:
+        allowed = float(allowed_raw) if isinstance(allowed_raw, (int, float)) else None
+    except (TypeError, ValueError):
+        allowed = None
+
+    return EffectiveConstraintContext(
+        allowed_week1_hours=allowed,
+        effective_max_ramp_pct=_float("effective_max_ramp_pct", ConstraintConfig().max_ramp_pct),
+        effective_max_hard_per_7d=_int(
+            "effective_max_hard_per_7d", ConstraintConfig().max_hard_per_7d
+        ),
+        effective_max_consecutive_hard=_int(
+            "effective_max_consecutive_hard", ConstraintConfig().max_consecutive_hard
+        ),
+        min_rest_per_7d=_int("min_rest_per_7d", ConstraintConfig().min_rest_per_7d),
+        readiness_status=_as_clean_str(raw.get("readiness_status")),
+        overreach_risk_level=_as_clean_str(raw.get("overreach_risk_level")),
+        recovery_capability_key=_as_clean_str(raw.get("recovery_capability_key")),
+        lifestyle_notes=str(raw.get("lifestyle_notes", "") or "").strip(),
+        reasons=[
+            str(item).strip()
+            for item in raw.get("reasons", [])
+            if isinstance(item, str) and str(item).strip()
+        ],
+    )
+
+
+def _extract_forecast_context_from_artifact(plan_obj: dict[str, Any]) -> dict[str, Optional[str]]:
+    effective = _extract_effective_constraints(plan_obj)
+    if effective is None:
+        return _extract_forecast_context_from_citations(plan_obj)
+
+    return {
+        "readiness_status": effective.readiness_status.lower()
+        if effective.readiness_status
+        else None,
+        "overreach_risk_level": effective.overreach_risk_level.lower()
+        if effective.overreach_risk_level
+        else None,
+        "recovery_capability_key": effective.recovery_capability_key.lower()
+        if effective.recovery_capability_key
+        else None,
+        "recovery_capability_label": None,
+    }
+
+
+def _extract_forecast_context(plan_obj: dict[str, Any]) -> dict[str, Optional[str]]:
+    effective = _extract_effective_constraints(plan_obj)
+    if effective is not None:
+        return _extract_forecast_context_from_artifact(plan_obj)
+    return _extract_forecast_context_from_citations(plan_obj)
 
 
 def _is_sparse_capability(ctx: dict[str, Optional[str]]) -> bool:
@@ -210,6 +299,92 @@ def _forecast_reason_text(ctx: dict[str, Optional[str]]) -> str:
     return "; ".join(reasons)
 
 
+def derive_effective_constraints(
+    *,
+    det_forecast: Optional[dict[str, Any]],
+    rollups: Optional[dict[str, Any]],
+    cfg: ConstraintConfig,
+    lifestyle_notes: str = "",
+) -> EffectiveConstraintContext:
+    readiness_status: Optional[str] = None
+    overreach_risk_level: Optional[str] = None
+    recovery_capability_key: Optional[str] = None
+    recovery_capability_label: Optional[str] = None
+
+    if isinstance(det_forecast, dict):
+        result = det_forecast.get("result") or {}
+        if isinstance(result, dict):
+            readiness = result.get("readiness") or {}
+            risk = result.get("overreach_risk") or {}
+            inputs = result.get("inputs") or {}
+            if isinstance(readiness, dict):
+                readiness_status = _as_clean_str(readiness.get("status"))
+                readiness_status = readiness_status.lower() if readiness_status else None
+            if isinstance(risk, dict):
+                overreach_risk_level = _as_clean_str(risk.get("level"))
+                overreach_risk_level = (
+                    overreach_risk_level.lower() if overreach_risk_level else None
+                )
+            if isinstance(inputs, dict):
+                recovery_capability_key = _as_clean_str(inputs.get("recovery_capability_key"))
+                recovery_capability_key = (
+                    recovery_capability_key.lower() if recovery_capability_key else None
+                )
+                recovery_capability_label = _as_clean_str(inputs.get("recovery_capability_label"))
+
+    effective_max_hard_per_7d = cfg.max_hard_per_7d
+    effective_max_consecutive_hard = cfg.max_consecutive_hard
+    effective_max_ramp_pct = cfg.max_ramp_pct
+    reasons: list[str] = []
+
+    forecast_ctx = {
+        "readiness_status": readiness_status,
+        "overreach_risk_level": overreach_risk_level,
+        "recovery_capability_key": recovery_capability_key,
+        "recovery_capability_label": recovery_capability_label,
+    }
+
+    if readiness_status == "fatigued":
+        effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.fatigued_max_hard_per_7d)
+        reasons.append("readiness is fatigued")
+
+    if overreach_risk_level == "high":
+        effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.high_risk_max_hard_per_7d)
+        effective_max_consecutive_hard = min(
+            effective_max_consecutive_hard, cfg.high_risk_max_consecutive_hard
+        )
+        effective_max_ramp_pct = min(effective_max_ramp_pct, cfg.high_risk_max_ramp_pct)
+        reasons.append("overreach risk is high")
+
+    if _is_sparse_capability(forecast_ctx):
+        effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.sparse_data_max_hard_per_7d)
+        effective_max_ramp_pct = min(effective_max_ramp_pct, cfg.sparse_data_max_ramp_pct)
+        reasons.append("recovery telemetry is sparse")
+
+    if lifestyle_notes.strip():
+        reasons.append("lifestyle constraints apply")
+
+    last7 = extract_last7_hours(rollups)
+    allowed_week1_hours = (
+        float(last7) * (1.0 + effective_max_ramp_pct / 100.0)
+        if isinstance(last7, (int, float)) and float(last7) > 0
+        else None
+    )
+
+    return EffectiveConstraintContext(
+        allowed_week1_hours=allowed_week1_hours,
+        effective_max_ramp_pct=effective_max_ramp_pct,
+        effective_max_hard_per_7d=effective_max_hard_per_7d,
+        effective_max_consecutive_hard=effective_max_consecutive_hard,
+        min_rest_per_7d=cfg.min_rest_per_7d,
+        readiness_status=readiness_status,
+        overreach_risk_level=overreach_risk_level,
+        recovery_capability_key=recovery_capability_key,
+        lifestyle_notes=lifestyle_notes.strip(),
+        reasons=reasons,
+    )
+
+
 def _planned_week_hours(plan_obj: dict[str, Any]) -> Optional[float]:
     wt = (plan_obj.get("plan") or {}).get("weekly_totals") or {}
     v = wt.get("planned_moving_time_hours")
@@ -229,6 +404,232 @@ def _pct_diff(a: float, b: float) -> Optional[float]:
     if b <= 0:
         return None
     return abs(a - b) / b * 100.0
+
+
+def _citation_lookup(plan_obj: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    cits = plan_obj.get("citations")
+    if not isinstance(cits, list):
+        return out
+    for item in cits:
+        if not isinstance(item, dict):
+            continue
+        signal_id = str(item.get("signal_id", "") or "").strip()
+        if not signal_id:
+            continue
+        citation_id = str(
+            item.get("citation_id", "") or f"cit_{signal_id.replace(' ', '_')}"
+        ).strip()
+        normalized = dict(item)
+        normalized["citation_id"] = citation_id
+        out[citation_id] = normalized
+    return out
+
+
+def _required_claim_field_paths(plan_obj: dict[str, Any]) -> list[str]:
+    if "claim_attributions" not in plan_obj:
+        return []
+
+    required: list[str] = ["readiness.rationale"]
+
+    recovery = plan_obj.get("recovery") or {}
+    if isinstance(recovery, dict):
+        for idx, action in enumerate(recovery.get("actions") or []):
+            if isinstance(action, str) and action.strip():
+                required.append(f"recovery.actions[{idx}]")
+
+    for idx, risk in enumerate(plan_obj.get("risks") or []):
+        if isinstance(risk, dict) and str(risk.get("message", "") or "").strip():
+            required.append(f"risks[{idx}].message")
+
+    days = normalize_plan_days(plan_obj)
+    for idx, day in enumerate(days):
+        if str(day.get("purpose", "") or "").strip():
+            required.append(f"plan.days[{idx}].purpose")
+
+    return required
+
+
+def _preferred_signal_prefixes(field_path: str, claim_text: str) -> list[str]:
+    low_text = claim_text.lower()
+
+    if field_path == "readiness.rationale":
+        if "missing" in low_text or "sparse" in low_text or "telemetry" in low_text:
+            return ["forecast.recovery_capability."]
+        if "overreach" in low_text or "risk" in low_text:
+            return ["forecast.overreach_risk.", "load."]
+        return ["forecast.readiness.", "recovery.", "load."]
+
+    if field_path.startswith("recovery.actions["):
+        return ["forecast.readiness.", "forecast.recovery_capability.", "recovery.", "load."]
+
+    if field_path.startswith("risks["):
+        return ["forecast.overreach_risk.", "forecast.readiness.", "load.", "recovery."]
+
+    if field_path.startswith("plan.days[") and field_path.endswith("].purpose"):
+        return ["forecast.", "load.", "recovery."]
+
+    return ["forecast.", "load.", "recovery."]
+
+
+def _has_preferred_signal(signal_ids: list[str], prefixes: list[str]) -> bool:
+    return any(any(signal_id.startswith(prefix) for prefix in prefixes) for signal_id in signal_ids)
+
+
+def validate_claim_support(plan_obj: dict[str, Any]) -> list[dict[str, Any]]:
+    if "claim_attributions" not in plan_obj:
+        return []
+
+    violations: list[dict[str, Any]] = []
+    claim_items = plan_obj.get("claim_attributions")
+    if not isinstance(claim_items, list):
+        return [
+            _v(
+                "CLAIM_ATTRIBUTIONS_BAD_TYPE",
+                "medium",
+                "justification",
+                "claim_attributions must be a list when present.",
+            )
+        ]
+
+    by_field: dict[str, list[dict[str, Any]]] = {}
+    citation_lookup = _citation_lookup(plan_obj)
+
+    for item in claim_items:
+        if not isinstance(item, dict):
+            violations.append(
+                _v(
+                    "CLAIM_ATTRIBUTION_BAD_ITEM",
+                    "low",
+                    "justification",
+                    "claim_attributions contains a non-object item.",
+                )
+            )
+            continue
+
+        field_path = str(item.get("field_path", "") or "").strip()
+        claim_text = str(item.get("claim_text", "") or "").strip()
+        signal_ids = [
+            str(s).strip()
+            for s in item.get("signal_ids", [])
+            if isinstance(s, str) and str(s).strip()
+        ]
+        citation_ids = [
+            str(c).strip()
+            for c in item.get("citation_ids", [])
+            if isinstance(c, str) and str(c).strip()
+        ]
+        support_level = str(item.get("support_level", "") or "").strip().lower()
+
+        if field_path:
+            by_field.setdefault(field_path, []).append(item)
+
+        if not field_path:
+            violations.append(
+                _v(
+                    "CLAIM_MISSING_FIELD_PATH",
+                    "medium",
+                    "justification",
+                    "Claim attribution is missing field_path.",
+                )
+            )
+
+        if not claim_text:
+            violations.append(
+                _v(
+                    "CLAIM_MISSING_TEXT",
+                    "low",
+                    "justification",
+                    f"Claim attribution for {field_path or '(unknown field)'} is missing claim_text.",
+                )
+            )
+
+        if not signal_ids:
+            violations.append(
+                _v(
+                    "CLAIM_MISSING_SIGNAL_IDS",
+                    "medium",
+                    "justification",
+                    f"Claim attribution for {field_path or '(unknown field)'} has no signal_ids.",
+                )
+            )
+
+        if not citation_ids:
+            violations.append(
+                _v(
+                    "CLAIM_MISSING_CITATIONS",
+                    "medium",
+                    "justification",
+                    f"Claim attribution for {field_path or '(unknown field)'} has no citation_ids.",
+                )
+            )
+
+        for citation_id in citation_ids:
+            cited = citation_lookup.get(citation_id)
+            if not cited:
+                violations.append(
+                    _v(
+                        "CLAIM_UNKNOWN_CITATION",
+                        "high",
+                        "justification",
+                        f"Claim attribution references unknown citation_id '{citation_id}'.",
+                        details={"citation_id": citation_id, "field_path": field_path},
+                    )
+                )
+                continue
+
+            cited_signal = str(cited.get("signal_id", "") or "").strip()
+            if cited_signal and cited_signal not in signal_ids:
+                violations.append(
+                    _v(
+                        "CLAIM_SOURCE_MISMATCH",
+                        "medium",
+                        "justification",
+                        f"Claim attribution cites {citation_id} ({cited_signal}) but does not list that signal_id.",
+                        details={
+                            "citation_id": citation_id,
+                            "signal_id": cited_signal,
+                            "field_path": field_path,
+                        },
+                    )
+                )
+
+        prefixes = _preferred_signal_prefixes(field_path, claim_text)
+        if signal_ids and not _has_preferred_signal(signal_ids, prefixes):
+            violations.append(
+                _v(
+                    "WEAK_CLAIM_SUPPORT",
+                    "low",
+                    "justification",
+                    f"Claim attribution for {field_path or '(unknown field)'} does not use the most relevant evidence family.",
+                    details={"field_path": field_path, "signal_ids": signal_ids},
+                )
+            )
+
+        if support_level == "unsupported":
+            violations.append(
+                _v(
+                    "UNSUPPORTED_RATIONALE",
+                    "medium",
+                    "justification",
+                    f"Claim attribution for {field_path or '(unknown field)'} is marked unsupported.",
+                    details={"field_path": field_path, "claim_text": claim_text},
+                )
+            )
+
+    for required_path in _required_claim_field_paths(plan_obj):
+        if required_path not in by_field:
+            violations.append(
+                _v(
+                    "CLAIM_MISSING_ATTRIBUTION",
+                    "medium",
+                    "justification",
+                    f"Missing claim attribution for {required_path}.",
+                    details={"field_path": required_path},
+                )
+            )
+
+    return violations
 
 
 def validate_training_plan(
@@ -311,23 +712,33 @@ def evaluate_training_plan_quality(
         if v is not None:
             stats[k] = v
 
+    effective = _extract_effective_constraints(plan_obj)
     effective_max_hard_per_7d = cfg.max_hard_per_7d
     effective_max_consecutive_hard = cfg.max_consecutive_hard
     effective_max_ramp_pct = cfg.max_ramp_pct
 
-    if fx.get("readiness_status") == "fatigued":
-        effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.fatigued_max_hard_per_7d)
+    if effective is not None:
+        effective_max_hard_per_7d = effective.effective_max_hard_per_7d
+        effective_max_consecutive_hard = effective.effective_max_consecutive_hard
+        effective_max_ramp_pct = effective.effective_max_ramp_pct
+    else:
+        if fx.get("readiness_status") == "fatigued":
+            effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.fatigued_max_hard_per_7d)
 
-    if fx.get("overreach_risk_level") == "high":
-        effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.high_risk_max_hard_per_7d)
-        effective_max_consecutive_hard = min(
-            effective_max_consecutive_hard, cfg.high_risk_max_consecutive_hard
-        )
-        effective_max_ramp_pct = min(effective_max_ramp_pct, cfg.high_risk_max_ramp_pct)
+        if fx.get("overreach_risk_level") == "high":
+            effective_max_hard_per_7d = min(
+                effective_max_hard_per_7d, cfg.high_risk_max_hard_per_7d
+            )
+            effective_max_consecutive_hard = min(
+                effective_max_consecutive_hard, cfg.high_risk_max_consecutive_hard
+            )
+            effective_max_ramp_pct = min(effective_max_ramp_pct, cfg.high_risk_max_ramp_pct)
 
-    if _is_sparse_capability(fx):
-        effective_max_hard_per_7d = min(effective_max_hard_per_7d, cfg.sparse_data_max_hard_per_7d)
-        effective_max_ramp_pct = min(effective_max_ramp_pct, cfg.sparse_data_max_ramp_pct)
+        if _is_sparse_capability(fx):
+            effective_max_hard_per_7d = min(
+                effective_max_hard_per_7d, cfg.sparse_data_max_hard_per_7d
+            )
+            effective_max_ramp_pct = min(effective_max_ramp_pct, cfg.sparse_data_max_ramp_pct)
 
     stats["effective_max_hard_per_7d"] = effective_max_hard_per_7d
     stats["effective_max_consecutive_hard"] = effective_max_consecutive_hard
@@ -579,6 +990,24 @@ def evaluate_training_plan_quality(
                 if isinstance(s, str):
                     used.add(s)
 
+    readiness = plan_obj.get("readiness") or {}
+    if isinstance(readiness, dict):
+        for s in readiness.get("signal_ids", []):
+            if isinstance(s, str):
+                used.add(s)
+
+    recovery = plan_obj.get("recovery") or {}
+    if isinstance(recovery, dict):
+        for s in recovery.get("signal_ids", []):
+            if isinstance(s, str):
+                used.add(s)
+
+    for risk in plan_obj.get("risks", []) or []:
+        if isinstance(risk, dict):
+            for s in risk.get("signal_ids", []):
+                if isinstance(s, str):
+                    used.add(s)
+
     if used and not cited:
         violations.append(
             _v(
@@ -597,10 +1026,12 @@ def evaluate_training_plan_quality(
                     "UNCITED_SIGNAL_IDS",
                     "medium",
                     "justification",
-                    "Some signal_ids used in plan.days are not present in citations[].signal_id.",
+                    "Some signal_ids used in plan.days/readiness/recovery/risks are not present in citations[].signal_id.",
                     details={"missing_signal_ids": missing[:50], "missing_count": len(missing)},
                 )
             )
+
+    violations.extend(validate_claim_support(plan_obj))
 
     return score_from_violations(violations, stats=stats)
 

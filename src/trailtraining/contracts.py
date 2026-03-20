@@ -3,14 +3,14 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-# ---------- training-plan artifact ----------
+# ---------- shared primitives ----------
 
 
 class SnapshotStats(StrictModel):
@@ -59,16 +59,73 @@ class TrainingMeta(StrictModel):
         raise ValueError(f"Cannot parse date from {v!r}")
 
 
-class Readiness(StrictModel):
-    status: Literal["primed", "steady", "fatigued"]
-    rationale: str
-    signal_ids: list[str] = Field(default_factory=list)
-
-
 class WeeklyTotals(StrictModel):
     planned_distance_km: float = Field(ge=0)
     planned_moving_time_hours: float = Field(ge=0)
     planned_elevation_m: float = Field(ge=0)
+
+
+class Recovery(StrictModel):
+    actions: list[str] = Field(default_factory=list)
+    signal_ids: list[str] = Field(default_factory=list)
+
+
+class RiskItem(StrictModel):
+    severity: Literal["low", "medium", "high"]
+    message: str
+    signal_ids: list[str] = Field(default_factory=list)
+
+
+class Citation(StrictModel):
+    citation_id: str = ""
+    signal_id: str
+    source: str
+    date_range: str
+    value: str
+
+    @model_validator(mode="after")
+    def _default_citation_id(self) -> Citation:
+        if not self.citation_id:
+            safe_signal = (self.signal_id or "unknown").strip().replace(" ", "_")
+            self.citation_id = f"cit_{safe_signal}"
+        return self
+
+
+class ClaimAttribution(StrictModel):
+    claim_id: str
+    field_path: str
+    claim_text: str
+    signal_ids: list[str] = Field(default_factory=list)
+    citation_ids: list[str] = Field(default_factory=list)
+    support_level: Literal["supported", "weak", "unsupported"]
+
+
+class Snapshot(StrictModel):
+    last7: SnapshotStats
+    baseline28: SnapshotStats
+    notes: str
+
+
+class EffectiveConstraintsArtifact(StrictModel):
+    allowed_week1_hours: Optional[float] = None
+    effective_max_ramp_pct: float
+    effective_max_hard_per_7d: int
+    effective_max_consecutive_hard: int
+    min_rest_per_7d: int
+    readiness_status: Optional[str] = None
+    overreach_risk_level: Optional[str] = None
+    recovery_capability_key: Optional[str] = None
+    lifestyle_notes: str = ""
+    reasons: list[str] = Field(default_factory=list)
+
+
+# ---------- final training-plan artifact ----------
+
+
+class Readiness(StrictModel):
+    status: Literal["primed", "steady", "fatigued"]
+    rationale: str
+    signal_ids: list[str] = Field(default_factory=list)
 
 
 class PlanDay(StrictModel):
@@ -109,30 +166,6 @@ class Plan(StrictModel):
     days: list[PlanDay] = Field(min_length=1, max_length=28)
 
 
-class Recovery(StrictModel):
-    actions: list[str] = Field(default_factory=list)
-    signal_ids: list[str] = Field(default_factory=list)
-
-
-class RiskItem(StrictModel):
-    severity: Literal["low", "medium", "high"]
-    message: str
-    signal_ids: list[str] = Field(default_factory=list)
-
-
-class Citation(StrictModel):
-    signal_id: str
-    source: str
-    date_range: str
-    value: str
-
-
-class Snapshot(StrictModel):
-    last7: SnapshotStats
-    baseline28: SnapshotStats
-    notes: str
-
-
 class TrainingPlanArtifact(StrictModel):
     meta: TrainingMeta
     snapshot: Snapshot
@@ -142,6 +175,87 @@ class TrainingPlanArtifact(StrictModel):
     risks: list[RiskItem] = Field(default_factory=list)
     data_notes: list[str] = Field(default_factory=list)
     citations: list[Citation] = Field(default_factory=list)
+    claim_attributions: list[ClaimAttribution] = Field(default_factory=list)
+    effective_constraints: Optional[EffectiveConstraintsArtifact] = None
+
+
+# ---------- stage A: machine-plan artifact ----------
+
+
+class MachineReadiness(StrictModel):
+    status: Literal["primed", "steady", "fatigued"]
+
+
+class MachinePlanDay(StrictModel):
+    date: dt.date
+    session_type: Literal[
+        "rest",
+        "easy",
+        "aerobic",
+        "long",
+        "tempo",
+        "intervals",
+        "hills",
+        "strength",
+        "cross",
+    ]
+    is_rest_day: bool
+    is_hard_day: bool
+    duration_minutes: int = Field(ge=0, le=420)
+    target_intensity: str
+    terrain: str
+    workout: str
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any) -> dt.date:
+        if isinstance(v, dt.date):
+            return v
+        if isinstance(v, str):
+            return dt.date.fromisoformat(v[:10])
+        raise ValueError(f"Cannot parse date from {v!r}")
+
+
+class MachinePlan(StrictModel):
+    weekly_totals: WeeklyTotals
+    days: list[MachinePlanDay] = Field(min_length=1, max_length=28)
+
+
+class MachinePlanArtifact(StrictModel):
+    meta: TrainingMeta
+    readiness: MachineReadiness
+    plan: MachinePlan
+
+
+# ---------- stage B: explanation artifact ----------
+
+
+class PlanExplanationDay(StrictModel):
+    date: dt.date
+    title: str
+    purpose: str
+    signal_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any) -> dt.date:
+        if isinstance(v, dt.date):
+            return v
+        if isinstance(v, str):
+            return dt.date.fromisoformat(v[:10])
+        raise ValueError(f"Cannot parse date from {v!r}")
+
+
+class PlanExplanationArtifact(StrictModel):
+    snapshot: Snapshot
+    readiness_rationale: str
+    readiness_signal_ids: list[str] = Field(default_factory=list)
+    day_explanations: list[PlanExplanationDay] = Field(default_factory=list)
+    recovery: Recovery
+    risks: list[RiskItem] = Field(default_factory=list)
+    data_notes: list[str] = Field(default_factory=list)
+    citations: list[Citation] = Field(default_factory=list)
+    claim_attributions: list[ClaimAttribution] = Field(default_factory=list)
 
 
 # ---------- eval-coach artifact ----------
@@ -167,7 +281,7 @@ class MarkerAssessmentArtifact(StrictModel):
     marker: str
     verdict: Literal["pass", "partial", "fail"]
     score: Union[int, float]
-    observation: Optional[str] = None  # what the model observes in the plan before scoring
+    observation: Optional[str] = None
     evidence: str
     improvement_hint: str
 
