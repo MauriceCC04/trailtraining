@@ -218,6 +218,10 @@ class ForecastInputs(StrictModel):
     training_load_delta_hours: Optional[float] = None
     training_load_z: Optional[float] = None
 
+    atl_load_hours: Optional[float] = None
+    ctl_load_hours: Optional[float] = None
+    tsb_load_hours: Optional[float] = None
+
     sleep_7d_mean_hours: Optional[float] = None
     sleep_28d_mean_hours: Optional[float] = None
     sleep_28d_std_hours: Optional[float] = None

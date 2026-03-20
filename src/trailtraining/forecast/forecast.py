@@ -17,7 +17,7 @@ from trailtraining.contracts import (
     ForecastResultArtifact,
     ForecastRisk,
 )
-from trailtraining.metrics.training_load import day_training_load_hours
+from trailtraining.metrics.training_load import day_training_load_hours, latest_atl_ctl_tsb
 from trailtraining.util.dates import _as_date
 from trailtraining.util.errors import ArtifactError, DataValidationError
 from trailtraining.util.state import load_json, save_json
@@ -507,6 +507,20 @@ def compute_readiness_and_risk(
     prior_roll7 = [float(x) for x in roll7[:-1] if x is not None]
     base7_mean = _mean(prior_roll7)
     base7_std = _std(prior_roll7)
+    load_model = latest_atl_ctl_tsb(combined)
+    atl_load = None
+    ctl_load = None
+    tsb_load = None
+
+    if isinstance(load_model, dict):
+        v = load_model.get("atl_load_h")
+        atl_load = float(v) if isinstance(v, (int, float)) else None
+
+        v = load_model.get("ctl_load_h")
+        ctl_load = float(v) if isinstance(v, (int, float)) else None
+
+        v = load_model.get("tsb_load_h")
+        tsb_load = float(v) if isinstance(v, (int, float)) else None
 
     # ---- Z-scores ----------------------------------------------------------
     # Only compute a z-score when we have enough recent data to trust it.
@@ -660,6 +674,11 @@ def compute_readiness_and_risk(
         signals_used.append("hrv")
     if z_load is not None:
         signals_used.append("load")
+    if atl_load is not None and ctl_load is not None and tsb_load is not None:
+        notes.append(
+            "ATL/CTL/TSB computed from daily training_load_hours "
+            "(EWMA time constants: ATL=7d, CTL=42d; TSB=CTL-ATL)."
+        )
     if signals_used:
         notes.append(f"Signals contributing to this score: {', '.join(signals_used)}.")
     else:
@@ -685,6 +704,9 @@ def compute_readiness_and_risk(
         "training_load_rolling7_std_hours": _r(base7_std, 3),
         "training_load_delta_hours": _r(delta_load, 3),
         "training_load_z": _r(z_load, 3),
+        "atl_load_hours": _r(atl_load, 3),
+        "ctl_load_hours": _r(ctl_load, 3),
+        "tsb_load_hours": _r(tsb_load, 3),
         # Sleep
         "sleep_7d_mean_hours": _r(sleep7),
         "sleep_28d_mean_hours": _r(sleep28),

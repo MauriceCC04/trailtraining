@@ -311,3 +311,43 @@ class TestCombineMain:
         assert (prompting / "combined_summary.json").exists()
         # Rollups must NOT be written because the date is bad
         assert not (prompting / "combined_rollups.json").exists()
+
+    def test_main_writes_load_model_into_rollups(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from trailtraining.data import combine as combine_mod
+
+        processing = tmp_path / "processing"
+        prompting = tmp_path / "prompting"
+        processing.mkdir()
+        prompting.mkdir()
+
+        sleep_data = [{"calendarDate": "2026-03-01", "sleepTimeSeconds": 28000}]
+        self._write_json(processing / "filtered_sleep.json", sleep_data)
+
+        activity_data = [
+            {
+                "id": 1,
+                "start_date_local": "2026-03-01T09:00:00",
+                "sport_type": "Run",
+                "distance": 10000,
+                "moving_time": 3600,
+            }
+        ]
+        self._write_json(processing / "strava_activities.json", activity_data)
+
+        monkeypatch.setattr(combine_mod.config, "ensure_directories", lambda runtime=None: None)
+        monkeypatch.setattr(
+            combine_mod.config,
+            "current",
+            lambda: self._make_runtime(processing, prompting),
+        )
+        monkeypatch.setattr(combine_mod, "build_formatted_personal_profile", lambda **kwargs: None)
+
+        combine_mod.main()
+
+        rollups = json.loads((prompting / "combined_rollups.json").read_text())
+        assert "load_model" in rollups
+        assert "atl_load_h" in rollups["load_model"]
+        assert "ctl_load_h" in rollups["load_model"]
+        assert "tsb_load_h" in rollups["load_model"]

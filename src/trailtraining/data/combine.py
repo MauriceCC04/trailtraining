@@ -6,7 +6,10 @@ from typing import Any, Optional
 
 from trailtraining import config
 from trailtraining.data.personal_profile import build_formatted_personal_profile
-from trailtraining.metrics.training_load import activity_training_load_hours
+from trailtraining.metrics.training_load import (
+    activity_training_load_hours,
+    latest_atl_ctl_tsb,
+)
 from trailtraining.util.dates import _as_date
 from trailtraining.util.state import load_json, save_json
 
@@ -228,6 +231,11 @@ def main() -> None:
                     "28": _compute_rollup(combined, end_date=last_date, window_days=28),
                 },
             }
+
+            load_model = latest_atl_ctl_tsb(combined)
+            if load_model is not None:
+                rollups["load_model"] = load_model
+
             save_json(out_rollups, rollups, compact=True)
             rollups_written = True
 
