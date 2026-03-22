@@ -265,17 +265,48 @@ def apply_primary_goal(plan_obj: dict[str, Any], primary_goal: Optional[str]) ->
         plan_obj["meta"] = meta
 
 
-def recompute_planned_hours(plan_obj: dict[str, Any]) -> None:
-    all_days = _as_list(_as_dict(plan_obj.get("plan")).get("days"))
+def recompute_weekly_totals(plan_obj: dict[str, Any]) -> None:
+    plan = _as_dict(plan_obj.get("plan"))
+    all_days = [day for day in _as_list(plan.get("days")) if isinstance(day, dict)]
     week1 = all_days[: min(7, len(all_days))]
+
     total_min = sum(
         float(day["duration_minutes"])
         for day in week1
-        if isinstance(day, dict) and isinstance(day.get("duration_minutes"), (int, float))
+        if isinstance(day.get("duration_minutes"), (int, float))
     )
-    weekly_totals = _as_dict(_as_dict(plan_obj.get("plan")).get("weekly_totals"))
+
+    non_rest_days = [
+        day
+        for day in week1
+        if not bool(day.get("is_rest_day")) and str(day.get("session_type") or "") != "rest"
+    ]
+    distance_values = [
+        float(day["estimated_distance_km"])
+        for day in non_rest_days
+        if isinstance(day.get("estimated_distance_km"), (int, float))
+    ]
+    elevation_values = [
+        float(day["estimated_elevation_m"])
+        for day in non_rest_days
+        if isinstance(day.get("estimated_elevation_m"), (int, float))
+    ]
+
+    weekly_totals = _as_dict(plan.get("weekly_totals"))
     if weekly_totals:
         weekly_totals["planned_moving_time_hours"] = round(total_min / 60.0, 1)
+        if non_rest_days and len(distance_values) == len(non_rest_days):
+            weekly_totals["planned_distance_km"] = round(sum(distance_values), 1)
+        else:
+            weekly_totals["planned_distance_km"] = None
+        if non_rest_days and len(elevation_values) == len(non_rest_days):
+            weekly_totals["planned_elevation_m"] = round(sum(elevation_values), 1)
+        else:
+            weekly_totals["planned_elevation_m"] = None
+
+
+def recompute_planned_hours(plan_obj: dict[str, Any]) -> None:
+    recompute_weekly_totals(plan_obj)
 
 
 def training_plan_to_text(obj: dict[str, Any]) -> str:
@@ -316,9 +347,11 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
     totals: list[str] = []
     if (hours := _as_float(weekly.get("planned_moving_time_hours"))) is not None:
         totals.append(f"{hours:.1f} h")
-    if (km := _as_float(weekly.get("planned_distance_km"))) and km > 0:
+    km = _as_float(weekly.get("planned_distance_km"))
+    if km is not None and km > 0:
         totals.append(f"{km:.0f} km")
-    if (elev := _as_float(weekly.get("planned_elevation_m"))) and elev > 0:
+    elev = _as_float(weekly.get("planned_elevation_m"))
+    if elev is not None and elev > 0:
         totals.append(f"{elev:.0f} m+")
     if totals:
         lines += ["", "Weekly totals: " + " • ".join(totals)]
@@ -351,6 +384,16 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
         ]:
             if value := _as_str(day_obj.get(field)):
                 lines.append(f"  {label}: {value}")
+
+        est_km = _as_float(day_obj.get("estimated_distance_km"))
+        est_elev = _as_float(day_obj.get("estimated_elevation_m"))
+        if est_km is not None or est_elev is not None:
+            extra_parts: list[str] = []
+            if est_km is not None:
+                extra_parts.append(f"Est. distance: {est_km:.1f} km")
+            if est_elev is not None:
+                extra_parts.append(f"Est. elevation: {est_elev:.0f} m+")
+            lines.append("  " + " • ".join(extra_parts))
         lines.append("")
 
     recovery = _as_dict(obj.get("recovery"))
@@ -381,5 +424,6 @@ __all__ = [
     "parse_race_context",
     "race_context_section",
     "recompute_planned_hours",
+    "recompute_weekly_totals",
     "training_plan_to_text",
 ]

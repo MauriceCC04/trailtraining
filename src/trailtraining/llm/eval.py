@@ -31,14 +31,28 @@ from trailtraining.util.state import load_json
 
 log = logging.getLogger(__name__)
 
-# Markers with std above this threshold on a 1-5 scale are flagged as ambiguous.
 _HIGH_VARIANCE_THRESHOLD = 0.5
-
-# Temperature used for inter-rater runs when no explicit temperature is configured.
 _INTER_RATER_DEFAULT_TEMPERATURE = 0.3
-
-# Human-readable label for the multi-run aggregation path.
 _CONSENSUS_METHOD = "median-marker-scores + majority-verdict + representative-narrative"
+
+_SCHEMA_BLOCKER_CODES = {
+    "BAD_DATE",
+    "DUPLICATE_DATE",
+    "NON_CONSECUTIVE_DATES",
+    "REST_DAY_FLAG_MISMATCH",
+    "REST_DAY_NONZERO_DURATION",
+    "REST_DAY_TOO_LONG",
+    "REST_DAY_MARKED_HARD",
+    "REST_DAY_WORKOUT_CONFLICT",
+    "HARD_SESSION_NOT_MARKED_HARD",
+    "NON_HARD_SESSION_MARKED_HARD",
+    "SESSION_ZERO_DURATION_CONFLICT",
+}
+_ARITHMETIC_BLOCKER_CODES = {
+    "WEEKLY_TOTALS_MISMATCH",
+    "UNVERIFIABLE_WEEKLY_TOTAL_DISTANCE",
+    "UNVERIFIABLE_WEEKLY_TOTAL_ELEVATION",
+}
 
 
 def _load_rollups_near(
@@ -75,12 +89,6 @@ def evaluate_training_plan_file(
 
 
 def _compute_marker_variance(all_runs: list[list[dict[str, Any]]]) -> dict[str, float]:
-    """
-    Compute per-marker score standard deviation across N evaluation runs.
-
-    Returns a dict mapping marker_id -> std (on a 0-5 scale).
-    Only markers with >=2 data points are included.
-    """
     by_marker: dict[str, list[float]] = {}
     for run in all_runs:
         for item in run:
@@ -185,13 +193,6 @@ def _select_representative_assessment(all_assessments: list[dict[str, Any]]) -> 
 def _aggregate_marker_results(
     all_runs: list[list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
-    """
-    Build sparse consensus marker rows across runs.
-
-    This intentionally does NOT normalize to the full rubric set. Missing
-    markers in sparse fixtures should remain missing here so they are not
-    treated as zeros when rubric scores and overall score are derived.
-    """
     by_marker: dict[str, list[dict[str, Any]]] = {}
     for run in all_runs:
         for item in run:
@@ -320,6 +321,66 @@ def _aggregate_soft_assessments(
     }
 
 
+def _blocking_issue_labels(violations: list[dict[str, Any]]) -> list[str]:
+    codes = {str(v.get("code") or "") for v in violations if isinstance(v, dict)}
+    issues: list[str] = []
+    if codes & _SCHEMA_BLOCKER_CODES:
+        issues.append("schema_validity")
+    if codes & _ARITHMETIC_BLOCKER_CODES:
+        issues.append("derived_totals")
+    return issues
+
+
+def _apply_blocking_caps(score: float, blocking_issues: list[str]) -> float:
+    capped = float(score)
+    if len(blocking_issues) >= 2:
+        capped = min(capped, 79.0)
+    elif blocking_issues:
+        capped = min(capped, 89.0)
+    return round(capped, 1)
+
+
+def _finalize_report_scores(report_raw: dict[str, Any]) -> dict[str, Any]:
+    deterministic_score = _as_float(report_raw.get("score", 0.0))
+    deterministic_grade = str(report_raw.get("grade", "?") or "?")
+    violations = report_raw.get("violations") or []
+    blocking_issues = _blocking_issue_labels(violations if isinstance(violations, list) else [])
+
+    soft = report_raw.get("soft_assessment")
+    score_components: dict[str, float] = {"deterministic": deterministic_score}
+    base_score = deterministic_score
+    score_basis = "deterministic"
+
+    if isinstance(soft, dict):
+        soft_overall = _as_float(
+            soft.get("overall_score", deterministic_score), deterministic_score
+        )
+        score_components["soft_overall"] = soft_overall
+        justification = report_raw.get("subscores", {}).get("justification")
+        if isinstance(justification, (int, float)):
+            score_components["claim_support"] = float(justification)
+        base_score = soft_overall
+        score_basis = "soft_overall"
+
+    final_score = _apply_blocking_caps(base_score, blocking_issues)
+    final_grade = grade_from_score(final_score)
+
+    report_raw["deterministic_score"] = deterministic_score
+    report_raw["deterministic_grade"] = deterministic_grade
+    report_raw["score_components"] = {k: round(v, 1) for k, v in score_components.items()}
+    report_raw["blocking_issues"] = blocking_issues
+    report_raw["score"] = final_score
+    report_raw["grade"] = final_grade
+
+    stats = report_raw.setdefault("stats", {})
+    if isinstance(stats, dict):
+        stats["final_score_basis"] = score_basis
+        if blocking_issues:
+            stats["grade_caps_applied"] = blocking_issues
+
+    return report_raw
+
+
 def evaluate_training_plan_quality_file(
     coach_json_path: str,
     *,
@@ -329,15 +390,6 @@ def evaluate_training_plan_quality_file(
     primary_goal: str | None = None,
     soft_eval_runs: int = 1,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """
-    Evaluate a training plan file, optionally running the soft evaluator N times.
-
-    When soft_eval_runs > 1, the function runs the soft evaluator N times
-    (with temperature > 0 if not explicitly set), aggregates marker scores into
-    a consensus assessment, and computes per-marker score variance. Markers with
-    std > 0.5 on a 1-5 scale are flagged in stats as potentially ambiguous
-    rubric definitions.
-    """
     p = Path(coach_json_path).expanduser().resolve()
     raw_obj = load_json(p, default=None)
     obj = TrainingPlanArtifact.model_validate(raw_obj)
@@ -433,5 +485,6 @@ def evaluate_training_plan_quality_file(
 
                 report_raw["soft_assessment"] = consensus
 
+    report_raw = _finalize_report_scores(report_raw)
     report = EvaluationReportArtifact.model_validate(report_raw)
     return report.model_dump(mode="json"), obj.model_dump(mode="json")

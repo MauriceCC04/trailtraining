@@ -76,6 +76,7 @@ _EFFECTIVE_CONSTRAINTS_SCHEMA: dict[str, Any] = {
         "reasons": {"type": "array", "items": {"type": "string"}},
     },
 }
+
 _CITATION_ITEM_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -113,8 +114,113 @@ _CLAIM_ATTRIBUTION_ITEM_SCHEMA: dict[str, Any] = {
     },
 }
 
+_WEEKLY_TOTALS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "planned_distance_km",
+        "planned_moving_time_hours",
+        "planned_elevation_m",
+    ],
+    "properties": {
+        "planned_distance_km": {"type": ["number", "null"], "minimum": 0},
+        "planned_moving_time_hours": {"type": "number", "minimum": 0},
+        "planned_elevation_m": {"type": ["number", "null"], "minimum": 0},
+    },
+}
+
+_MACHINE_DAY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "date",
+        "session_type",
+        "is_rest_day",
+        "is_hard_day",
+        "duration_minutes",
+        "target_intensity",
+        "terrain",
+        "workout",
+        "estimated_distance_km",
+        "estimated_elevation_m",
+    ],
+    "properties": {
+        "date": {"type": "string"},
+        "session_type": {
+            "type": "string",
+            "enum": [
+                "rest",
+                "easy",
+                "aerobic",
+                "long",
+                "tempo",
+                "intervals",
+                "hills",
+                "strength",
+                "cross",
+            ],
+        },
+        "is_rest_day": {"type": "boolean"},
+        "is_hard_day": {"type": "boolean"},
+        "duration_minutes": {"type": "integer", "minimum": 0, "maximum": 420},
+        "target_intensity": {"type": "string"},
+        "terrain": {"type": "string"},
+        "workout": {"type": "string"},
+        "estimated_distance_km": {"type": ["number", "null"], "minimum": 0},
+        "estimated_elevation_m": {"type": ["number", "null"], "minimum": 0},
+    },
+}
+
+_TRAINING_DAY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "date",
+        "title",
+        "session_type",
+        "is_rest_day",
+        "is_hard_day",
+        "duration_minutes",
+        "target_intensity",
+        "terrain",
+        "workout",
+        "purpose",
+        "signal_ids",
+        "estimated_distance_km",
+        "estimated_elevation_m",
+    ],
+    "properties": {
+        "date": {"type": "string", "description": "YYYY-MM-DD"},
+        "title": {"type": "string"},
+        "session_type": {
+            "type": "string",
+            "enum": [
+                "rest",
+                "easy",
+                "aerobic",
+                "long",
+                "tempo",
+                "intervals",
+                "hills",
+                "strength",
+                "cross",
+            ],
+        },
+        "is_rest_day": {"type": "boolean"},
+        "is_hard_day": {"type": "boolean"},
+        "duration_minutes": {"type": "integer", "minimum": 0, "maximum": 420},
+        "target_intensity": {"type": "string"},
+        "terrain": {"type": "string"},
+        "workout": {"type": "string"},
+        "purpose": {"type": "string"},
+        "signal_ids": {"type": "array", "items": {"type": "string"}},
+        "estimated_distance_km": {"type": ["number", "null"], "minimum": 0},
+        "estimated_elevation_m": {"type": ["number", "null"], "minimum": 0},
+    },
+}
+
 MACHINE_PLAN_SCHEMA: dict[str, Any] = {
-    "name": "trailtraining_machine_plan_v1",
+    "name": "trailtraining_machine_plan_v2",
     "schema": {
         "type": "object",
         "additionalProperties": False,
@@ -153,65 +259,12 @@ MACHINE_PLAN_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
                 "required": ["days", "weekly_totals"],
                 "properties": {
-                    "weekly_totals": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": [
-                            "planned_distance_km",
-                            "planned_moving_time_hours",
-                            "planned_elevation_m",
-                        ],
-                        "properties": {
-                            "planned_distance_km": {"type": "number", "minimum": 0},
-                            "planned_moving_time_hours": {"type": "number", "minimum": 0},
-                            "planned_elevation_m": {"type": "number", "minimum": 0},
-                        },
-                    },
+                    "weekly_totals": _WEEKLY_TOTALS_SCHEMA,
                     "days": {
                         "type": "array",
                         "minItems": 1,
                         "maxItems": 28,
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": [
-                                "date",
-                                "session_type",
-                                "is_rest_day",
-                                "is_hard_day",
-                                "duration_minutes",
-                                "target_intensity",
-                                "terrain",
-                                "workout",
-                            ],
-                            "properties": {
-                                "date": {"type": "string"},
-                                "session_type": {
-                                    "type": "string",
-                                    "enum": [
-                                        "rest",
-                                        "easy",
-                                        "aerobic",
-                                        "long",
-                                        "tempo",
-                                        "intervals",
-                                        "hills",
-                                        "strength",
-                                        "cross",
-                                    ],
-                                },
-                                "is_rest_day": {"type": "boolean"},
-                                "is_hard_day": {"type": "boolean"},
-                                "duration_minutes": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 420,
-                                },
-                                "target_intensity": {"type": "string"},
-                                "terrain": {"type": "string"},
-                                "workout": {"type": "string"},
-                            },
-                        },
+                        "items": _MACHINE_DAY_SCHEMA,
                     },
                 },
             },
@@ -295,7 +348,7 @@ PLAN_EXPLANATION_SCHEMA: dict[str, Any] = {
 }
 
 TRAINING_PLAN_SCHEMA: dict[str, Any] = {
-    "name": "trailtraining_training_plan_v3",
+    "name": "trailtraining_training_plan_v4",
     "schema": {
         "type": "object",
         "additionalProperties": False,
@@ -332,8 +385,8 @@ TRAINING_PLAN_SCHEMA: dict[str, Any] = {
                     "lifestyle_notes": {
                         "type": "string",
                         "description": (
-                            "Athlete schedule or lifestyle constraints that affect session "
-                            "placement. Copy exactly from the prompt if provided, or empty."
+                            "Athlete schedule or lifestyle constraints that affect session placement. "
+                            "Copy exactly from the prompt if provided, or empty."
                         ),
                     },
                 },
@@ -363,71 +416,12 @@ TRAINING_PLAN_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
                 "required": ["days", "weekly_totals"],
                 "properties": {
-                    "weekly_totals": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": [
-                            "planned_distance_km",
-                            "planned_moving_time_hours",
-                            "planned_elevation_m",
-                        ],
-                        "properties": {
-                            "planned_distance_km": {"type": "number", "minimum": 0},
-                            "planned_moving_time_hours": {"type": "number", "minimum": 0},
-                            "planned_elevation_m": {"type": "number", "minimum": 0},
-                        },
-                    },
+                    "weekly_totals": _WEEKLY_TOTALS_SCHEMA,
                     "days": {
                         "type": "array",
                         "minItems": 1,
                         "maxItems": 28,
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": [
-                                "date",
-                                "title",
-                                "session_type",
-                                "is_rest_day",
-                                "is_hard_day",
-                                "duration_minutes",
-                                "target_intensity",
-                                "terrain",
-                                "workout",
-                                "purpose",
-                                "signal_ids",
-                            ],
-                            "properties": {
-                                "date": {"type": "string", "description": "YYYY-MM-DD"},
-                                "title": {"type": "string"},
-                                "session_type": {
-                                    "type": "string",
-                                    "enum": [
-                                        "rest",
-                                        "easy",
-                                        "aerobic",
-                                        "long",
-                                        "tempo",
-                                        "intervals",
-                                        "hills",
-                                        "strength",
-                                        "cross",
-                                    ],
-                                },
-                                "is_rest_day": {"type": "boolean"},
-                                "is_hard_day": {"type": "boolean"},
-                                "duration_minutes": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 420,
-                                },
-                                "target_intensity": {"type": "string"},
-                                "terrain": {"type": "string"},
-                                "workout": {"type": "string"},
-                                "purpose": {"type": "string"},
-                                "signal_ids": {"type": "array", "items": {"type": "string"}},
-                            },
-                        },
+                        "items": _TRAINING_DAY_SCHEMA,
                     },
                 },
             },
@@ -470,8 +464,7 @@ def training_plan_output_contract_text() -> str:
         "Output MUST be a single JSON object (no Markdown, no backticks) matching the training-plan schema.\n"
         "Rules:\n"
         "- meta.primary_goal MUST match the authoritative primary goal provided in the prompt.\n"
-        "- meta.lifestyle_notes MUST copy the lifestyle constraints from the prompt exactly, "
-        'or be empty string "" if none were provided.\n'
+        '- meta.lifestyle_notes MUST copy the lifestyle constraints from the prompt exactly, or be empty string "" if none were provided.\n'
         "- meta.plan_days MUST equal the number of days in plan.days.\n"
         "- Use only signal_ids that appear in the provided Signal registry.\n"
         "- Every plan day MUST include signal_ids justifying that day.\n"
@@ -481,6 +474,8 @@ def training_plan_output_contract_text() -> str:
         '- snapshot.last7 and snapshot.baseline28 MUST include all keys; use empty string "" if unknown.\n'
         "- If data is missing, write it in data_notes; do NOT fabricate.\n"
         "- weekly_totals MUST reflect WEEK 1 values only (first 7 days).\n"
+        "- planned_distance_km and planned_elevation_m MUST be null unless every non-rest day in week 1 includes matching estimated_distance_km / estimated_elevation_m values.\n"
+        "- Structured fields are authoritative: title/workout text MUST agree with session_type, is_rest_day, is_hard_day, and duration_minutes.\n"
     )
 
 
@@ -493,6 +488,7 @@ def machine_plan_output_contract_text() -> str:
         "- meta.plan_days MUST equal the number of days in plan.days.\n"
         "- Satisfy all hard constraints numerically.\n"
         "- weekly_totals MUST reflect week 1 only.\n"
+        "- planned_distance_km and planned_elevation_m MUST be null unless every non-rest day in week 1 includes matching estimates.\n"
     )
 
 

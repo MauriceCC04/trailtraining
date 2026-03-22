@@ -8,6 +8,7 @@ from trailtraining.commands.llm_commands import (
     cmd_coach,
     cmd_eval_coach,
     cmd_revise_plan,
+    cmd_run_training_cycle,
 )
 from trailtraining.commands.pipeline_commands import (
     cmd_auth_strava,
@@ -93,6 +94,42 @@ def _add_input_output_args(
         parser.add_argument("--output", default=None, help=output_help)
 
 
+def _add_soft_eval_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--soft-eval", action="store_true", help="Run rubric-based soft evaluation")
+    parser.add_argument(
+        "--soft-eval-model", default=None, help="OpenRouter model for soft evaluation"
+    )
+    parser.add_argument(
+        "--soft-eval-runs",
+        type=int,
+        default=1,
+        dest="soft_eval_runs",
+        metavar="N",
+        help=(
+            "Run the soft evaluator N times, aggregate the runs into a consensus assessment, "
+            "and report per-marker score variance."
+        ),
+    )
+    parser.add_argument(
+        "--soft-eval-reasoning-effort",
+        default=None,
+        choices=["none", "low", "medium", "high", "xhigh"],
+    )
+    parser.add_argument("--soft-eval-verbosity", default=None, choices=["low", "medium", "high"])
+    parser.add_argument(
+        "--skip-synthesis",
+        action="store_true",
+        dest="skip_synthesis",
+        help="Skip the synthesis LLM call during soft evaluation.",
+    )
+    parser.add_argument(
+        "--no-parallel-batches",
+        action="store_true",
+        dest="no_parallel_batches",
+        help="Run soft-eval rubric batches sequentially instead of in parallel.",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="trailtraining", description="TrailTraining CLI")
 
@@ -110,7 +147,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # ---- Simple commands ----
     sub.add_parser("doctor", help="Check configuration + dependencies").set_defaults(
         func=cmd_doctor
     )
@@ -129,7 +165,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub.add_parser("combine", help="Combine Garmin + Strava JSONs").set_defaults(func=cmd_combine)
 
-    # ---- run-all ----
     run_all_p = sub.add_parser(
         "run-all", help="Run full pipeline (auto: Garmin OR Intervals -> Strava -> Combine)"
     )
@@ -142,7 +177,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run_all_p.set_defaults(func=cmd_run_all)
 
-    # ---- coach ----
     coach_p = sub.add_parser(
         "coach", help="LLM coach analysis on combined_summary.json + formatted_personal_data.json"
     )
@@ -185,7 +219,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     coach_p.set_defaults(func=cmd_coach)
 
-    # ---- eval-coach ----
     eval_p = sub.add_parser(
         "eval-coach", help="Evaluate coach training-plan JSON output against constraints"
     )
@@ -206,44 +239,11 @@ def build_parser() -> argparse.ArgumentParser:
     eval_p.add_argument(
         "--report", default=None, help="Optional path to write full scoring report JSON"
     )
-    eval_p.add_argument("--soft-eval", action="store_true", help="Run rubric-based soft evaluation")
-    eval_p.add_argument(
-        "--soft-eval-model", default=None, help="OpenRouter model for soft evaluation"
-    )
-    eval_p.add_argument(
-        "--soft-eval-runs",
-        type=int,
-        default=1,
-        dest="soft_eval_runs",
-        metavar="N",
-        help=(
-            "Run the soft evaluator N times, aggregate the runs into a consensus assessment, "
-            "and report per-marker score variance."
-        ),
-    )
+    _add_soft_eval_args(eval_p)
     _add_goal_arg(eval_p)
     _add_lifestyle_notes_arg(eval_p)
-    eval_p.add_argument(
-        "--soft-eval-reasoning-effort",
-        default=None,
-        choices=["none", "low", "medium", "high", "xhigh"],
-    )
-    eval_p.add_argument("--soft-eval-verbosity", default=None, choices=["low", "medium", "high"])
-    eval_p.add_argument(
-        "--skip-synthesis",
-        action="store_true",
-        dest="skip_synthesis",
-        help="Skip the synthesis LLM call during soft evaluation.",
-    )
-    eval_p.add_argument(
-        "--no-parallel-batches",
-        action="store_true",
-        dest="no_parallel_batches",
-        help="Run soft-eval rubric batches sequentially instead of in parallel.",
-    )
     eval_p.set_defaults(func=cmd_eval_coach)
 
-    # ---- revise-plan ----
     revise_p = sub.add_parser(
         "revise-plan", help="Revise coach_brief_training-plan.json using eval_report.json"
     )
@@ -265,7 +265,6 @@ def build_parser() -> argparse.ArgumentParser:
     _add_lifestyle_notes_arg(revise_p)
     revise_p.set_defaults(func=cmd_revise_plan)
 
-    # ---- fetch-intervals ----
     intervals_p = sub.add_parser(
         "fetch-intervals", help="Fetch sleep + resting HR from Intervals.icu"
     )
@@ -273,14 +272,12 @@ def build_parser() -> argparse.ArgumentParser:
     intervals_p.add_argument("--newest", default=None, help="YYYY-MM-DD (default: today)")
     intervals_p.set_defaults(func=cmd_fetch_intervals)
 
-    # ---- run-all-intervals ----
     run_all_int_p = sub.add_parser(
         "run-all-intervals", help="Run full pipeline (Intervals -> Strava -> Combine)"
     )
     _add_clean_args(run_all_int_p)
     run_all_int_p.set_defaults(func=cmd_run_all_intervals)
 
-    # ---- forecast ----
     forecast_p = sub.add_parser(
         "forecast", help="Readiness forecast + overreach risk (from combined_summary.json)"
     )
@@ -291,7 +288,45 @@ def build_parser() -> argparse.ArgumentParser:
     )
     forecast_p.set_defaults(func=cmd_forecast)
 
-    # ---- plan-to-ics ----
+    cycle_p = sub.add_parser(
+        "run-training-cycle",
+        help=(
+            "Run the full Intervals-backed planning workflow: run-all-intervals -> forecast -> "
+            "coach 28-day plan -> soft eval -> revise -> soft eval revised plan"
+        ),
+    )
+    _add_clean_args(cycle_p)
+    _add_llm_model_args(cycle_p)
+    _add_goal_arg(cycle_p)
+    _add_lifestyle_notes_arg(cycle_p)
+    _add_soft_eval_args(cycle_p)
+    cycle_p.add_argument("--days", type=int, default=None)
+    cycle_p.add_argument("--max-chars", type=int, default=None)
+    cycle_p.add_argument(
+        "--plan-days",
+        type=int,
+        default=28,
+        dest="plan_days",
+        choices=[7, 14, 21, 28],
+        help="Output plan duration in days for the unified workflow (default: 28).",
+    )
+    cycle_p.add_argument(
+        "--style",
+        default=None,
+        choices=["trailrunning", "triathlon"],
+        help="Prompt preset for the unified workflow.",
+    )
+    cycle_p.add_argument("--rollups", default=None, help="Optional path to combined_rollups.json")
+    cycle_p.add_argument(
+        "--max-ramp-pct", type=float, default=float(os.getenv("TRAILTRAINING_MAX_RAMP_PCT", "10"))
+    )
+    cycle_p.add_argument(
+        "--max-consecutive-hard",
+        type=int,
+        default=int(os.getenv("TRAILTRAINING_MAX_CONSEC_HARD", "2")),
+    )
+    cycle_p.set_defaults(func=cmd_run_training_cycle, soft_eval_runs=2)
+
     ics_p = sub.add_parser(
         "plan-to-ics", help="Export most recent training plan to a .ics calendar file"
     )

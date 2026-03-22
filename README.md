@@ -234,6 +234,12 @@ With `--auto-reeval`, the revised plan is re-evaluated immediately and a delta r
 
 ---
 
+or if you want to run the strava+wellness+forecast+coaching+evaluation pipeline in one go:
+
+```bash
+trailtraining --profile me run-training-cycle
+```
+
 ## Calendar export
 
 ```bash

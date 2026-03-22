@@ -10,9 +10,6 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-# ---------- shared primitives ----------
-
-
 class SnapshotStats(StrictModel):
     distance_km: str
     moving_time_hours: str
@@ -60,9 +57,9 @@ class TrainingMeta(StrictModel):
 
 
 class WeeklyTotals(StrictModel):
-    planned_distance_km: float = Field(ge=0)
+    planned_distance_km: Optional[float] = Field(default=None, ge=0)
     planned_moving_time_hours: float = Field(ge=0)
-    planned_elevation_m: float = Field(ge=0)
+    planned_elevation_m: Optional[float] = Field(default=None, ge=0)
 
 
 class Recovery(StrictModel):
@@ -119,13 +116,13 @@ class EffectiveConstraintsArtifact(StrictModel):
     reasons: list[str] = Field(default_factory=list)
 
 
-# ---------- final training-plan artifact ----------
-
-
 class Readiness(StrictModel):
     status: Literal["primed", "steady", "fatigued"]
     rationale: str
     signal_ids: list[str] = Field(default_factory=list)
+
+
+_HARD_SESSION_TYPES = {"tempo", "intervals", "hills"}
 
 
 class PlanDay(StrictModel):
@@ -150,6 +147,8 @@ class PlanDay(StrictModel):
     workout: str
     purpose: str
     signal_ids: list[str] = Field(default_factory=list)
+    estimated_distance_km: Optional[float] = Field(default=None, ge=0)
+    estimated_elevation_m: Optional[float] = Field(default=None, ge=0)
 
     @field_validator("date", mode="before")
     @classmethod
@@ -159,6 +158,26 @@ class PlanDay(StrictModel):
         if isinstance(v, str):
             return dt.date.fromisoformat(v[:10])
         raise ValueError(f"Cannot parse date from {v!r}")
+
+    @model_validator(mode="after")
+    def _validate_internal_consistency(self) -> PlanDay:
+        if self.is_rest_day or self.session_type == "rest":
+            if not self.is_rest_day or self.session_type != "rest":
+                raise ValueError(
+                    "Rest days must set both is_rest_day=true and session_type='rest'."
+                )
+            if self.is_hard_day:
+                raise ValueError("Rest days cannot be marked hard.")
+            if self.duration_minutes != 0:
+                raise ValueError("Rest days must have duration_minutes == 0.")
+        else:
+            if self.session_type in _HARD_SESSION_TYPES and not self.is_hard_day:
+                raise ValueError("High-intensity session_types must be marked hard.")
+            if self.session_type not in _HARD_SESSION_TYPES and self.is_hard_day:
+                raise ValueError(
+                    "Only high-intensity session_types (tempo/intervals/hills) may be marked hard."
+                )
+        return self
 
 
 class Plan(StrictModel):
@@ -177,9 +196,6 @@ class TrainingPlanArtifact(StrictModel):
     citations: list[Citation] = Field(default_factory=list)
     claim_attributions: list[ClaimAttribution] = Field(default_factory=list)
     effective_constraints: Optional[EffectiveConstraintsArtifact] = None
-
-
-# ---------- stage A: machine-plan artifact ----------
 
 
 class MachineReadiness(StrictModel):
@@ -205,6 +221,8 @@ class MachinePlanDay(StrictModel):
     target_intensity: str
     terrain: str
     workout: str
+    estimated_distance_km: Optional[float] = Field(default=None, ge=0)
+    estimated_elevation_m: Optional[float] = Field(default=None, ge=0)
 
     @field_validator("date", mode="before")
     @classmethod
@@ -214,6 +232,26 @@ class MachinePlanDay(StrictModel):
         if isinstance(v, str):
             return dt.date.fromisoformat(v[:10])
         raise ValueError(f"Cannot parse date from {v!r}")
+
+    @model_validator(mode="after")
+    def _validate_internal_consistency(self) -> MachinePlanDay:
+        if self.is_rest_day or self.session_type == "rest":
+            if not self.is_rest_day or self.session_type != "rest":
+                raise ValueError(
+                    "Rest days must set both is_rest_day=true and session_type='rest'."
+                )
+            if self.is_hard_day:
+                raise ValueError("Rest days cannot be marked hard.")
+            if self.duration_minutes != 0:
+                raise ValueError("Rest days must have duration_minutes == 0.")
+        else:
+            if self.session_type in _HARD_SESSION_TYPES and not self.is_hard_day:
+                raise ValueError("High-intensity session_types must be marked hard.")
+            if self.session_type not in _HARD_SESSION_TYPES and self.is_hard_day:
+                raise ValueError(
+                    "Only high-intensity session_types (tempo/intervals/hills) may be marked hard."
+                )
+        return self
 
 
 class MachinePlan(StrictModel):
@@ -225,9 +263,6 @@ class MachinePlanArtifact(StrictModel):
     meta: TrainingMeta
     readiness: MachineReadiness
     plan: MachinePlan
-
-
-# ---------- stage B: explanation artifact ----------
 
 
 class PlanExplanationDay(StrictModel):
@@ -256,9 +291,6 @@ class PlanExplanationArtifact(StrictModel):
     data_notes: list[str] = Field(default_factory=list)
     citations: list[Citation] = Field(default_factory=list)
     claim_attributions: list[ClaimAttribution] = Field(default_factory=list)
-
-
-# ---------- eval-coach artifact ----------
 
 
 class Violation(StrictModel):
@@ -312,9 +344,10 @@ class EvaluationReportArtifact(StrictModel):
     stats: dict[str, Any] = Field(default_factory=dict)
     violations: list[Violation] = Field(default_factory=list)
     soft_assessment: Optional[SoftAssessmentArtifact] = None
-
-
-# ---------- forecast artifact ----------
+    deterministic_score: Optional[Union[int, float]] = None
+    deterministic_grade: Optional[str] = None
+    score_components: dict[str, Union[int, float]] = Field(default_factory=dict)
+    blocking_issues: list[str] = Field(default_factory=list)
 
 
 class ForecastInputs(StrictModel):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Optional
@@ -44,6 +45,16 @@ class EffectiveConstraintContext:
     recovery_capability_key: Optional[str]
     lifestyle_notes: str
     reasons: list[str]
+
+
+_REST_TEXT_OK_RE = re.compile(r"\b(rest|off|recovery day|no structured training)\b", re.I)
+_TRAINING_TEXT_RE = re.compile(
+    r"\b(run|jog|ride|bike|cycle|tempo|interval|hill|workout|long run|trail|aerobic|easy)\b",
+    re.I,
+)
+
+
+# env helpers -----------------------------------------------------------------
 
 
 def _env_float(name: str, default: float) -> float:
@@ -125,6 +136,9 @@ def constraint_config_from_env(
     )
 
 
+# generic helpers --------------------------------------------------------------
+
+
 def _pct_increase(new: float, old: Optional[float]) -> Optional[float]:
     if old is None or old <= 0:
         return None
@@ -159,6 +173,55 @@ def _as_clean_str(v: Any) -> Optional[str]:
         return None
     s = v.strip()
     return s or None
+
+
+def _planned_week_hours(plan_obj: dict[str, Any]) -> Optional[float]:
+    wt = (plan_obj.get("plan") or {}).get("weekly_totals") or {}
+    v = wt.get("planned_moving_time_hours")
+    return float(v) if isinstance(v, (int, float)) else None
+
+
+def _sum_hours(days: list[dict[str, Any]]) -> float:
+    total_min = 0.0
+    for d in days:
+        m = d.get("duration_minutes")
+        if isinstance(m, (int, float)):
+            total_min += float(m)
+    return total_min / 60.0
+
+
+def _pct_diff(a: float, b: float) -> Optional[float]:
+    if b <= 0:
+        return None
+    return abs(a - b) / b * 100.0
+
+
+def _day_text(day: dict[str, Any]) -> str:
+    return " ".join(
+        str(day.get(key, "") or "") for key in ("title", "target_intensity", "terrain", "workout")
+    ).strip()
+
+
+def _rest_text_conflicts(day: dict[str, Any]) -> bool:
+    text = _day_text(day)
+    if not text:
+        return False
+    if _REST_TEXT_OK_RE.search(text):
+        stripped = _REST_TEXT_OK_RE.sub(" ", text)
+        return bool(_TRAINING_TEXT_RE.search(stripped))
+    return bool(_TRAINING_TEXT_RE.search(text))
+
+
+def _non_rest_zero_duration_conflicts(day: dict[str, Any]) -> bool:
+    mins = day.get("duration_minutes")
+    if not isinstance(mins, (int, float)) or float(mins) != 0.0:
+        return False
+    if bool(day.get("is_rest_day")) or str(day.get("session_type") or "") == "rest":
+        return False
+    return bool(_TRAINING_TEXT_RE.search(_day_text(day)))
+
+
+# citation / forecast helpers --------------------------------------------------
 
 
 def _citation_value(plan_obj: dict[str, Any], signal_id: str) -> Any:
@@ -385,25 +448,7 @@ def derive_effective_constraints(
     )
 
 
-def _planned_week_hours(plan_obj: dict[str, Any]) -> Optional[float]:
-    wt = (plan_obj.get("plan") or {}).get("weekly_totals") or {}
-    v = wt.get("planned_moving_time_hours")
-    return float(v) if isinstance(v, (int, float)) else None
-
-
-def _sum_hours(days: list[dict[str, Any]]) -> float:
-    total_min = 0.0
-    for d in days:
-        m = d.get("duration_minutes")
-        if isinstance(m, (int, float)):
-            total_min += float(m)
-    return total_min / 60.0
-
-
-def _pct_diff(a: float, b: float) -> Optional[float]:
-    if b <= 0:
-        return None
-    return abs(a - b) / b * 100.0
+# claim support ----------------------------------------------------------------
 
 
 def _citation_lookup(plan_obj: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -632,6 +677,9 @@ def validate_claim_support(plan_obj: dict[str, Any]) -> list[dict[str, Any]]:
     return violations
 
 
+# evaluation -------------------------------------------------------------------
+
+
 def validate_training_plan(
     plan_obj: dict[str, Any],
     rollups: Optional[dict[str, Any]],
@@ -642,9 +690,7 @@ def validate_training_plan(
 
     declared_planned_hours = _planned_week_hours(plan_obj)
     actual_first7_hours = _sum_hours(days[: min(7, len(days))]) if days else None
-
     last7_hours = extract_last7_hours(rollups)
-
     ramp_basis_hours = (
         actual_first7_hours if actual_first7_hours is not None else declared_planned_hours
     )
@@ -794,7 +840,7 @@ def evaluate_training_plan_quality(
             violations.append(
                 _v(
                     "WEEKLY_TOTALS_MISMATCH",
-                    "low",
+                    "medium",
                     "structure",
                     f"weekly_totals.planned_moving_time_hours ({planned_hours:.1f}h) doesn't match "
                     f"sum(duration) ({sum_hours:.1f}h) within {cfg.weekly_time_tolerance_pct:.0f}%.",
@@ -806,9 +852,50 @@ def evaluate_training_plan_quality(
                 )
             )
 
-    last7_hours = extract_last7_hours(rollups)
+    first7 = days[: min(7, len(days))]
+    non_rest_first7 = [
+        d
+        for d in first7
+        if not bool(d.get("is_rest_day")) and str(d.get("session_type") or "") != "rest"
+    ]
+    has_partial_distance = any(
+        isinstance(d.get("estimated_distance_km"), (int, float)) for d in non_rest_first7
+    )
+    has_partial_elevation = any(
+        isinstance(d.get("estimated_elevation_m"), (int, float)) for d in non_rest_first7
+    )
+    full_distance = non_rest_first7 and all(
+        isinstance(d.get("estimated_distance_km"), (int, float)) for d in non_rest_first7
+    )
+    full_elevation = non_rest_first7 and all(
+        isinstance(d.get("estimated_elevation_m"), (int, float)) for d in non_rest_first7
+    )
+    weekly = (plan_obj.get("plan") or {}).get("weekly_totals") or {}
+    if has_partial_distance and not full_distance and weekly.get("planned_distance_km") is not None:
+        violations.append(
+            _v(
+                "UNVERIFIABLE_WEEKLY_TOTAL_DISTANCE",
+                "medium",
+                "structure",
+                "planned_distance_km is present but not derivable from complete per-day distance estimates.",
+            )
+        )
+    if (
+        has_partial_elevation
+        and not full_elevation
+        and weekly.get("planned_elevation_m") is not None
+    ):
+        violations.append(
+            _v(
+                "UNVERIFIABLE_WEEKLY_TOTAL_ELEVATION",
+                "medium",
+                "structure",
+                "planned_elevation_m is present but not derivable from complete per-day elevation estimates.",
+            )
+        )
 
-    actual_first7_hours = _sum_hours(days[: min(7, len(days))]) if days else None
+    last7_hours = extract_last7_hours(rollups)
+    actual_first7_hours = _sum_hours(first7) if days else None
     ramp_basis_hours = actual_first7_hours if actual_first7_hours is not None else planned_hours
 
     if isinstance(ramp_basis_hours, (int, float)) and isinstance(last7_hours, (int, float)):
@@ -935,32 +1022,107 @@ def evaluate_training_plan_quality(
                 streak_start = None
 
     for d in days:
-        if not bool(d.get("is_rest_day")):
-            continue
+        session_type = str(d.get("session_type") or "")
+        is_rest = bool(d.get("is_rest_day"))
+        is_hard = bool(d.get("is_hard_day"))
         mins = d.get("duration_minutes")
-        if isinstance(mins, (int, float)) and float(mins) > float(cfg.rest_day_max_minutes):
-            violations.append(
-                _v(
-                    "REST_DAY_TOO_LONG",
-                    "medium",
-                    "structure",
-                    f"Rest day exceeds {cfg.rest_day_max_minutes} minutes.",
-                    details={"date": d.get("date"), "duration_minutes": mins},
+
+        if is_rest or session_type == "rest":
+            if not is_rest or session_type != "rest":
+                violations.append(
+                    _v(
+                        "REST_DAY_FLAG_MISMATCH",
+                        "medium",
+                        "structure",
+                        "Rest days must set both is_rest_day=true and session_type='rest'.",
+                        details={"date": d.get("date")},
+                    )
                 )
-            )
-        if cfg.require_rest_session_type:
-            st = d.get("session_type")
-            if isinstance(st, str) and st != "rest":
+
+            if cfg.require_rest_session_type and session_type != "rest":
                 violations.append(
                     _v(
                         "REST_DAY_BAD_SESSION_TYPE",
                         "low",
                         "structure",
                         "Rest day should have session_type == 'rest'.",
-                        details={"date": d.get("date"), "session_type": st},
+                        details={"date": d.get("date"), "session_type": session_type},
                     )
                 )
 
+            if isinstance(mins, (int, float)) and float(mins) > float(cfg.rest_day_max_minutes):
+                violations.append(
+                    _v(
+                        "REST_DAY_TOO_LONG",
+                        "medium",
+                        "structure",
+                        f"Rest day exceeds {cfg.rest_day_max_minutes} minutes.",
+                        details={"date": d.get("date"), "duration_minutes": mins},
+                    )
+                )
+            elif isinstance(mins, (int, float)) and float(mins) != 0.0:
+                violations.append(
+                    _v(
+                        "REST_DAY_NONZERO_DURATION",
+                        "medium",
+                        "structure",
+                        f"Rest day must have duration_minutes == 0 (got {float(mins):.0f}).",
+                        details={"date": d.get("date"), "duration_minutes": mins},
+                    )
+                )
+
+            if is_hard:
+                violations.append(
+                    _v(
+                        "REST_DAY_MARKED_HARD",
+                        "medium",
+                        "structure",
+                        "Rest days cannot be marked hard.",
+                        details={"date": d.get("date")},
+                    )
+                )
+
+            if _rest_text_conflicts(d):
+                violations.append(
+                    _v(
+                        "REST_DAY_WORKOUT_CONFLICT",
+                        "high",
+                        "structure",
+                        "Rest day text prescribes a structured workout or run.",
+                        details={"date": d.get("date"), "text": _day_text(d)},
+                    )
+                )
+        else:
+            if session_type in {"tempo", "intervals", "hills"} and not is_hard:
+                violations.append(
+                    _v(
+                        "HARD_SESSION_NOT_MARKED_HARD",
+                        "medium",
+                        "structure",
+                        "tempo/intervals/hills sessions must set is_hard_day=true.",
+                        details={"date": d.get("date"), "session_type": session_type},
+                    )
+                )
+            if session_type not in {"tempo", "intervals", "hills"} and is_hard:
+                violations.append(
+                    _v(
+                        "NON_HARD_SESSION_MARKED_HARD",
+                        "medium",
+                        "structure",
+                        "Only tempo/intervals/hills sessions may set is_hard_day=true.",
+                        details={"date": d.get("date"), "session_type": session_type},
+                    )
+                )
+            if _non_rest_zero_duration_conflicts(d):
+                violations.append(
+                    _v(
+                        "SESSION_ZERO_DURATION_CONFLICT",
+                        "high",
+                        "structure",
+                        "Non-rest session has zero duration but workout text still prescribes training.",
+                        details={"date": d.get("date"), "text": _day_text(d)},
+                    )
+                )
     for idx, d in enumerate(days):
         sig = d.get("signal_ids")
         n = len(sig) if isinstance(sig, list) else 0

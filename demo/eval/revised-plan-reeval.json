@@ -1,22 +1,11 @@
 {
-  "delta_score": 0.0,
+  "blocking_issues": [],
+  "delta_score": 12.2,
   "grade": "A",
-  "original_score": 97.0,
-  "revised_score": 97.0,
-  "violations": [
-    {
-      "category": "justification",
-      "code": "WEAK_CLAIM_SUPPORT",
-      "details": {
-        "field_path": "risks[3].message",
-        "signal_ids": [
-          "forecast.recovery_capability.hrv_days_7d",
-          "forecast.recovery_capability.key"
-        ]
-      },
-      "message": "Claim attribution for risks[3].message does not use the most relevant evidence family.",
-      "penalty": 3,
-      "severity": "low"
-    }
-  ]
+  "original_score": 87.8,
+  "revised_score": 100.0,
+  "score_components": {
+    "deterministic": 100.0
+  },
+  "violations": []
 }

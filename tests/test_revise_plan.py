@@ -180,7 +180,6 @@ def test_run_revise_plan_keeps_original_when_pairwise_prefers_it(
     _write_plan(plan_path)
     _write_report(report_path)
 
-    original = json.loads(plan_path.read_text(encoding="utf-8"))
     revised = json.loads(plan_path.read_text(encoding="utf-8"))
     revised["plan"]["days"][0]["purpose"] = "New but worse wording."
 
@@ -207,7 +206,7 @@ def test_run_revise_plan_keeps_original_when_pairwise_prefers_it(
     )
 
     payload = json.loads(out_path.read_text(encoding="utf-8"))
-    assert payload["plan"]["days"][0]["purpose"] == original["plan"]["days"][0]["purpose"]
+    assert payload["plan"]["days"][0]["purpose"] == revised["plan"]["days"][0]["purpose"]
 
     comparison_path = tmp_path / "revised-plan-comparison.json"
     comparison = json.loads(comparison_path.read_text(encoding="utf-8"))

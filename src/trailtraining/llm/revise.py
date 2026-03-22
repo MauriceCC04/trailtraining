@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 from trailtraining import config
 from trailtraining.contracts import EvaluationReportArtifact, TrainingPlanArtifact
+from trailtraining.llm.constraints import _extract_effective_constraints
 from trailtraining.llm.eval import _load_rollups_near
 from trailtraining.llm.guardrails import apply_eval_coach_guardrails
 from trailtraining.llm.presets import _multiweek_addendum
@@ -20,14 +21,13 @@ from trailtraining.llm.shared import (
     extract_json_object,
     make_openrouter_client,
     race_context_section,
-    recompute_planned_hours,
+    recompute_weekly_totals,
     training_plan_to_text,
 )
 from trailtraining.llm.soft_eval import SoftEvalConfig, compare_plans
 from trailtraining.util.state import load_json, save_json
 from trailtraining.util.text import _safe_json_snippet
 
-# Backward-compatible aliases for tests that monkeypatch these names.
 _make_openrouter_client = make_openrouter_client
 _call_with_schema = call_with_schema
 
@@ -119,7 +119,6 @@ def _summarize_eval_targets(report_obj: dict[str, Any]) -> list[str]:
 
 
 def _lifestyle_notes_for_revise(lifestyle_notes: str) -> list[str]:
-    """Build lifestyle constraints section for the revise prompt."""
     notes = lifestyle_notes.strip() if isinstance(lifestyle_notes, str) else ""
     if not notes:
         return []
@@ -159,6 +158,8 @@ def _build_revise_prompt(
             "You are revising an existing endurance training plan using evaluator feedback.",
             "Return a FULL revised training-plan JSON artifact, not a diff.",
             "Fix clear problems, preserve strong parts, and avoid unnecessary rewrites.",
+            "Treat structured fields as authoritative: title/workout text MUST agree with session_type, is_rest_day, is_hard_day, duration_minutes, and terrain.",
+            "If the original plan was stronger overall, keep its strong ideas but still return a normalized revised artifact that fixes schema and consistency errors.",
             "Do not invent new telemetry, sources, or citations.",
             f"Style: {style}",
             f"Primary goal: {primary_goal}",
@@ -171,10 +172,12 @@ def _build_revise_prompt(
             "- Preserve meta.plan_days and the overall date range unless evaluator feedback clearly requires a change.",
             "- Keep the plan grounded in the original artifact's signals and citations.",
             "- Do not invent new signal_ids unless they already exist in the original plan/citations.",
-            "- weekly_totals must match week 1 of the revised day list.",
+            "- weekly_totals must be derived from WEEK 1 day objects only.",
+            "- planned_distance_km and planned_elevation_m must be null unless supported by complete per-day estimates.",
             "- If the evaluator identified concerns or improvements, address them concretely.",
             "- Preserve strong sessions and useful explanations when they are already good.",
             "- Preserve meta.lifestyle_notes from the original plan.",
+            "- Do not simply re-emit the original unchanged when the report asks for fixes.",
             "",
             *_lifestyle_notes_for_revise(lifestyle_notes),
             *multiweek_note,
@@ -192,12 +195,24 @@ def _build_revise_prompt(
 
 
 def _apply_lifestyle_notes(plan_obj: dict[str, Any], lifestyle_notes: str) -> None:
-    """Set meta.lifestyle_notes on the plan object."""
     notes = lifestyle_notes.strip() if isinstance(lifestyle_notes, str) else ""
     meta = plan_obj.get("meta")
     if isinstance(meta, dict):
         meta["lifestyle_notes"] = notes
         plan_obj["meta"] = meta
+
+
+def _apply_guardrails_compat(
+    plan_obj: dict[str, Any],
+    rollups: Optional[dict[str, Any]],
+    effective: Any = None,
+) -> None:
+    try:
+        apply_eval_coach_guardrails(plan_obj, rollups, effective=effective)
+    except TypeError as exc:
+        if "unexpected keyword argument 'effective'" not in str(exc):
+            raise
+        apply_eval_coach_guardrails(plan_obj, rollups)
 
 
 def _pairwise_cfg_for_revision(
@@ -227,7 +242,20 @@ def _pairwise_cfg_for_revision(
     )
 
 
-def _choose_final_plan_with_pairwise(
+def _report_requests_change(report_obj: dict[str, Any]) -> bool:
+    violations = report_obj.get("violations") or []
+    if isinstance(violations, list) and violations:
+        return True
+    soft = report_obj.get("soft_assessment") or {}
+    if isinstance(soft, dict):
+        for key in ("concerns", "suggested_improvements"):
+            value = soft.get(key) or []
+            if isinstance(value, list) and any(str(item or "").strip() for item in value):
+                return True
+    return False
+
+
+def _compare_revised_candidate(
     original_plan: dict[str, Any],
     revised_candidate: dict[str, Any],
     *,
@@ -236,7 +264,7 @@ def _choose_final_plan_with_pairwise(
     cfg: RevisePlanConfig,
     primary_goal: str,
     lifestyle_notes: str,
-) -> tuple[dict[str, Any], Optional[dict[str, Any]]]:
+) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]]]:
     original_json = json.dumps(original_plan, sort_keys=True, default=str)
     candidate_json = json.dumps(revised_candidate, sort_keys=True, default=str)
     if original_json == candidate_json:
@@ -263,18 +291,15 @@ def _choose_final_plan_with_pairwise(
             cfg=pairwise_cfg,
         )
     except Exception as exc:
-        log.warning("Pairwise comparison failed; keeping revised candidate: %s", exc)
-        return revised_candidate, None
+        log.warning("Pairwise comparison failed; keeping revised candidate only: %s", exc)
+        return None, None
 
+    preferred = str(comparison.get("preferred", "tie") or "tie").strip().lower()
     selected_plan = revised_candidate
     selected_label = "revised_candidate"
-    preferred = str(comparison.get("preferred", "tie") or "tie").strip().lower()
     if preferred == "plan_a":
         selected_plan = original_plan
         selected_label = "original"
-        log.warning(
-            "Pairwise judge preferred the original plan; saving original as the final choice."
-        )
 
     comparison_payload = {
         "judge_model": pairwise_cfg.model,
@@ -283,8 +308,16 @@ def _choose_final_plan_with_pairwise(
         "plan_a_advantages": comparison.get("plan_a_advantages", []),
         "plan_b_advantages": comparison.get("plan_b_advantages", []),
         "selected_plan": selected_label,
+        "revised_artifact_contract": "revised-plan.json is always the normalized revised artifact; selected-plan.json stores the pairwise winner.",
     }
     return selected_plan, comparison_payload
+
+
+def _write_selected_plan_artifacts(out_p: Path, selected_plan: dict[str, Any]) -> None:
+    selected_json = out_p.parent / "selected-plan.json"
+    selected_txt = out_p.parent / "selected-plan.txt"
+    save_json(selected_json, selected_plan, compact=False)
+    selected_txt.write_text(training_plan_to_text(selected_plan), encoding="utf-8")
 
 
 def run_revise_plan(
@@ -316,7 +349,6 @@ def run_revise_plan(
         or str((plan_obj.get("meta") or {}).get("primary_goal") or "").strip()
         or default_primary_goal_for_style(style)
     )
-    # Resolve lifestyle_notes: explicit config > plan artifact
     lifestyle_notes = (
         str(cfg.lifestyle_notes or "").strip()
         or str((plan_obj.get("meta") or {}).get("lifestyle_notes") or "").strip()
@@ -347,10 +379,12 @@ def run_revise_plan(
     resp = _call_with_schema(client, kwargs, TRAINING_PLAN_SCHEMA)
     out_text = getattr(resp, "output_text", None) or str(resp)
 
+    used_repair_fallback = False
     try:
-        obj = ensure_training_plan_shape(json.loads(extract_json_object(out_text)))
-        recompute_planned_hours(obj)
+        raw_candidate = json.loads(extract_json_object(out_text))
+        obj = ensure_training_plan_shape(raw_candidate)
     except Exception as exc:
+        used_repair_fallback = True
         log.warning("Revised-plan JSON parse/shape failed; attempting one repair pass: %s", exc)
         repair_prompt = (
             "Return ONLY valid JSON (no markdown, no backticks) matching this schema:\n"
@@ -367,18 +401,35 @@ def run_revise_plan(
         }
         repair_resp = _call_with_schema(client, repair_kwargs, TRAINING_PLAN_SCHEMA)
         repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
-        obj = ensure_training_plan_shape(json.loads(extract_json_object(repaired)))
-        recompute_planned_hours(obj)
+        raw_candidate = json.loads(extract_json_object(repaired))
+        obj = ensure_training_plan_shape(raw_candidate)
+
+    # Check for a true authored revision BEFORE deterministic guardrails/normalization.
+    # But do not fail the repair-fallback path if the repaired artifact normalizes back
+    # to the original; that path is meant to recover invalid JSON, not prove a semantic rewrite.
+    original_basis_json = json.dumps(plan_obj, sort_keys=True, default=str)
+    candidate_basis_json = json.dumps(obj, sort_keys=True, default=str)
+    if (
+        not used_repair_fallback
+        and original_basis_json == candidate_basis_json
+        and _report_requests_change(report_obj)
+    ):
+        raise RuntimeError(
+            "Revision produced no material change despite requested fixes. "
+            "Refusing to save an unchanged revised-plan artifact."
+        )
 
     apply_primary_goal(obj, primary_goal)
     _apply_lifestyle_notes(obj, lifestyle_notes)
 
     rollups = _load_rollups_near(plan_p, rollups_path)
-    if isinstance(rollups, dict):
-        apply_eval_coach_guardrails(obj, rollups)
+    effective = _extract_effective_constraints(plan_obj) or _extract_effective_constraints(obj)
+    _apply_guardrails_compat(obj, rollups if isinstance(rollups, dict) else None, effective)
+    recompute_weekly_totals(obj)
 
     revised_candidate = TrainingPlanArtifact.model_validate(obj).model_dump(mode="json")
-    final_obj, comparison_payload = _choose_final_plan_with_pairwise(
+
+    selected_plan, comparison_payload = _compare_revised_candidate(
         plan_obj,
         revised_candidate,
         rollups=rollups,
@@ -387,8 +438,8 @@ def run_revise_plan(
         primary_goal=primary_goal,
         lifestyle_notes=lifestyle_notes,
     )
-    final_obj = TrainingPlanArtifact.model_validate(final_obj).model_dump(mode="json")
 
+    final_obj = TrainingPlanArtifact.model_validate(revised_candidate).model_dump(mode="json")
     out_p = (
         Path(output_path).expanduser().resolve()
         if output_path
@@ -399,6 +450,9 @@ def run_revise_plan(
 
     txt_p = out_p.parent / f"{out_p.stem}.txt"
     txt_p.write_text(training_plan_to_text(final_obj), encoding="utf-8")
+
+    if selected_plan is not None:
+        _write_selected_plan_artifacts(out_p, selected_plan)
 
     if comparison_payload:
         comparison_path = out_p.parent / f"{out_p.stem}-comparison.json"
@@ -445,6 +499,8 @@ def _run_auto_reeval(
         "delta_score": round(delta, 1),
         "violations": revised_report.get("violations", []),
         "grade": revised_report.get("grade", "?"),
+        "blocking_issues": revised_report.get("blocking_issues", []),
+        "score_components": revised_report.get("score_components", {}),
     }
 
     reeval_path = revised_plan_path.parent / f"{revised_plan_path.stem}-reeval.json"
@@ -463,4 +519,7 @@ def _run_auto_reeval(
         log.warning(msg)
         print(msg)
     else:
-        print(f"Auto-reeval: score {original_score:.0f} -> {revised_score:.0f} ({delta:+.1f}).")
+        print(
+            f"Auto-reeval: deterministic score "
+            f"{original_score:.0f} -> {revised_score:.0f} ({delta:+.1f})."
+        )
