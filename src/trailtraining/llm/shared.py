@@ -48,6 +48,11 @@ _MONTH_PATTERN = (
     r"january|february|march|april|may|june|july|august|september|october|november|december"
     r"|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec"
 )
+_INTERNAL_ONLY_KEYS = {"stage_name"}
+
+
+def _strip_internal_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in kwargs.items() if k not in _INTERNAL_ONLY_KEYS}
 
 
 @dataclass(frozen=True)
@@ -182,17 +187,20 @@ def _call_chat_completion_with_schema(
         raise ValueError(f"Schema '{name}' is missing a dict-valued 'schema' body.")
 
     stage_name = str(kwargs.get("stage_name") or name)
+    public_kwargs = _strip_internal_kwargs(kwargs)
 
     messages: list[dict[str, str]] = []
-    instructions = kwargs.get("instructions")
+    instructions = public_kwargs.get("instructions")
     if isinstance(instructions, str) and instructions.strip():
         messages.append({"role": "system", "content": instructions})
-    messages.append({"role": "user", "content": _coerce_input_to_text(kwargs.get("input", ""))})
+    messages.append(
+        {"role": "user", "content": _coerce_input_to_text(public_kwargs.get("input", ""))}
+    )
 
     chat_kwargs: dict[str, Any] = {
-        "model": kwargs.get("model"),
+        "model": public_kwargs.get("model"),
         "messages": messages,
-        "max_tokens": int(kwargs.get("max_tokens") or 4096),
+        "max_tokens": int(public_kwargs.get("max_tokens") or 4096),
         "response_format": {
             "type": "json_schema",
             "json_schema": {
@@ -214,10 +222,10 @@ def _call_chat_completion_with_schema(
         "stop",
         "n",
     ):
-        if key in kwargs and kwargs[key] is not None:
-            chat_kwargs[key] = kwargs[key]
+        if key in public_kwargs and public_kwargs[key] is not None:
+            chat_kwargs[key] = public_kwargs[key]
 
-    extra_body = _merge_extra_body(client, kwargs)
+    extra_body = _merge_extra_body(client, public_kwargs)
     if extra_body:
         chat_kwargs["extra_body"] = extra_body
 
@@ -262,10 +270,13 @@ def _call_responses_with_schema(
     if not isinstance(body, dict):
         raise ValueError(f"Schema '{name}' is missing a dict-valued 'schema' body.")
 
+    stage_name = str(kwargs.get("stage_name") or name)
+    public_kwargs = _strip_internal_kwargs(kwargs)
+
     response_kwargs: dict[str, Any] = {
-        **kwargs,
+        **public_kwargs,
         "text": {
-            **kwargs.get("text", {}),
+            **public_kwargs.get("text", {}),
             "format": {
                 "type": "json_schema",
                 "name": name,
@@ -275,11 +286,29 @@ def _call_responses_with_schema(
         },
     }
 
-    extra_body = _merge_extra_body(client, kwargs)
+    extra_body = _merge_extra_body(client, public_kwargs)
     if extra_body:
         response_kwargs["extra_body"] = extra_body
 
-    return call_with_param_fallback(client, response_kwargs)
+    response = call_with_param_fallback(client, response_kwargs)
+
+    usage = getattr(response, "usage", None)
+    prompt_tokens = int(
+        getattr(usage, "prompt_tokens", 0) or getattr(usage, "input_tokens", 0) or 0
+    )
+    completion_tokens = int(
+        getattr(usage, "completion_tokens", 0) or getattr(usage, "output_tokens", 0) or 0
+    )
+    finish_reason = str(getattr(response, "status", "unknown") or "unknown")
+    log.info(
+        "stage=%s finish=%s prompt_tokens=%d completion_tokens=%d",
+        stage_name,
+        finish_reason,
+        prompt_tokens,
+        completion_tokens,
+    )
+
+    return response
 
 
 def parse_race_context(goal_text: str, today: Optional[date] = None) -> dict[str, Any]:
