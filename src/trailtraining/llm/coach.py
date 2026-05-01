@@ -49,6 +49,30 @@ from trailtraining.util.state import _json_default
 log = logging.getLogger(__name__)
 
 
+def _structured_max_tokens() -> int:
+    raw = (os.getenv("TRAILTRAINING_STRUCTURED_MAX_TOKENS") or "").strip()
+    try:
+        return max(1, int(raw)) if raw else 4096
+    except ValueError:
+        return 4096
+
+
+def _log_structured_result(stage_name: str, resp: Any) -> None:
+    response = getattr(resp, "response", resp)
+    usage = getattr(response, "usage", None)
+    prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+    completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+    choices = getattr(response, "choices", None) or []
+    finish_reason = str(getattr(choices[0], "finish_reason", "unknown")) if choices else "unknown"
+    log.info(
+        "stage=%s finish=%s prompt_tokens=%d completion_tokens=%d",
+        stage_name,
+        finish_reason,
+        prompt_tokens,
+        completion_tokens,
+    )
+
+
 def _apply_eval_coach_guardrails_compat(
     plan_obj: dict[str, Any],
     rollups: Optional[dict[str, Any]],
@@ -286,9 +310,11 @@ def _parse_machine_plan(
         "reasoning": {"effort": "none"},
         "text": {"verbosity": "low"},
         "temperature": 0.0,
+        "max_tokens": _structured_max_tokens(),
     }
 
     repair_resp = _call_with_schema(client, repair_kwargs, MACHINE_PLAN_SCHEMA)
+    _log_structured_result("machine_plan_repair", repair_resp)
     repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
     return ensure_machine_plan_shape(json.loads(_extract_json_object(repaired)))
 
@@ -323,9 +349,11 @@ def _parse_plan_explanation(
         "reasoning": {"effort": "none"},
         "text": {"verbosity": "low"},
         "temperature": 0.0,
+        "max_tokens": _structured_max_tokens(),
     }
 
     repair_resp = _call_with_schema(client, repair_kwargs, PLAN_EXPLANATION_SCHEMA)
+    _log_structured_result("plan_explanation_repair", repair_resp)
     repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
     return ensure_plan_explanation_shape(json.loads(_extract_json_object(repaired)))
 
@@ -631,8 +659,13 @@ def _run_training_plan_legacy(
     prompting_dir: Path,
     effective: Optional[EffectiveConstraintContext] = None,
 ) -> tuple[str, str]:
+    api_kwargs = {
+        **api_kwargs,
+        "max_tokens": int(api_kwargs.get("max_tokens") or _structured_max_tokens()),
+    }
     system_instructions = str(api_kwargs.get("instructions") or "")
     resp = _call_with_schema(client, api_kwargs, TRAINING_PLAN_SCHEMA)
+    _log_structured_result("training_plan", resp)
     out_text = getattr(resp, "output_text", None) or str(resp)
 
     obj = _parse_training_plan(out_text, client, cfg, system_instructions)
@@ -687,12 +720,14 @@ def _run_training_plan_pipeline(
         "instructions": get_system_prompt(cfg.style),
         "input": machine_prompt,
         "reasoning": {"effort": cfg.reasoning_effort},
+        "max_tokens": _structured_max_tokens(),
         "text": {"verbosity": cfg.verbosity},
     }
     if cfg.reasoning_effort == "none" and cfg.temperature is not None:
         machine_kwargs["temperature"] = cfg.temperature
 
     machine_resp = _call_with_schema(client, machine_kwargs, MACHINE_PLAN_SCHEMA)
+    _log_structured_result("machine_plan", machine_resp)
     machine_text = getattr(machine_resp, "output_text", None) or str(machine_resp)
     machine_obj = _parse_machine_plan(
         machine_text,
@@ -778,12 +813,14 @@ def _run_training_plan_pipeline(
         "instructions": get_system_prompt(cfg.style),
         "input": explainer_prompt,
         "reasoning": {"effort": cfg.reasoning_effort},
+        "max_tokens": _structured_max_tokens(),
         "text": {"verbosity": cfg.verbosity},
     }
     if cfg.reasoning_effort == "none" and cfg.temperature is not None:
         explain_kwargs["temperature"] = cfg.temperature
 
     explain_resp = _call_with_schema(client, explain_kwargs, PLAN_EXPLANATION_SCHEMA)
+    _log_structured_result("plan_explanation", explain_resp)
     explain_text = getattr(explain_resp, "output_text", None) or str(explain_resp)
     explanation_obj = _parse_plan_explanation(
         explain_text,
