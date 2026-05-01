@@ -181,6 +181,8 @@ def _call_chat_completion_with_schema(
     if not isinstance(body, dict):
         raise ValueError(f"Schema '{name}' is missing a dict-valued 'schema' body.")
 
+    stage_name = str(kwargs.get("stage_name") or name)
+
     messages: list[dict[str, str]] = []
     instructions = kwargs.get("instructions")
     if isinstance(instructions, str) and instructions.strip():
@@ -190,6 +192,7 @@ def _call_chat_completion_with_schema(
     chat_kwargs: dict[str, Any] = {
         "model": kwargs.get("model"),
         "messages": messages,
+        "max_tokens": int(kwargs.get("max_tokens") or 4096),
         "response_format": {
             "type": "json_schema",
             "json_schema": {
@@ -225,6 +228,18 @@ def _call_chat_completion_with_schema(
         raise
 
     output_text = _extract_chat_completion_text(response)
+    usage = getattr(response, "usage", None)
+    prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+    completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+    choices = getattr(response, "choices", None) or []
+    finish_reason = str(getattr(choices[0], "finish_reason", "unknown")) if choices else "unknown"
+    log.info(
+        "stage=%s finish=%s prompt_tokens=%d completion_tokens=%d",
+        stage_name,
+        finish_reason,
+        prompt_tokens,
+        completion_tokens,
+    )
     if not output_text:
         raise RuntimeError(
             f"Chat Completions structured-output response was empty for schema '{name}'."
