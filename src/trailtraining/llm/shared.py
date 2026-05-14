@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import calendar
 import contextlib
-import json
 import logging
 import os
 import re
-from dataclasses import dataclass
 from datetime import date
 from typing import Any, Optional
 
@@ -48,223 +46,6 @@ _MONTH_PATTERN = (
     r"january|february|march|april|may|june|july|august|september|october|november|december"
     r"|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec"
 )
-
-
-@dataclass(frozen=True)
-class _StructuredChatResponse:
-    output_text: str
-    model: Optional[str]
-    response: Any
-
-    def __str__(self) -> str:
-        return self.output_text
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self.response, name)
-
-
-class StructuredOutputUnavailableError(RuntimeError):
-    def __init__(
-        self,
-        *,
-        schema_name: str,
-        attempted_modes: list[str],
-        last_error: Exception | None,
-    ) -> None:
-        detail = f"; last_error={last_error}" if last_error is not None else ""
-        super().__init__(
-            f"No structured-output mode succeeded for schema '{schema_name}'. "
-            f"attempted_modes={attempted_modes}{detail}"
-        )
-        self.schema_name = schema_name
-        self.attempted_modes = list(attempted_modes)
-        self.last_error = last_error
-
-
-def _client_base_url(client: OpenAI) -> str:
-    raw = getattr(client, "base_url", None)
-    if raw is None:
-        raw = getattr(client, "_base_url", None)
-    return str(raw or "").strip()
-
-
-def _structured_api_preference(client: OpenAI) -> str:
-    forced = (os.getenv("TRAILTRAINING_FORCE_API") or "").strip().lower()
-    if forced in {"chat", "responses"}:
-        return forced
-
-    base_url = _client_base_url(client).lower()
-    return "responses" if "openrouter.ai" in base_url else "chat"
-
-
-def _guided_decoding_extra_body(client: OpenAI) -> dict[str, Any]:
-    backend = (
-        (
-            os.getenv("TRAILTRAINING_GUIDED_DECODING_BACKEND")
-            or os.getenv("GUIDED_DECODING_BACKEND")
-            or ""
-        )
-        .strip()
-        .lower()
-    )
-    if not backend:
-        return {}
-
-    base_url = _client_base_url(client).lower()
-    if "openrouter.ai" in base_url:
-        return {}
-
-    return {"guided_decoding_backend": backend}
-
-
-def _merge_extra_body(client: OpenAI, kwargs: dict[str, Any]) -> dict[str, Any]:
-    extra_body = dict(kwargs.get("extra_body") or {})
-    extra_body.update(_guided_decoding_extra_body(client))
-    return extra_body
-
-
-def _coerce_input_to_text(value: Any) -> str:
-    if isinstance(value, str):
-        return value
-    try:
-        return json.dumps(value, ensure_ascii=False)
-    except Exception:
-        return str(value)
-
-
-def _extract_chat_completion_text(response: Any) -> str:
-    choices = getattr(response, "choices", None)
-    if not choices:
-        return ""
-
-    message = getattr(choices[0], "message", None)
-    if message is None:
-        return ""
-
-    content = getattr(message, "content", None)
-    if isinstance(content, str):
-        return content
-
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, dict):
-                text = item.get("text")
-                if isinstance(text, str) and text:
-                    parts.append(text)
-                continue
-
-            text_attr = getattr(item, "text", None)
-            if isinstance(text_attr, str) and text_attr:
-                parts.append(text_attr)
-        if parts:
-            return "".join(parts)
-
-    parsed = getattr(message, "parsed", None)
-    if parsed is None:
-        return ""
-    if isinstance(parsed, str):
-        return parsed
-    try:
-        return json.dumps(parsed, ensure_ascii=False)
-    except Exception:
-        return str(parsed)
-
-
-def _call_chat_completion_with_schema(
-    client: OpenAI,
-    kwargs: dict[str, Any],
-    schema: dict[str, Any],
-) -> Any:
-    name = str(schema.get("name") or "unnamed_schema")
-    body = schema.get("schema")
-    if not isinstance(body, dict):
-        raise ValueError(f"Schema '{name}' is missing a dict-valued 'schema' body.")
-
-    messages: list[dict[str, str]] = []
-    instructions = kwargs.get("instructions")
-    if isinstance(instructions, str) and instructions.strip():
-        messages.append({"role": "system", "content": instructions})
-    messages.append({"role": "user", "content": _coerce_input_to_text(kwargs.get("input", ""))})
-
-    chat_kwargs: dict[str, Any] = {
-        "model": kwargs.get("model"),
-        "messages": messages,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": name,
-                "schema": body,
-                "strict": True,
-            },
-        },
-    }
-
-    for key in (
-        "temperature",
-        "top_p",
-        "presence_penalty",
-        "frequency_penalty",
-        "max_tokens",
-        "max_completion_tokens",
-        "seed",
-        "stop",
-        "n",
-    ):
-        if key in kwargs and kwargs[key] is not None:
-            chat_kwargs[key] = kwargs[key]
-
-    extra_body = _merge_extra_body(client, kwargs)
-    if extra_body:
-        chat_kwargs["extra_body"] = extra_body
-
-    try:
-        response = client.chat.completions.create(**chat_kwargs)
-    except Exception as exc:
-        _classify_and_raise(exc)
-        raise
-
-    output_text = _extract_chat_completion_text(response)
-    if not output_text:
-        raise RuntimeError(
-            f"Chat Completions structured-output response was empty for schema '{name}'."
-        )
-
-    return _StructuredChatResponse(
-        output_text=output_text,
-        model=getattr(response, "model", None),
-        response=response,
-    )
-
-
-def _call_responses_with_schema(
-    client: OpenAI,
-    kwargs: dict[str, Any],
-    schema: dict[str, Any],
-) -> Any:
-    name = str(schema.get("name") or "unnamed_schema")
-    body = schema.get("schema")
-    if not isinstance(body, dict):
-        raise ValueError(f"Schema '{name}' is missing a dict-valued 'schema' body.")
-
-    response_kwargs: dict[str, Any] = {
-        **kwargs,
-        "text": {
-            **kwargs.get("text", {}),
-            "format": {
-                "type": "json_schema",
-                "name": name,
-                "schema": body,
-                "strict": True,
-            },
-        },
-    }
-
-    extra_body = _merge_extra_body(client, kwargs)
-    if extra_body:
-        response_kwargs["extra_body"] = extra_body
-
-    return call_with_param_fallback(client, response_kwargs)
 
 
 def parse_race_context(goal_text: str, today: Optional[date] = None) -> dict[str, Any]:
@@ -412,42 +193,43 @@ def call_with_param_fallback(client: OpenAI, kwargs: dict[str, Any]) -> Any:
 
 
 def call_with_schema(client: OpenAI, kwargs: dict[str, Any], schema: dict[str, Any]) -> Any:
-    schema_name = str(schema.get("name") or "unnamed_schema")
-    preferred = _structured_api_preference(client)
+    name, body = schema.get("name"), schema.get("schema")
 
-    if preferred == "responses":
-        structured_attempts = [
-            ("responses.text.format", _call_responses_with_schema),
-            ("chat.response_format", _call_chat_completion_with_schema),
-        ]
-    else:
-        structured_attempts = [
-            ("chat.response_format", _call_chat_completion_with_schema),
-            ("responses.text.format", _call_responses_with_schema),
-        ]
+    structured_attempts = [
+        (
+            "text.format",
+            {
+                **kwargs,
+                "text": {
+                    **kwargs.get("text", {}),
+                    "format": {
+                        "type": "json_schema",
+                        "name": name,
+                        "schema": body,
+                        "strict": True,
+                    },
+                },
+            },
+        ),
+        (
+            "response_format",
+            {
+                **kwargs,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": name, "strict": True, "schema": body},
+                },
+            },
+        ),
+    ]
 
-    attempted_modes: list[str] = []
-    last_unsupported: Exception | None = None
-
-    for label, caller in structured_attempts:
-        attempted_modes.append(label)
+    for label, kw in structured_attempts:
         try:
-            return caller(client, kwargs, schema)
+            return call_with_param_fallback(client, kw)
         except LLMUnsupportedParameterError as exc:
-            log.warning(
-                "Structured-output attempt skipped; schema=%s attempt=%s error=%s",
-                schema_name,
-                label,
-                exc,
-            )
-            last_unsupported = exc
-            continue
+            log.warning("Structured output mode %s unavailable; falling back: %s", label, exc)
 
-    raise StructuredOutputUnavailableError(
-        schema_name=schema_name,
-        attempted_modes=attempted_modes,
-        last_error=last_unsupported,
-    )
+    return call_with_param_fallback(client, kwargs)
 
 
 def extract_json_object(text: str) -> str:
@@ -634,7 +416,6 @@ def training_plan_to_text(obj: dict[str, Any]) -> str:
 
 
 __all__ = [
-    "StructuredOutputUnavailableError",
     "apply_primary_goal",
     "call_with_param_fallback",
     "call_with_schema",

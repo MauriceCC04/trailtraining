@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 from openai import OpenAI
-from pydantic import ValidationError
 
 import trailtraining.llm.coach_prompting as _coach_prompting
 from trailtraining import config
@@ -262,33 +261,24 @@ def _parse_machine_plan(
     cfg: CoachConfig,
     system_instructions: str,
 ) -> dict[str, Any]:
-    validation_error: ValidationError
     try:
-        parsed = json.loads(_extract_json_object(out_text))
-        return ensure_machine_plan_shape(parsed)
-    except ValidationError as exc:
-        validation_error = exc
-        log.warning(
-            "Machine-plan validation failed; attempting one structured repair: %s",
-            validation_error,
-        )
+        return ensure_machine_plan_shape(json.loads(_extract_json_object(out_text)))
+    except Exception as exc:
+        log.warning("Machine-plan JSON parse/shape failed; attempting repair: %s", exc)
 
-    repair_kwargs: dict[str, Any] = {
-        "model": cfg.model,
-        "instructions": system_instructions,
-        "input": (
-            "Your previous JSON parsed, but it did not validate against the target schema.\n"
-            "Re-emit ONLY corrected JSON and do not include any commentary.\n\n"
-            f"Schema:\n{json.dumps(MACHINE_PLAN_SCHEMA.get('schema'), indent=2, ensure_ascii=False)}\n\n"
-            f"Validation error:\n{validation_error}\n\n"
-            f"Previous output:\n{out_text}\n"
-        ),
-        "reasoning": {"effort": "none"},
-        "text": {"verbosity": "low"},
-        "temperature": 0.0,
-    }
-
-    repair_resp = _call_with_schema(client, repair_kwargs, MACHINE_PLAN_SCHEMA)
+    repair_resp = _call_with_param_fallback(
+        client,
+        {
+            "model": cfg.model,
+            "instructions": system_instructions,
+            "input": (
+                f"Return ONLY valid JSON matching this schema:\n{MACHINE_PLAN_SCHEMA.get('schema')}\n\n"
+                f"Your previous output was invalid. Fix it:\n{out_text}\n"
+            ),
+            "reasoning": {"effort": "none"},
+            "text": {"verbosity": "low"},
+        },
+    )
     repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
     return ensure_machine_plan_shape(json.loads(_extract_json_object(repaired)))
 
@@ -299,33 +289,24 @@ def _parse_plan_explanation(
     cfg: CoachConfig,
     system_instructions: str,
 ) -> dict[str, Any]:
-    validation_error: ValidationError
     try:
-        parsed = json.loads(_extract_json_object(out_text))
-        return ensure_plan_explanation_shape(parsed)
-    except ValidationError as exc:
-        validation_error = exc
-        log.warning(
-            "Plan-explanation validation failed; attempting one structured repair: %s",
-            validation_error,
-        )
+        return ensure_plan_explanation_shape(json.loads(_extract_json_object(out_text)))
+    except Exception as exc:
+        log.warning("Plan-explanation JSON parse/shape failed; attempting repair: %s", exc)
 
-    repair_kwargs: dict[str, Any] = {
-        "model": cfg.model,
-        "instructions": system_instructions,
-        "input": (
-            "Your previous JSON parsed, but it did not validate against the target schema.\n"
-            "Re-emit ONLY corrected JSON and do not include any commentary.\n\n"
-            f"Schema:\n{json.dumps(PLAN_EXPLANATION_SCHEMA.get('schema'), indent=2, ensure_ascii=False)}\n\n"
-            f"Validation error:\n{validation_error}\n\n"
-            f"Previous output:\n{out_text}\n"
-        ),
-        "reasoning": {"effort": "none"},
-        "text": {"verbosity": "low"},
-        "temperature": 0.0,
-    }
-
-    repair_resp = _call_with_schema(client, repair_kwargs, PLAN_EXPLANATION_SCHEMA)
+    repair_resp = _call_with_param_fallback(
+        client,
+        {
+            "model": cfg.model,
+            "instructions": system_instructions,
+            "input": (
+                f"Return ONLY valid JSON matching this schema:\n{PLAN_EXPLANATION_SCHEMA.get('schema')}\n\n"
+                f"Your previous output was invalid. Fix it:\n{out_text}\n"
+            ),
+            "reasoning": {"effort": "none"},
+            "text": {"verbosity": "low"},
+        },
+    )
     repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
     return ensure_plan_explanation_shape(json.loads(_extract_json_object(repaired)))
 

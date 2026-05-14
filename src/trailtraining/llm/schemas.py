@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 from typing import Any
 
 from trailtraining.contracts import (
@@ -19,45 +18,13 @@ _SNAPSHOT_KEYS = [
     "rhr_mean",
 ]
 
-_HARD_SESSION_TYPES = {"tempo", "intervals", "hills"}
-
-
-def _derive_day_flags(day_obj: dict[str, Any]) -> dict[str, Any]:
-    session_type_raw = day_obj.get("session_type")
-    session_type = session_type_raw.strip() if isinstance(session_type_raw, str) else ""
-
-    out = dict(day_obj)
-    out["is_rest_day"] = session_type == "rest"
-    out["is_hard_day"] = session_type in _HARD_SESSION_TYPES
-    return out
-
-
-def _with_derived_plan_day_flags(obj: Any) -> Any:
-    if not isinstance(obj, dict):
-        return obj
-
-    prepared = copy.deepcopy(obj)
-    plan = prepared.get("plan")
-    if not isinstance(plan, dict):
-        return prepared
-
-    days = plan.get("days")
-    if not isinstance(days, list):
-        return prepared
-
-    plan["days"] = [_derive_day_flags(day) if isinstance(day, dict) else day for day in days]
-    prepared["plan"] = plan
-    return prepared
-
 
 def ensure_training_plan_shape(obj: Any) -> dict[str, Any]:
-    prepared = _with_derived_plan_day_flags(obj)
-    return TrainingPlanArtifact.model_validate(prepared).model_dump(mode="python")
+    return TrainingPlanArtifact.model_validate(obj).model_dump(mode="python")
 
 
 def ensure_machine_plan_shape(obj: Any) -> dict[str, Any]:
-    prepared = _with_derived_plan_day_flags(obj)
-    return MachinePlanArtifact.model_validate(prepared).model_dump(mode="python")
+    return MachinePlanArtifact.model_validate(obj).model_dump(mode="python")
 
 
 def ensure_plan_explanation_shape(obj: Any) -> dict[str, Any]:
@@ -156,9 +123,9 @@ _WEEKLY_TOTALS_SCHEMA: dict[str, Any] = {
         "planned_elevation_m",
     ],
     "properties": {
-        "planned_distance_km": {"type": ["number", "null"]},
-        "planned_moving_time_hours": {"type": "number"},
-        "planned_elevation_m": {"type": ["number", "null"]},
+        "planned_distance_km": {"type": ["number", "null"], "minimum": 0},
+        "planned_moving_time_hours": {"type": "number", "minimum": 0},
+        "planned_elevation_m": {"type": ["number", "null"], "minimum": 0},
     },
 }
 
@@ -168,6 +135,8 @@ _MACHINE_DAY_SCHEMA: dict[str, Any] = {
     "required": [
         "date",
         "session_type",
+        "is_rest_day",
+        "is_hard_day",
         "duration_minutes",
         "target_intensity",
         "terrain",
@@ -191,12 +160,14 @@ _MACHINE_DAY_SCHEMA: dict[str, Any] = {
                 "cross",
             ],
         },
-        "duration_minutes": {"type": "integer"},
+        "is_rest_day": {"type": "boolean"},
+        "is_hard_day": {"type": "boolean"},
+        "duration_minutes": {"type": "integer", "minimum": 0, "maximum": 420},
         "target_intensity": {"type": "string"},
         "terrain": {"type": "string"},
         "workout": {"type": "string"},
-        "estimated_distance_km": {"type": ["number", "null"]},
-        "estimated_elevation_m": {"type": ["number", "null"]},
+        "estimated_distance_km": {"type": ["number", "null"], "minimum": 0},
+        "estimated_elevation_m": {"type": ["number", "null"], "minimum": 0},
     },
 }
 
@@ -207,6 +178,8 @@ _TRAINING_DAY_SCHEMA: dict[str, Any] = {
         "date",
         "title",
         "session_type",
+        "is_rest_day",
+        "is_hard_day",
         "duration_minutes",
         "target_intensity",
         "terrain",
@@ -233,14 +206,16 @@ _TRAINING_DAY_SCHEMA: dict[str, Any] = {
                 "cross",
             ],
         },
-        "duration_minutes": {"type": "integer"},
+        "is_rest_day": {"type": "boolean"},
+        "is_hard_day": {"type": "boolean"},
+        "duration_minutes": {"type": "integer", "minimum": 0, "maximum": 420},
         "target_intensity": {"type": "string"},
         "terrain": {"type": "string"},
         "workout": {"type": "string"},
         "purpose": {"type": "string"},
         "signal_ids": {"type": "array", "items": {"type": "string"}},
-        "estimated_distance_km": {"type": ["number", "null"]},
-        "estimated_elevation_m": {"type": ["number", "null"]},
+        "estimated_distance_km": {"type": ["number", "null"], "minimum": 0},
+        "estimated_elevation_m": {"type": ["number", "null"], "minimum": 0},
     },
 }
 
@@ -265,7 +240,7 @@ MACHINE_PLAN_SCHEMA: dict[str, Any] = {
                 "properties": {
                     "today": {"type": "string"},
                     "plan_start": {"type": "string"},
-                    "plan_days": {"type": "integer"},
+                    "plan_days": {"type": "integer", "minimum": 1, "maximum": 28},
                     "style": {"type": "string"},
                     "primary_goal": {"type": "string"},
                     "lifestyle_notes": {"type": "string"},
@@ -404,7 +379,7 @@ TRAINING_PLAN_SCHEMA: dict[str, Any] = {
                 "properties": {
                     "today": {"type": "string", "description": "YYYY-MM-DD"},
                     "plan_start": {"type": "string", "description": "YYYY-MM-DD"},
-                    "plan_days": {"type": "integer"},
+                    "plan_days": {"type": "integer", "minimum": 1, "maximum": 28},
                     "style": {"type": "string"},
                     "primary_goal": {"type": "string"},
                     "lifestyle_notes": {
@@ -500,8 +475,7 @@ def training_plan_output_contract_text() -> str:
         "- If data is missing, write it in data_notes; do NOT fabricate.\n"
         "- weekly_totals MUST reflect WEEK 1 values only (first 7 days).\n"
         "- planned_distance_km and planned_elevation_m MUST be null unless every non-rest day in week 1 includes matching estimated_distance_km / estimated_elevation_m values.\n"
-        "- Structured fields are authoritative: title/workout text MUST agree with session_type and duration_minutes.\n"
-        "- is_rest_day and is_hard_day are derived automatically from session_type.\n"
+        "- Structured fields are authoritative: title/workout text MUST agree with session_type, is_rest_day, is_hard_day, and duration_minutes.\n"
     )
 
 
@@ -515,7 +489,6 @@ def machine_plan_output_contract_text() -> str:
         "- Satisfy all hard constraints numerically.\n"
         "- weekly_totals MUST reflect week 1 only.\n"
         "- planned_distance_km and planned_elevation_m MUST be null unless every non-rest day in week 1 includes matching estimates.\n"
-        "- is_rest_day and is_hard_day are derived automatically from session_type.\n"
     )
 
 
