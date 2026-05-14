@@ -49,17 +49,6 @@ from trailtraining.util.state import _json_default
 log = logging.getLogger(__name__)
 
 
-SNAPSHOT_NUMERIC_FIELDS = (
-    "distance_km",
-    "moving_time_hours",
-    "elevation_m",
-    "activity_count",
-    "sleep_hours_mean",
-    "hrv_mean",
-    "rhr_mean",
-)
-
-
 def _structured_max_tokens() -> int:
     raw = (os.getenv("TRAILTRAINING_STRUCTURED_MAX_TOKENS") or "").strip()
     try:
@@ -271,172 +260,6 @@ def _apply_deterministic_readiness(
     if note not in data_notes:
         data_notes.append(note)
     plan_obj["data_notes"] = data_notes
-
-
-def _to_float(value: Any) -> Optional[float]:
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        text = value.strip().replace(",", "")
-        if not text:
-            return None
-        try:
-            return float(text)
-        except ValueError:
-            return None
-    return None
-
-
-def _to_activity_distance_km(value: Any) -> Optional[float]:
-    raw = _to_float(value)
-    if raw is None:
-        return None
-    return raw / 1000.0 if raw > 200 else raw
-
-
-def _to_activity_hours(value: Any) -> Optional[float]:
-    raw = _to_float(value)
-    if raw is None:
-        return None
-    if raw > 1000:
-        return raw / 3600.0
-    if raw > 24:
-        return raw / 60.0
-    return raw
-
-
-def _to_sleep_hours(value: Any) -> Optional[float]:
-    raw = _to_float(value)
-    if raw is None:
-        return None
-    if raw > 1000:
-        return raw / 3600.0
-    if raw > 24:
-        return raw / 60.0
-    return raw
-
-
-def _format_number(value: Optional[float], *, digits: int = 2, integer: bool = False) -> str:
-    if value is None:
-        return ""
-    if integer:
-        return str(int(round(value)))
-    text = f"{value:.{digits}f}".rstrip("0").rstrip(".")
-    return text
-
-
-def _mean(values: list[float]) -> Optional[float]:
-    return (sum(values) / len(values)) if values else None
-
-
-def _extract_sleep_metric(sleep_obj: dict[str, Any], keys: tuple[str, ...]) -> Optional[float]:
-    for key in keys:
-        if key not in sleep_obj:
-            continue
-        value = _to_float(sleep_obj.get(key))
-        if value is not None:
-            return value
-    return None
-
-
-def _window_from_combined(combined: list[dict[str, Any]], days: int) -> dict[str, str]:
-    window = combined[-days:] if len(combined) > days else list(combined)
-
-    activity_count = 0
-    distance_values: list[float] = []
-    moving_time_values: list[float] = []
-    elevation_values: list[float] = []
-    sleep_hours_values: list[float] = []
-    hrv_values: list[float] = []
-    rhr_values: list[float] = []
-
-    for day in window:
-        day_obj = _as_dict(day)
-        activities = _as_list(day_obj.get("activities"))
-        activity_count += len([a for a in activities if isinstance(a, dict)])
-        for activity in activities:
-            activity_obj = _as_dict(activity)
-            distance_km = _to_activity_distance_km(activity_obj.get("distance"))
-            if distance_km is not None:
-                distance_values.append(distance_km)
-            moving_hours = _to_activity_hours(activity_obj.get("moving_time"))
-            if moving_hours is not None:
-                moving_time_values.append(moving_hours)
-            elevation = _to_float(activity_obj.get("total_elevation_gain"))
-            if elevation is not None:
-                elevation_values.append(elevation)
-
-        sleep = _as_dict(day_obj.get("sleep"))
-        if sleep:
-            sleep_hours = _extract_sleep_metric(sleep, ("sleep_hours", "duration", "total_sleep"))
-            if sleep_hours is not None:
-                sleep_hours_values.append(_to_sleep_hours(sleep_hours) or sleep_hours)
-            hrv = _extract_sleep_metric(sleep, ("hrv", "average_hrv", "avg_hrv", "hrv_mean"))
-            if hrv is not None:
-                hrv_values.append(hrv)
-            rhr = _extract_sleep_metric(
-                sleep,
-                ("resting_hr", "rhr", "average_resting_heart_rate", "resting_heart_rate"),
-            )
-            if rhr is not None:
-                rhr_values.append(rhr)
-
-    return {
-        "distance_km": _format_number(sum(distance_values) if distance_values else None, digits=2),
-        "moving_time_hours": _format_number(
-            sum(moving_time_values) if moving_time_values else None,
-            digits=2,
-        ),
-        "elevation_m": _format_number(
-            sum(elevation_values) if elevation_values else None, digits=1
-        ),
-        "activity_count": str(activity_count) if activity_count else "0",
-        "sleep_hours_mean": _format_number(_mean(sleep_hours_values), digits=2),
-        "hrv_mean": _format_number(_mean(hrv_values), digits=1),
-        "rhr_mean": _format_number(_mean(rhr_values), digits=1),
-    }
-
-
-def _build_snapshot_notes(
-    last7: dict[str, str], baseline28: dict[str, str], combined: list[dict[str, Any]]
-) -> str:
-    baseline_days = min(28, len(combined))
-    parts: list[str] = []
-
-    def _append_summary(label: str, snap: dict[str, str]) -> None:
-        metrics: list[str] = []
-        if snap.get("activity_count"):
-            metrics.append(f"{snap['activity_count']} activities")
-        if snap.get("distance_km"):
-            metrics.append(f"{snap['distance_km']} km")
-        if snap.get("moving_time_hours"):
-            metrics.append(f"{snap['moving_time_hours']} h moving time")
-        if snap.get("elevation_m"):
-            metrics.append(f"{snap['elevation_m']} m gain")
-        if snap.get("sleep_hours_mean"):
-            metrics.append(f"{snap['sleep_hours_mean']} h mean sleep")
-        if snap.get("hrv_mean"):
-            metrics.append(f"HRV {snap['hrv_mean']}")
-        if snap.get("rhr_mean"):
-            metrics.append(f"RHR {snap['rhr_mean']}")
-        if metrics:
-            parts.append(f"{label}: " + ", ".join(metrics) + ".")
-        else:
-            parts.append(f"{label}: no usable telemetry available.")
-
-    _append_summary("Last 7 days", last7)
-    _append_summary(f"Baseline last {baseline_days} available days", baseline28)
-    return " ".join(parts)
-
-
-def _build_deterministic_snapshot(combined: list[dict[str, Any]]) -> dict[str, Any]:
-    last7 = _window_from_combined(combined, 7)
-    baseline28 = _window_from_combined(combined, 28)
-    return {
-        "last7": last7,
-        "baseline28": baseline28,
-        "notes": _build_snapshot_notes(last7, baseline28, combined),
-    }
 
 
 def _parse_training_plan(
@@ -929,7 +752,27 @@ def _run_training_plan_pipeline(
 
     guarded_stub: dict[str, Any] = {
         "meta": dict(_as_dict(machine_obj.get("meta"))),
-        "snapshot": _build_deterministic_snapshot(source_data.combined),
+        "snapshot": {
+            "last7": {
+                "distance_km": "",
+                "moving_time_hours": "",
+                "elevation_m": "",
+                "activity_count": "",
+                "sleep_hours_mean": "",
+                "hrv_mean": "",
+                "rhr_mean": "",
+            },
+            "baseline28": {
+                "distance_km": "",
+                "moving_time_hours": "",
+                "elevation_m": "",
+                "activity_count": "",
+                "sleep_hours_mean": "",
+                "hrv_mean": "",
+                "rhr_mean": "",
+            },
+            "notes": "",
+        },
         "readiness": {
             "status": _as_str((_as_dict(machine_obj.get("readiness"))).get("status")) or "steady",
             "rationale": "",
@@ -999,7 +842,6 @@ def _run_training_plan_pipeline(
         cfg,
         str(explain_kwargs.get("instructions") or ""),
     )
-    explanation_obj["snapshot"] = _build_deterministic_snapshot(source_data.combined)
 
     obj = _merge_machine_plan_and_explanations(
         machine_obj,

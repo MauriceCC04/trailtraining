@@ -11,6 +11,7 @@ from trailtraining.contracts import (
     PlanExplanationDay,
     Recovery,
     RiskItem,
+    Snapshot,
     TrainingPlanArtifact,
 )
 
@@ -30,6 +31,7 @@ _HARD_SESSION_TYPES = {"tempo", "intervals", "hills"}
 class _PlanExplanationStageArtifact(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    snapshot: Snapshot
     readiness_rationale: str
     readiness_signal_ids: list[str] = Field(default_factory=list)
     day_explanations: list[PlanExplanationDay] = Field(default_factory=list)
@@ -323,6 +325,7 @@ PLAN_EXPLANATION_STAGE_SCHEMA: dict[str, Any] = {
         "type": "object",
         "additionalProperties": False,
         "required": [
+            "snapshot",
             "readiness_rationale",
             "readiness_signal_ids",
             "day_explanations",
@@ -331,6 +334,16 @@ PLAN_EXPLANATION_STAGE_SCHEMA: dict[str, Any] = {
             "data_notes",
         ],
         "properties": {
+            "snapshot": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["last7", "baseline28", "notes"],
+                "properties": {
+                    "last7": _snapshot_obj_schema(),
+                    "baseline28": _snapshot_obj_schema(),
+                    "notes": {"type": "string"},
+                },
+            },
             "readiness_rationale": {"type": "string"},
             "readiness_signal_ids": {"type": "array", "items": {"type": "string"}},
             "day_explanations": {
@@ -605,7 +618,7 @@ def plan_explanation_stage_output_contract_text() -> str:
         "- Every day_explanations[].purpose must be justified by day_explanations[].signal_ids.\n"
         "- readiness_signal_ids must justify readiness_rationale.\n"
         "- If support is weak or missing, say so explicitly in the text or data_notes.\n"
-        "- Do NOT emit snapshot, citations, or claim_attributions in this stage; they are derived deterministically downstream.\n"
+        "- Do NOT emit citations or claim_attributions in this stage; they are derived deterministically downstream.\n"
     )
 
 

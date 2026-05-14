@@ -103,12 +103,8 @@ def _forecast_signal_rows(det_forecast: dict[str, Any]) -> list[dict[str, Any]]:
         ("sleep_days_7d", "forecast.recovery_capability.sleep_days_7d"),
         ("resting_hr_days_7d", "forecast.recovery_capability.resting_hr_days_7d"),
         ("hrv_days_7d", "forecast.recovery_capability.hrv_days_7d"),
-        ("sleep_days_28d", "forecast.recovery_capability.sleep_days_28d"),
-        ("resting_hr_days_28d", "forecast.recovery_capability.resting_hr_days_28d"),
-        ("hrv_days_28d", "forecast.recovery_capability.hrv_days_28d"),
     ]:
-        if input_key in inputs:
-            rows.append(_row(signal_id, inputs.get(input_key), f"inputs.{input_key}", "days"))
+        rows.append(_row(signal_id, inputs.get(input_key), f"inputs.{input_key}", "days"))
 
     risk = _as_dict(result.get("overreach_risk"))
     rows.extend(
@@ -389,10 +385,9 @@ def build_explainer_prompt_text(
             _safe_json_snippet(machine_plan, max_chars=30_000),
             "",
             "## Task",
-            "Write readiness rationale, day purposes, risks, recovery actions, and data notes against the locked plan.",
+            "Write explanations, purposes, risks, recovery actions, and data notes against the locked plan.",
             "Use signal_ids to justify the explanation fields you write.",
-            "Structured snapshot values are deterministic and will be filled downstream.",
-            "Do not emit snapshot, citations, or claim_attributions in this stage.",
+            "Do not emit citations or claim_attributions in this stage; those are derived deterministically downstream.",
             "Do not change dates, durations, session_type, is_rest_day, is_hard_day, target_intensity, terrain, workout, or weekly_totals.",
             "",
             "## Output Contract (STRICT)",
