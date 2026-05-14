@@ -29,10 +29,10 @@ from trailtraining.llm.presets import get_system_prompt
 from trailtraining.llm.rubrics import default_primary_goal_for_style
 from trailtraining.llm.schemas import (
     MACHINE_PLAN_SCHEMA,
-    PLAN_EXPLANATION_STAGE_SCHEMA,
+    PLAN_EXPLANATION_SCHEMA,
     TRAINING_PLAN_SCHEMA,
     ensure_machine_plan_shape,
-    ensure_plan_explanation_stage_shape,
+    ensure_plan_explanation_shape,
     ensure_training_plan_shape,
 )
 from trailtraining.llm.shared import apply_primary_goal as _apply_primary_goal
@@ -55,20 +55,6 @@ def _structured_max_tokens() -> int:
         return max(1, int(raw)) if raw else 4096
     except ValueError:
         return 4096
-
-
-def _structured_max_tokens_for_stage(stage: str) -> int:
-    stage_key = (stage or "").strip().upper()
-    default = 12288 if stage_key == "EXPLAINER" else 4096
-    raw = (
-        os.getenv(f"TRAILTRAINING_{stage_key}_MAX_TOKENS")
-        or os.getenv("TRAILTRAINING_STRUCTURED_MAX_TOKENS")
-        or ""
-    ).strip()
-    try:
-        return max(1, int(raw)) if raw else default
-    except ValueError:
-        return default
 
 
 def _log_structured_result(stage_name: str, resp: Any) -> None:
@@ -300,31 +286,31 @@ def _parse_machine_plan(
     cfg: CoachConfig,
     system_instructions: str,
 ) -> dict[str, Any]:
-    parse_error: Exception
+    validation_error: ValidationError
     try:
         parsed = json.loads(_extract_json_object(out_text))
         return ensure_machine_plan_shape(parsed)
-    except (ValidationError, json.JSONDecodeError) as exc:
-        parse_error = exc
+    except ValidationError as exc:
+        validation_error = exc
         log.warning(
-            "Machine-plan parse/validation failed; attempting one structured repair: %s",
-            parse_error,
+            "Machine-plan validation failed; attempting one structured repair: %s",
+            validation_error,
         )
 
     repair_kwargs: dict[str, Any] = {
         "model": cfg.model,
         "instructions": system_instructions,
         "input": (
-            "Your previous JSON was invalid or did not validate against the target schema.\n"
+            "Your previous JSON parsed, but it did not validate against the target schema.\n"
             "Re-emit ONLY corrected JSON and do not include any commentary.\n\n"
             f"Schema:\n{json.dumps(MACHINE_PLAN_SCHEMA.get('schema'), indent=2, ensure_ascii=False)}\n\n"
-            f"Error:\n{parse_error}\n\n"
+            f"Validation error:\n{validation_error}\n\n"
             f"Previous output:\n{out_text}\n"
         ),
         "reasoning": {"effort": "none"},
         "text": {"verbosity": "low"},
         "temperature": 0.0,
-        "max_tokens": _structured_max_tokens_for_stage("SOURCE"),
+        "max_tokens": _structured_max_tokens(),
     }
 
     repair_resp = _call_with_schema(client, repair_kwargs, MACHINE_PLAN_SCHEMA)
@@ -339,37 +325,37 @@ def _parse_plan_explanation(
     cfg: CoachConfig,
     system_instructions: str,
 ) -> dict[str, Any]:
-    parse_error: Exception
+    validation_error: ValidationError
     try:
         parsed = json.loads(_extract_json_object(out_text))
-        return ensure_plan_explanation_stage_shape(parsed)
-    except (ValidationError, json.JSONDecodeError) as exc:
-        parse_error = exc
+        return ensure_plan_explanation_shape(parsed)
+    except ValidationError as exc:
+        validation_error = exc
         log.warning(
-            "Plan-explanation parse/validation failed; attempting one structured repair: %s",
-            parse_error,
+            "Plan-explanation validation failed; attempting one structured repair: %s",
+            validation_error,
         )
 
     repair_kwargs: dict[str, Any] = {
         "model": cfg.model,
         "instructions": system_instructions,
         "input": (
-            "Your previous JSON was invalid or did not validate against the target schema.\n"
+            "Your previous JSON parsed, but it did not validate against the target schema.\n"
             "Re-emit ONLY corrected JSON and do not include any commentary.\n\n"
-            f"Schema:\n{json.dumps(PLAN_EXPLANATION_STAGE_SCHEMA.get('schema'), indent=2, ensure_ascii=False)}\n\n"
-            f"Error:\n{parse_error}\n\n"
+            f"Schema:\n{json.dumps(PLAN_EXPLANATION_SCHEMA.get('schema'), indent=2, ensure_ascii=False)}\n\n"
+            f"Validation error:\n{validation_error}\n\n"
             f"Previous output:\n{out_text}\n"
         ),
         "reasoning": {"effort": "none"},
         "text": {"verbosity": "low"},
         "temperature": 0.0,
-        "max_tokens": _structured_max_tokens_for_stage("EXPLAINER"),
+        "max_tokens": _structured_max_tokens(),
     }
 
-    repair_resp = _call_with_schema(client, repair_kwargs, PLAN_EXPLANATION_STAGE_SCHEMA)
+    repair_resp = _call_with_schema(client, repair_kwargs, PLAN_EXPLANATION_SCHEMA)
     _log_structured_result("plan_explanation_repair", repair_resp)
     repaired = getattr(repair_resp, "output_text", None) or str(repair_resp)
-    return ensure_plan_explanation_stage_shape(json.loads(_extract_json_object(repaired)))
+    return ensure_plan_explanation_shape(json.loads(_extract_json_object(repaired)))
 
 
 def _serialize_effective_constraints(
@@ -734,7 +720,7 @@ def _run_training_plan_pipeline(
         "instructions": get_system_prompt(cfg.style),
         "input": machine_prompt,
         "reasoning": {"effort": cfg.reasoning_effort},
-        "max_tokens": _structured_max_tokens_for_stage("SOURCE"),
+        "max_tokens": _structured_max_tokens(),
         "text": {"verbosity": cfg.verbosity},
     }
     if cfg.reasoning_effort == "none" and cfg.temperature is not None:
@@ -827,13 +813,13 @@ def _run_training_plan_pipeline(
         "instructions": get_system_prompt(cfg.style),
         "input": explainer_prompt,
         "reasoning": {"effort": cfg.reasoning_effort},
-        "max_tokens": _structured_max_tokens_for_stage("EXPLAINER"),
+        "max_tokens": _structured_max_tokens(),
         "text": {"verbosity": cfg.verbosity},
     }
     if cfg.reasoning_effort == "none" and cfg.temperature is not None:
         explain_kwargs["temperature"] = cfg.temperature
 
-    explain_resp = _call_with_schema(client, explain_kwargs, PLAN_EXPLANATION_STAGE_SCHEMA)
+    explain_resp = _call_with_schema(client, explain_kwargs, PLAN_EXPLANATION_SCHEMA)
     _log_structured_result("plan_explanation", explain_resp)
     explain_text = getattr(explain_resp, "output_text", None) or str(explain_resp)
     explanation_obj = _parse_plan_explanation(

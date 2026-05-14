@@ -3,15 +3,9 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
-
 from trailtraining.contracts import (
     MachinePlanArtifact,
     PlanExplanationArtifact,
-    PlanExplanationDay,
-    Recovery,
-    RiskItem,
-    Snapshot,
     TrainingPlanArtifact,
 )
 
@@ -26,18 +20,6 @@ _SNAPSHOT_KEYS = [
 ]
 
 _HARD_SESSION_TYPES = {"tempo", "intervals", "hills"}
-
-
-class _PlanExplanationStageArtifact(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    snapshot: Snapshot
-    readiness_rationale: str
-    readiness_signal_ids: list[str] = Field(default_factory=list)
-    day_explanations: list[PlanExplanationDay] = Field(default_factory=list)
-    recovery: Recovery
-    risks: list[RiskItem] = Field(default_factory=list)
-    data_notes: list[str] = Field(default_factory=list)
 
 
 def _derive_day_flags(day_obj: dict[str, Any]) -> dict[str, Any]:
@@ -80,10 +62,6 @@ def ensure_machine_plan_shape(obj: Any) -> dict[str, Any]:
 
 def ensure_plan_explanation_shape(obj: Any) -> dict[str, Any]:
     return PlanExplanationArtifact.model_validate(obj).model_dump(mode="python")
-
-
-def ensure_plan_explanation_stage_shape(obj: Any) -> dict[str, Any]:
-    return _PlanExplanationStageArtifact.model_validate(obj).model_dump(mode="python")
 
 
 def _snapshot_obj_schema() -> dict[str, Any]:
@@ -319,74 +297,6 @@ MACHINE_PLAN_SCHEMA: dict[str, Any] = {
     },
 }
 
-PLAN_EXPLANATION_STAGE_SCHEMA: dict[str, Any] = {
-    "name": "trailtraining_plan_explanation_stage_v1",
-    "schema": {
-        "type": "object",
-        "additionalProperties": False,
-        "required": [
-            "snapshot",
-            "readiness_rationale",
-            "readiness_signal_ids",
-            "day_explanations",
-            "recovery",
-            "risks",
-            "data_notes",
-        ],
-        "properties": {
-            "snapshot": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["last7", "baseline28", "notes"],
-                "properties": {
-                    "last7": _snapshot_obj_schema(),
-                    "baseline28": _snapshot_obj_schema(),
-                    "notes": {"type": "string"},
-                },
-            },
-            "readiness_rationale": {"type": "string"},
-            "readiness_signal_ids": {"type": "array", "items": {"type": "string"}},
-            "day_explanations": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["date", "title", "purpose", "signal_ids"],
-                    "properties": {
-                        "date": {"type": "string"},
-                        "title": {"type": "string"},
-                        "purpose": {"type": "string"},
-                        "signal_ids": {"type": "array", "items": {"type": "string"}},
-                    },
-                },
-            },
-            "recovery": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["actions", "signal_ids"],
-                "properties": {
-                    "actions": {"type": "array", "items": {"type": "string"}},
-                    "signal_ids": {"type": "array", "items": {"type": "string"}},
-                },
-            },
-            "risks": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["severity", "message", "signal_ids"],
-                    "properties": {
-                        "severity": {"type": "string", "enum": ["low", "medium", "high"]},
-                        "message": {"type": "string"},
-                        "signal_ids": {"type": "array", "items": {"type": "string"}},
-                    },
-                },
-            },
-            "data_notes": {"type": "array", "items": {"type": "string"}},
-        },
-    },
-}
-
 PLAN_EXPLANATION_SCHEMA: dict[str, Any] = {
     "name": "trailtraining_plan_explanation_v1",
     "schema": {
@@ -609,22 +519,9 @@ def machine_plan_output_contract_text() -> str:
     )
 
 
-def plan_explanation_stage_output_contract_text() -> str:
-    return (
-        "Output MUST be a single JSON object matching the plan-explanation stage schema.\n"
-        "This pass is explanation only.\n"
-        "- Do not change the locked machine plan.\n"
-        "- Use only signal_ids from the provided Signal registry.\n"
-        "- Every day_explanations[].purpose must be justified by day_explanations[].signal_ids.\n"
-        "- readiness_signal_ids must justify readiness_rationale.\n"
-        "- If support is weak or missing, say so explicitly in the text or data_notes.\n"
-        "- Do NOT emit citations or claim_attributions in this stage; they are derived deterministically downstream.\n"
-    )
-
-
 def plan_explanation_output_contract_text() -> str:
     return (
-        "Output MUST be a single JSON object matching the full plan-explanation schema.\n"
+        "Output MUST be a single JSON object matching the plan-explanation schema.\n"
         "This pass is explanation only.\n"
         "- Do not change the locked machine plan.\n"
         "- Every textual explanation claim must have claim-level attribution.\n"

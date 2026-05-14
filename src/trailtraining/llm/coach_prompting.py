@@ -12,7 +12,7 @@ from trailtraining.llm.guardrails import build_eval_constraints_block
 from trailtraining.llm.presets import get_task_prompt
 from trailtraining.llm.schemas import (
     machine_plan_output_contract_text,
-    plan_explanation_stage_output_contract_text,
+    plan_explanation_output_contract_text,
     training_plan_output_contract_text,
 )
 from trailtraining.llm.shared import race_context_section as _race_context_section
@@ -385,13 +385,11 @@ def build_explainer_prompt_text(
             _safe_json_snippet(machine_plan, max_chars=30_000),
             "",
             "## Task",
-            "Write explanations, purposes, risks, recovery actions, and data notes against the locked plan.",
-            "Use signal_ids to justify the explanation fields you write.",
-            "Do not emit citations or claim_attributions in this stage; those are derived deterministically downstream.",
+            "Write explanations, purposes, citations, risks, recovery actions, and claim-level attributions against the locked plan.",
             "Do not change dates, durations, session_type, is_rest_day, is_hard_day, target_intensity, terrain, workout, or weekly_totals.",
             "",
             "## Output Contract (STRICT)",
-            plan_explanation_stage_output_contract_text(),
+            plan_explanation_output_contract_text(),
             "",
         ]
     )
