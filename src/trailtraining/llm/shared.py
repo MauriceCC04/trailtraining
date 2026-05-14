@@ -176,9 +176,6 @@ def _extract_chat_completion_text(response: Any) -> str:
         return str(parsed)
 
 
-DEFAULT_STRUCTURED_MAX_TOKENS = int(os.getenv("TRAILTRAINING_STRUCTURED_MAX_TOKENS", "4096"))
-
-
 def _call_chat_completion_with_schema(
     client: OpenAI,
     kwargs: dict[str, Any],
@@ -203,7 +200,7 @@ def _call_chat_completion_with_schema(
     chat_kwargs: dict[str, Any] = {
         "model": public_kwargs.get("model"),
         "messages": messages,
-        "max_tokens": int(public_kwargs.get("max_tokens") or DEFAULT_STRUCTURED_MAX_TOKENS),
+        "max_tokens": int(public_kwargs.get("max_tokens") or 4096),
         "response_format": {
             "type": "json_schema",
             "json_schema": {
