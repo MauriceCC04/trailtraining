@@ -3,7 +3,6 @@
 ![CI](https://github.com/MauriceCC04/trailtraining/actions/workflows/ci.yml/badge.svg)
 
 A local-first Python CLI that turns Strava, Garmin, and Intervals.icu data into auditable coaching artifacts: structured plans, deterministic evaluation, readiness forecasting, soft rubric-based review, iterative revision, and calendar export.
-=======
 A local-first Python CLI that turns Strava/Garmin training data into auditable coaching artifacts — structured plans, deterministic evaluation, and iterative revision.
 
 Most AI coaching tools are generic and unverifiable. `trailtraining` is an attempt to build something better: every output is grounded in local data, checked against explicit constraints, and revisable from its own evaluation report.
@@ -24,7 +23,6 @@ Strava / Garmin / Intervals.icu
   combine → combined_summary.json
           → combined_rollups.json
           → formatted_personal_data.json
-=======
   combine → combined_rollups.json + formatted_personal_data.json
         │
         ▼
@@ -47,7 +45,6 @@ Strava / Garmin / Intervals.icu
         ├──► revised-plan-comparison.json
         ├──► selected-plan.json / .txt
         ├──► revised-plan-reeval.json
-=======
         ├──► revised-plan-reeval.json     ← delta score (with --auto-reeval)
         │
         ▼
@@ -136,7 +133,6 @@ This means the project supports both:
 **Revision is a revise-and-select step.** `revise-plan` generates a revised candidate from the original plan plus its eval report, then records pairwise comparison metadata. The final saved artifact may preserve the original plan if the pairwise judge prefers it. The comparison metadata and companion artifacts are written separately so that outcome is inspectable.
 
 **Lifestyle constraints are separate from race goals.** Schedule and access constraints are stored separately from the primary goal. The coach sees both during generation, and the evaluator scores the plan against the best plan possible given those constraints.
-=======
 ## Engineering decisions worth noting
 
 **Deterministic constraints before generation.** Ramp rate, hard-day spacing, and rest structure are enforced mathematically on the output — not left to the model's judgment. The model sees the constraints in its context; if it still violates them, guardrails correct in-place.
@@ -198,7 +194,6 @@ TRAILTRAINING_PLAN_DAYS="7"   # 7, 14, 21, or 28
 **`TRAILTRAINING_PRIMARY_GOAL`** accepts any free-form description of your target. If it contains a recognisable date (e.g. `July 30 2026`, `2026-09-12`, `in April`), the CLI automatically computes weeks-to-race and injects a recommended training phase (base / build / peak / taper) into every generated plan.
 
 **`TRAILTRAINING_LIFESTYLE_NOTES`** accepts schedule or access constraints that affect session placement. Keep this separate from the race goal: the goal describes *what* you're training for, the lifestyle notes describe *when and where* you can train.
-=======
 **`TRAILTRAINING_LIFESTYLE_NOTES`** accepts schedule or access constraints that affect session placement. These are stored in the plan artifact (`meta.lifestyle_notes`), injected into the generation prompt so the coach respects them, and passed to the soft evaluator so it doesn't penalize constrained choices. Keep this separate from your race goal — the goal describes *what* you're training for, the lifestyle notes describe *when and where* you can train.
 
 ---
@@ -285,7 +280,6 @@ Generated plans are expected to cite these signal IDs in structured fields and r
 ---
 
 ## 28-day plans
-=======
 ### 28-day plan
 
 ```bash
@@ -294,7 +288,6 @@ trailtraining --profile alice coach --prompt training-plan --plan-days 28
 ```
 
 Multi-week plans are split into phased weeks. Hard-day and rest-day constraints are enforced across rolling windows, not just single calendar weeks. `weekly_totals` reflects **week 1**, not the full 28-day sum, so ramp-rate validation remains meaningful.
-=======
 The plan is split into phased training weeks (build → build → peak → recovery). Hard-day and rest-day constraints are enforced per rolling 7-day window across all weeks. `weekly_totals` in the artifact reflects week 1 so ramp-rate validation remains accurate.
 
 ### Soft evaluation with inter-rater reliability
@@ -318,7 +311,6 @@ With `--soft-eval-runs N`, the evaluator runs `N` independent passes and reports
 ---
 
 ## Revision and automatic re-evaluation
-=======
 With `--soft-eval-runs N`, the evaluator runs N independent passes with temperature > 0. The report includes per-marker score variance; any marker with std > 0.5 on a 1–5 scale is printed as a warning. High variance means the rubric definition is ambiguous — it is useful for calibrating rubrics during development or before deploying a new prompt to production.
 
 ### Revision with automatic re-evaluation
@@ -341,7 +333,6 @@ With `--auto-reeval`, a re-evaluation delta file is written with:
 ---
 
 ## Calendar export
-=======
 With `--auto-reeval`, the revised plan is re-evaluated straight away against the deterministic constraint engine. A delta report is written to `revised-plan-reeval.json` with `original_score`, `revised_score`, `delta_score`, and any remaining violations. If the delta is negative the CLI prints a warning so you know to inspect the report before accepting the revision.
 
 ### Lifestyle constraints
@@ -385,7 +376,6 @@ trailtraining --profile alice plan-to-ics --start-hour 6 --output ~/Desktop/plan
 ├── selected-plan.json / .txt
 ├── revised-plan-reeval.json
 ├── training-plan.ics
-=======
 ├── revised-plan-reeval.json               ← delta score (--auto-reeval only)
 ├── training-plan.ics                      ← calendar export
 └── coach_brief_<recovery-status|meal-plan|session-review>.md
@@ -422,7 +412,6 @@ mypy src/trailtraining
 ruff check .
 ```
 
-=======
 ---
 
 ## Stack
@@ -440,7 +429,6 @@ Python 3.9–3.12 · Pydantic v2 · OpenAI SDK (OpenRouter) · Flask (OAuth call
 * Generation with structured JSON output works best with OpenAI models via OpenRouter
 * Revision quality still depends on the quality of both the first-pass plan and the evaluation report
 * Not medical software — outputs should be reviewed with common sense
-=======
 - Requires user-managed credentials and local setup to run
 - Load modeling is intentionally simple (moving time × intensity proxy)
 - Generation with structured JSON output requires OpenAI models via OpenRouter; non-OpenAI models lack reliable structured output support through the Responses API
