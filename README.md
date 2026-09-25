@@ -5,7 +5,6 @@
 A local-first Python CLI that turns Strava, Garmin, and Intervals.icu data into auditable coaching artifacts: structured plans, deterministic evaluation, readiness forecasting, soft rubric-based review, iterative revision, and calendar export.
 =======
 A local-first Python CLI that turns Strava/Garmin training data into auditable coaching artifacts — structured plans, deterministic evaluation, and iterative revision.
->>>>>>> parent of 190815a (Update README.md)
 
 Most AI coaching tools are generic and unverifiable. `trailtraining` is an attempt to build something better: every output is grounded in local data, checked against explicit constraints, and revisable from its own evaluation report.
 
@@ -28,7 +27,6 @@ Strava / Garmin / Intervals.icu
           → formatted_personal_data.json
 =======
   combine → combined_rollups.json + formatted_personal_data.json
->>>>>>> parent of 190815a (Update README.md)
         │
         ▼
   deterministic forecast (readiness + overreach risk)
@@ -53,7 +51,6 @@ Strava / Garmin / Intervals.icu
         ├──► revised-plan-reeval.json
 =======
         ├──► revised-plan-reeval.json     ← delta score (with --auto-reeval)
->>>>>>> parent of 190815a (Update README.md)
         │
         ▼
   plan-to-ics  ──► training-plan.ics → Calendar.app
@@ -166,7 +163,6 @@ This means the project supports both:
 **Structured contracts throughout.** Artifacts are validated with strict Pydantic models. The LLM is prompted with a JSON schema and the output is validated on the way out — malformed responses trigger a repair pass before anything is saved.
 
 **Graceful degradation.** The pipeline runs on activity-only data and improves when sleep, HRV, or resting HR are available. Missing recovery telemetry is surfaced explicitly in the output rather than silently omitted.
->>>>>>> parent of 190815a (Update README.md)
 
 ---
 
@@ -227,7 +223,6 @@ As of March 2026:
 | **Reliable + cheap** | `openai/gpt-5.4-mini` | `anthropic/claude-haiku-4.5` | Best default. Structured output works on first call. |
 | **Highest quality** | `openai/gpt-5.4`      | `anthropic/claude-haiku-4.5` | Better plan quality, same eval. |
 | **Fast iteration** | `openai/gpt-5.4-mini` | `anthropic/claude-haiku-4.5` + `--skip-synthesis` | Skips narrative synthesis LLM call. |
->>>>>>> parent of 190815a (Update README.md)
 
 ---
 
@@ -297,7 +292,6 @@ Generated plans are expected to cite these signal IDs in structured fields and r
 ## 28-day plans
 =======
 ### 28-day plan
->>>>>>> parent of 190815a (Update README.md)
 
 ```bash
 trailtraining --profile alice coach --prompt training-plan --plan-days 28
@@ -308,7 +302,6 @@ trailtraining --profile alice coach --prompt training-plan --plan-days 28
 Multi-week plans are split into phased weeks. Hard-day and rest-day constraints are enforced across rolling windows, not just single calendar weeks. `weekly_totals` reflects **week 1**, not the full 28-day sum, so ramp-rate validation remains meaningful.
 =======
 The plan is split into phased training weeks (build → build → peak → recovery). Hard-day and rest-day constraints are enforced per rolling 7-day window across all weeks. `weekly_totals` in the artifact reflects week 1 so ramp-rate validation remains accurate.
->>>>>>> parent of 190815a (Update README.md)
 
 ### Soft evaluation with inter-rater reliability
 
@@ -336,7 +329,6 @@ With `--soft-eval-runs N`, the evaluator runs `N` independent passes and reports
 With `--soft-eval-runs N`, the evaluator runs N independent passes with temperature > 0. The report includes per-marker score variance; any marker with std > 0.5 on a 1–5 scale is printed as a warning. High variance means the rubric definition is ambiguous — it is useful for calibrating rubrics during development or before deploying a new prompt to production.
 
 ### Revision with automatic re-evaluation
->>>>>>> parent of 190815a (Update README.md)
 
 ```bash
 # Revise and immediately check whether the revision helped
@@ -361,7 +353,6 @@ With `--auto-reeval`, a re-evaluation delta file is written with:
 With `--auto-reeval`, the revised plan is re-evaluated straight away against the deterministic constraint engine. A delta report is written to `revised-plan-reeval.json` with `original_score`, `revised_score`, `delta_score`, and any remaining violations. If the delta is negative the CLI prints a warning so you know to inspect the report before accepting the revision.
 
 ### Lifestyle constraints
->>>>>>> parent of 190815a (Update README.md)
 
 ```bash
 # Via .env (recommended)
@@ -406,7 +397,6 @@ trailtraining --profile alice plan-to-ics --start-hour 6 --output ~/Desktop/plan
 =======
 ├── revised-plan-reeval.json               ← delta score (--auto-reeval only)
 ├── training-plan.ics                      ← calendar export
->>>>>>> parent of 190815a (Update README.md)
 └── coach_brief_<recovery-status|meal-plan|session-review>.md
 ```
 
@@ -443,7 +433,6 @@ ruff check .
 ```
 
 =======
->>>>>>> parent of 190815a (Update README.md)
 ---
 
 ## Stack
@@ -467,7 +456,6 @@ Python 3.9–3.12 · Pydantic v2 · OpenAI SDK (OpenRouter) · Flask (OAuth call
 - Load modeling is intentionally simple (moving time × intensity proxy)
 - Generation with structured JSON output requires OpenAI models via OpenRouter; non-OpenAI models lack reliable structured output support through the Responses API
 - Not medical software — outputs should be reviewed with common sense
->>>>>>> parent of 190815a (Update README.md)
 
 ---
 
