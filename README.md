@@ -21,7 +21,6 @@ Strava / Garmin / Intervals.icu
    local ingestion
         │
         ▼
-<<<<<<< HEAD
   combine → combined_summary.json
           → combined_rollups.json
           → formatted_personal_data.json
@@ -45,7 +44,6 @@ Strava / Garmin / Intervals.icu
   revise-plan [--auto-reeval]
         │
         ├──► revised-plan.json / .txt
-<<<<<<< HEAD
         ├──► revised-plan-comparison.json
         ├──► selected-plan.json / .txt
         ├──► revised-plan-reeval.json
@@ -87,7 +85,6 @@ It also preserves separate original and revised evaluation artifacts so you can 
 
 ---
 
-<<<<<<< HEAD
 ## What the load model does
 
 The base daily load signal is intentionally simple and robust:
