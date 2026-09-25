@@ -2,7 +2,6 @@
 
 ![CI](https://github.com/MauriceCC04/trailtraining/actions/workflows/ci.yml/badge.svg)
 
-<<<<<<< HEAD
 A local-first Python CLI that turns Strava, Garmin, and Intervals.icu data into auditable coaching artifacts: structured plans, deterministic evaluation, readiness forecasting, soft rubric-based review, iterative revision, and calendar export.
 =======
 A local-first Python CLI that turns Strava/Garmin training data into auditable coaching artifacts — structured plans, deterministic evaluation, and iterative revision.
