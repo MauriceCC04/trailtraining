@@ -197,7 +197,6 @@ TRAILTRAINING_PLAN_DAYS="7"   # 7, 14, 21, or 28
 
 **`TRAILTRAINING_PRIMARY_GOAL`** accepts any free-form description of your target. If it contains a recognisable date (e.g. `July 30 2026`, `2026-09-12`, `in April`), the CLI automatically computes weeks-to-race and injects a recommended training phase (base / build / peak / taper) into every generated plan.
 
-<<<<<<< HEAD
 **`TRAILTRAINING_LIFESTYLE_NOTES`** accepts schedule or access constraints that affect session placement. Keep this separate from the race goal: the goal describes *what* you're training for, the lifestyle notes describe *when and where* you can train.
 =======
 **`TRAILTRAINING_LIFESTYLE_NOTES`** accepts schedule or access constraints that affect session placement. These are stored in the plan artifact (`meta.lifestyle_notes`), injected into the generation prompt so the coach respects them, and passed to the soft evaluator so it doesn't penalize constrained choices. Keep this separate from your race goal — the goal describes *what* you're training for, the lifestyle notes describe *when and where* you can train.
@@ -246,7 +245,6 @@ trailtraining --profile alice run-training-cycle
 
 Other prompts: `recovery-status`, `meal-plan`, `session-review`.
 
-<<<<<<< HEAD
 ---
 
 ## Forecast outputs
@@ -295,7 +293,6 @@ trailtraining --profile alice coach --prompt training-plan --plan-days 28
 # or set TRAILTRAINING_PLAN_DAYS=28 in your .env to make it the default
 ```
 
-<<<<<<< HEAD
 Multi-week plans are split into phased weeks. Hard-day and rest-day constraints are enforced across rolling windows, not just single calendar weeks. `weekly_totals` reflects **week 1**, not the full 28-day sum, so ramp-rate validation remains meaningful.
 =======
 The plan is split into phased training weeks (build → build → peak → recovery). Hard-day and rest-day constraints are enforced per rolling 7-day window across all weeks. `weekly_totals` in the artifact reflects week 1 so ramp-rate validation remains accurate.
@@ -316,7 +313,6 @@ trailtraining --profile alice eval-coach --soft-eval --skip-synthesis
 trailtraining --profile alice eval-coach --soft-eval --no-parallel-batches
 ```
 
-<<<<<<< HEAD
 With `--soft-eval-runs N`, the evaluator runs `N` independent passes and reports per-marker score variance. High variance means the rubric definition is ambiguous and probably needs tightening.
 
 ---
@@ -332,7 +328,6 @@ With `--soft-eval-runs N`, the evaluator runs N independent passes with temperat
 trailtraining --profile alice revise-plan --auto-reeval
 ```
 
-<<<<<<< HEAD
 `revise-plan` uses the original training plan plus its evaluation report to generate a revised candidate. It also writes comparison metadata so you can inspect whether the revised candidate or the original was preferred in pairwise judging.
 
 With `--auto-reeval`, a re-evaluation delta file is written with:
@@ -386,7 +381,6 @@ trailtraining --profile alice plan-to-ics --start-hour 6 --output ~/Desktop/plan
 ├── eval_report.original.json          # when using the unified cycle
 ├── eval_report.revised.json           # when using the unified cycle
 ├── revised-plan.json / .txt
-<<<<<<< HEAD
 ├── revised-plan-comparison.json
 ├── selected-plan.json / .txt
 ├── revised-plan-reeval.json
@@ -422,7 +416,6 @@ Two markers carry explicit **failure conditions** that trigger a score of 1 rega
 
 When `TRAILTRAINING_LIFESTYLE_NOTES` is set, the evaluator receives the constraints alongside the rubrics and adjusts scoring accordingly — road sessions forced by schedule constraints are not penalized under `trail_specificity`, and cycling sessions are not flagged under `non_competing_focus` when the schedule makes them the sensible weekday option.
 
-<<<<<<< HEAD
 ```bash
 pytest -q
 mypy src/trailtraining
@@ -440,7 +433,6 @@ Python 3.9–3.12 · Pydantic v2 · OpenAI SDK (OpenRouter) · Flask (OAuth call
 
 ## Limitations
 
-<<<<<<< HEAD
 * Requires user-managed credentials and local setup to run
 * Base daily load is intentionally simple: `moving_time × intensity proxy`
 * ATL / CTL / TSB are only as good as that underlying daily load signal
